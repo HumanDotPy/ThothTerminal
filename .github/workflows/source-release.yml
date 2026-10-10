@@ -1,0 +1,58 @@
+name: Publish reviewed source release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag matching the project version
+        required: true
+        default: v0.3.1-beta.1
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Export and verify the tagged source
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, pathlib, subprocess, tomllib, zipfile
+          version = tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version']
+          assert os.environ['RELEASE_TAG'] == 'v' + version
+          subprocess.run(['python', 'scripts/public_release.py'], check=True)
+          directory = pathlib.Path('dist/public-release')
+          archive = next(directory.glob('*.zip'))
+          with zipfile.ZipFile(archive) as bundle:
+              receipt_name = next(name for name in bundle.namelist() if name.endswith('/PUBLIC_RELEASE_MANIFEST.json'))
+              receipt_bytes = bundle.read(receipt_name)
+              receipt = json.loads(receipt_bytes)
+              assert receipt['dirty_preview'] is False
+              prefix = receipt_name.rsplit('/', 1)[0] + '/'
+              for name, item in receipt['files'].items():
+                  payload = bundle.read(prefix + name)
+                  assert len(payload) == item['bytes']
+                  assert hashlib.sha256(payload).hexdigest() == item['sha256']
+          canonical = directory / f'thoth-terminal-{version}-source.zip'
+          archive.rename(canonical)
+          (directory / 'PUBLIC_RELEASE_MANIFEST.json').write_bytes(receipt_bytes)
+          (directory / (canonical.name + '.sha256')).write_text(hashlib.sha256(canonical.read_bytes()).hexdigest() + '  ' + canonical.name + '\n')
+          print(f'Verified {len(receipt["files"])} source files at {receipt["git_sha"]}')
+          PY
+      - name: Upload verified assets and publish the beta
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          gh release upload "$RELEASE_TAG" dist/public-release/*.zip dist/public-release/*.sha256 dist/public-release/PUBLIC_RELEASE_MANIFEST.json --clobber
+          gh release edit "$RELEASE_TAG" --draft=false --prerelease
