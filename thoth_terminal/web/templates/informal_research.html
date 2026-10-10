@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-section informal-surface">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">Working research</p>
+      <h1>Informal Research</h1>
+      <p class="muted">Useful synthesis, failed canonical writes, and promotion candidates that are not yet formal reports.</p>
+    </div>
+  </div>
+
+  <form class="filter-bar" method="get" action="/informal-research">
+    <input type="search" name="q" placeholder="Search informal documents" value="{{ filters.q }}" />
+    <select name="status">
+      <option value="">All statuses</option>
+      {% for value in ['active', 'promoted', 'archived'] %}
+        <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ value }}</option>
+      {% endfor %}
+    </select>
+    <select name="category">
+      <option value="">All categories</option>
+      {% for row in categories %}
+        <option value="{{ row }}" {% if filters.category == row %}selected{% endif %}>{{ row }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Filter</button>
+  </form>
+
+  <div class="informal-summary">
+    <div><b>{{ docs|length }}</b><span>visible documents</span></div>
+    <div><b>{{ docs|selectattr('status', 'equalto', 'active')|list|length }}</b><span>active</span></div>
+    <div><b>{{ docs|selectattr('status', 'equalto', 'promoted')|list|length }}</b><span>promoted</span></div>
+    <div><b>{{ docs|selectattr('failure_reason')|list|length }}</b><span>needs review</span></div>
+  </div>
+  <div class="informal-list">
+    {% for row in docs %}
+      <article class="informal-row">
+        <div class="informal-state"><span class="chip">{{ row.status }}</span><small>{{ row.word_count }} words</small></div>
+        <div class="informal-main">
+          <h2><a href="/informal-research/{{ row.doc_key }}">{{ row.title }}</a></h2>
+          {% if row.summary %}<p>{{ row.summary }}</p>{% endif %}
+          <div class="informal-meta"><span>{{ row.subject or "Unscoped" }}</span>{% if row.category %}<span>{{ row.category }}</span>{% endif %}<time>{{ row.updated_at }}</time></div>
+        </div>
+        <div class="informal-action">
+          {% if row.failure_reason %}<b>Write needs review</b><p>{{ row.failure_reason[:180] }}{% if row.failure_reason|length > 180 %}...{% endif %}</p>{% elif row.promotion_target %}<b>Promotion candidate</b><p>{{ row.promotion_target }}</p>{% else %}<span class="muted">Working synthesis</span>{% endif %}
+          {% if row.retry_payload %}<span class="chip">retry available</span>{% endif %}
+        </div>
+      </article>
+    {% else %}<div class="empty-state">No informal research documents yet.</div>{% endfor %}
+  </div>
+</section>
+{% endblock %}

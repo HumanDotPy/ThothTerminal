@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="hd">
+    <h2>Notification Rules</h2>
+    <span class="pill">{{ rules|length }}</span>
+    <div class="btnrow" style="margin-left:auto;">
+      <a class="btn" href="/alerts">Discovery</a>
+      <a class="btn" href="/notifications/inbox">Inbox</a>
+    </div>
+  </div>
+  <div class="bd">
+    {% if rules|length > 0 %}
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Rule</th>
+            <th>Action</th>
+            <th>Enabled</th>
+            <th>Filters</th>
+            <th>Quiet hours</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rules %}
+            <tr>
+              <td>{{ r.id }}</td>
+              <td>{{ r.name }}</td>
+              <td>{{ r.action }}</td>
+              <td>{{ 'yes' if r.enabled else 'no' }}</td>
+              <td>
+                {% if r.source_ids and r.source_ids|length > 0 %}sources={{ r.source_ids|join(',') }}{% endif %}
+                {% if r.domain_slugs and r.domain_slugs|length > 0 %} domains={{ r.domain_slugs|join(',') }}{% endif %}
+                {% if r.tag_slugs and r.tag_slugs|length > 0 %} tags={{ r.tag_slugs|join(',') }}{% endif %}
+                {% if r.entity_ids and r.entity_ids|length > 0 %} entities={{ r.entity_ids|join(',') }}{% endif %}
+                {% if r.keyword_regex %} regex={{ r.keyword_regex }}{% endif %}
+              </td>
+              <td>
+                <form method="post" action="/notifications/{{ r.id }}/update" class="btnrow" style="gap:6px;">
+                  <input type="text" name="quiet_start" value="{{ r.quiet_start or '' }}" placeholder="22:00" style="width:70px;" />
+                  <input type="text" name="quiet_end" value="{{ r.quiet_end or '' }}" placeholder="07:00" style="width:70px;" />
+                  <input type="text" name="quiet_tz" value="{{ r.quiet_tz or '' }}" placeholder="UTC" style="width:90px;" />
+                  <button class="btn" type="submit">Save</button>
+                </form>
+              </td>
+              <td>
+                <div class="btnrow">
+                  <form method="post" action="/notifications/{{ r.id }}/toggle">
+                    <button class="btn" type="submit">{{ 'Disable' if r.enabled else 'Enable' }}</button>
+                  </form>
+                  <form method="post" action="/notifications/{{ r.id }}/delete" onsubmit="return confirm('Delete rule?');">
+                    <button class="btn" type="submit">Delete</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div style="color:var(--muted);font-family:var(--mono);font-size:12px;">No rules yet.</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="panel" style="margin-top:14px;">
+  <div class="hd"><h2>New Rule</h2></div>
+  <div class="bd">
+    <form method="post" action="/notifications/new">
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>Name</label>
+          <input type="text" name="name" placeholder="HBM alerts" required />
+        </div>
+        <div class="field">
+          <label>Action</label>
+          <select name="action">
+            <option value="badge_only">badge_only</option>
+            <option value="toast" selected>toast</option>
+            <option value="sound">sound</option>
+            <option value="toast+sound">toast+sound</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>Sources (IDs or names, comma-separated)</label>
+          <input type="text" name="sources" placeholder="trendforce_presscenter, amd_newsroom" />
+        </div>
+        <div class="field">
+          <label>Domains (slugs)</label>
+          <input type="text" name="domains" placeholder="memory, advanced_packaging" />
+        </div>
+      </div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>Tags (slugs)</label>
+          <input type="text" name="tags" placeholder="watch, early_signal" />
+        </div>
+        <div class="field">
+          <label>Entities (IDs or names)</label>
+          <input type="text" name="entities" placeholder="HBM, CoWoS" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Keyword regex (optional)</label>
+        <input type="text" name="keyword_regex" placeholder="HBM4|CoWoS|allocation" />
+      </div>
+      <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>Quiet start (optional)</label>
+          <input type="text" name="quiet_start" placeholder="22:00" />
+        </div>
+        <div class="field">
+          <label>Quiet end (optional)</label>
+          <input type="text" name="quiet_end" placeholder="07:00" />
+        </div>
+        <div class="field">
+          <label>Timezone (optional)</label>
+          <input type="text" name="quiet_tz" placeholder="UTC or America/New_York" />
+        </div>
+      </div>
+      <div class="btnrow" style="justify-content:flex-end;">
+        <button class="btn primary" type="submit">Create</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

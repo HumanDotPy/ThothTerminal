@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% block content %}
+{% set active_gap_scope = gap_scope_filter|default('active_universe') %}
+{% set gap_counts = gap_scope_counts|default({}) %}
+<div class="calendar-shell">
+  <section class="panel">
+    <div class="hd">
+      <div>
+        <h2>Investor Calendar</h2>
+        <span class="muted">{{ catalysts|length }} shown · {{ catalyst_count }} total catalysts · {{ memo_count }} memos</span>
+      </div>
+      <form method="post" action="/calendar/sync">
+        <button class="btn" type="submit">Sync</button>
+      </form>
+    </div>
+    <div class="bd">
+      <div class="calendar-filters">
+        <a class="filter-chip {{ 'active' if view == 'upcoming' else '' }}" href="/calendar?view=upcoming{% if kind_filter %}&kind={{ kind_filter }}{% endif %}&gap_scope={{ active_gap_scope }}">Upcoming</a>
+        <a class="filter-chip {{ 'active' if view == 'recent' else '' }}" href="/calendar?view=recent{% if kind_filter %}&kind={{ kind_filter }}{% endif %}&gap_scope={{ active_gap_scope }}">Recent</a>
+        <a class="filter-chip {{ 'active' if view == 'all' else '' }}" href="/calendar?view=all{% if kind_filter %}&kind={{ kind_filter }}{% endif %}&gap_scope={{ active_gap_scope }}">All</a>
+      </div>
+      <div class="calendar-filters">
+        <a class="filter-chip {{ 'active' if not kind_filter else '' }}" href="/calendar?view={{ view }}&gap_scope={{ active_gap_scope }}">All Kinds</a>
+        <a class="filter-chip {{ 'active' if kind_filter == 'earnings' else '' }}" href="/calendar?view={{ view }}&kind=earnings&gap_scope={{ active_gap_scope }}">Earnings</a>
+        <a class="filter-chip {{ 'active' if kind_filter == 'ipo' else '' }}" href="/calendar?view={{ view }}&kind=ipo&gap_scope={{ active_gap_scope }}">IPO</a>
+        <a class="filter-chip {{ 'active' if kind_filter == 'manual' else '' }}" href="/calendar?view={{ view }}&kind=manual&gap_scope={{ active_gap_scope }}">Manual</a>
+      </div>
+      {% if catalysts %}
+        <div class="calendar-table">
+          <div class="calendar-row calendar-head">
+            <span>Date</span>
+            <span>Priority</span>
+            <span>Kind</span>
+            <span>Title</span>
+            <span>Evidence</span>
+            <span>Status</span>
+          </div>
+          {% for row in catalysts %}
+            <div class="calendar-row">
+              <span>{{ row.event_date or 'TBD' }}</span>
+              <span>{{ row.priority }}</span>
+              <span>{{ row.catalyst_kind }}</span>
+              <span>
+                {% if row.source_url %}<a href="{{ row.source_url }}" target="_blank" rel="noopener noreferrer">{{ row.title }}</a>{% else %}{{ row.title }}{% endif %}
+                {% if row.summary %}<small>{{ row.summary }}</small>{% endif %}
+              </span>
+              <span>{{ row.evidence_tier or row.source_kind or 'manual' }}</span>
+              <span>{{ row.status_label or row.status }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state">No catalysts in this window.</div>
+      {% endif %}
+    </div>
+  </section>
+
+  <aside class="panel">
+    <div class="hd"><h2>Add Catalyst</h2></div>
+    <div class="bd">
+      <form class="calendar-form" method="post" action="/calendar/catalysts">
+        <label>Title<input name="title" required /></label>
+        <label>Ticker<input name="ticker" /></label>
+        <label>Date<input name="event_date" type="date" /></label>
+        <label>Kind
+          <select name="catalyst_kind">
+            <option value="manual">manual</option>
+            <option value="earnings">earnings</option>
+            <option value="product">product</option>
+            <option value="regulatory">regulatory</option>
+            <option value="ipo">ipo</option>
+            <option value="valuation">valuation</option>
+          </select>
+        </label>
+        <label>Evidence
+          <select name="evidence_tier">
+            <option value="">unclassified</option>
+            <option value="official_regulatory">official_regulatory</option>
+            <option value="issuer_disclosure">issuer_disclosure</option>
+            <option value="call_transcript">call_transcript</option>
+            <option value="professional_analyst_media">professional_analyst_media</option>
+            <option value="professional_media">professional_media</option>
+          </select>
+        </label>
+        <label>Source URL<input name="source_url" /></label>
+        <label>Summary<textarea name="summary" rows="4"></textarea></label>
+        <div class="calendar-form-row">
+          <label>Priority<input name="priority" type="number" min="1" max="50" value="5" /></label>
+          <label>Confidence<input name="confidence" type="number" min="0" max="1" step="0.01" /></label>
+        </div>
+        <button class="btn primary" type="submit">Add</button>
+      </form>
+    </div>
+  </aside>
+
+  <section class="panel calendar-gaps">
+    <div class="hd">
+      <div>
+        <h2>Open Gaps</h2>
+        <span class="muted">Decision-spine coverage queue · {{ active_gap_scope|replace('_', ' ') }}</span>
+      </div>
+    </div>
+    <div class="bd">
+      <div class="calendar-filters">
+        <a class="filter-chip {{ 'active' if active_gap_scope == 'active_universe' else '' }}" href="/calendar?view={{ view }}{% if kind_filter %}&kind={{ kind_filter }}{% endif %}&gap_scope=active_universe">Universe {{ gap_counts.get('active_universe', 0) }}</a>
+        <a class="filter-chip {{ 'active' if active_gap_scope == 'off_universe' else '' }}" href="/calendar?view={{ view }}{% if kind_filter %}&kind={{ kind_filter }}{% endif %}&gap_scope=off_universe">Backlog {{ gap_counts.get('off_universe', 0) }}</a>
+        <a class="filter-chip {{ 'active' if active_gap_scope == 'manual' else '' }}" href="/calendar?view={{ view }}{% if kind_filter %}&kind={{ kind_filter }}{% endif %}&gap_scope=manual">Manual {{ gap_counts.get('manual', 0) }}</a>
+        <a class="filter-chip {{ 'active' if active_gap_scope == 'all' else '' }}" href="/calendar?view={{ view }}{% if kind_filter %}&kind={{ kind_filter }}{% endif %}&gap_scope=all">All</a>
+      </div>
+      {% if open_gaps %}
+        <div class="stack-list">
+          {% for gap in open_gaps %}
+            <div class="stack-row">
+              <div class="stack-title">{{ gap.title }}</div>
+              <div class="stack-meta">
+                <span>{{ gap.gap_kind }}</span>
+                <span>severity {{ gap.severity }}</span>
+                <span>{{ gap.queue_scope|replace('_', ' ') }}</span>
+                {% if gap.updated_at %}<span data-utc="{{ gap.updated_at }}">{{ gap.updated_at.strftime("%Y-%m-%d %H:%M") }}</span>{% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state">No open gaps.</div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+
+<style>
+.calendar-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 14px;
+  align-items: start;
+}
+.calendar-gaps {
+  grid-column: 1 / -1;
+}
+.calendar-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.calendar-table {
+  display: grid;
+  gap: 6px;
+}
+.calendar-row {
+  display: grid;
+  grid-template-columns: 96px 72px 110px minmax(220px, 1fr) 180px 90px;
+  gap: 10px;
+  align-items: start;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(7,10,13,.34);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.calendar-head {
+  color: var(--muted);
+  text-transform: uppercase;
+  font-size: 10px;
+  background: transparent;
+}
+.calendar-row small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+  white-space: normal;
+}
+.calendar-form {
+  display: grid;
+  gap: 10px;
+}
+.calendar-form label {
+  display: grid;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.calendar-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 980px) {
+  .calendar-shell {
+    grid-template-columns: 1fr;
+  }
+  .calendar-row {
+    grid-template-columns: 80px 56px 86px minmax(0, 1fr);
+  }
+  .calendar-row span:nth-child(5),
+  .calendar-row span:nth-child(6) {
+    grid-column: span 2;
+  }
+}
+</style>
+{% endblock %}

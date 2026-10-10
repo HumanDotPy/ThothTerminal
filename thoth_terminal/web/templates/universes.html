@@ -1,0 +1,1769 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="universe-shell" data-selected-slug="{{ selected.slug if selected else '' }}" data-universe-id="{{ selected.id if selected else 0 }}">
+  <section class="universe-rail panel">
+    <div class="hd">
+      <div>
+        <h2>Universes</h2>
+        <span class="muted">Local semantic watchlists</span>
+      </div>
+      <button class="btn" type="button" id="new-universe-btn">New</button>
+    </div>
+    <div class="bd">
+      <div class="universe-tabs">
+        <button class="filter-chip active" type="button" data-tab="thoth">Thoth Universes</button>
+        <button class="filter-chip" type="button" data-tab="ibkr">IBKR Watchlists</button>
+      </div>
+
+      <div id="thoth-tab">
+        <div class="universe-list" id="universe-list">
+          {% for universe in universes %}
+            <a class="universe-link {{ 'active' if selected and selected.slug == universe.slug else '' }}" href="/universes?slug={{ universe.slug }}" draggable="true" data-drag-kind="universe" data-universe-id="{{ universe.id }}" data-universe-name="{{ universe.name }}" data-universe-description="{{ universe.description or '' }}">
+              <span class="universe-link-name">{{ universe.name }}</span>
+              <strong>{{ universe.row_count }}</strong>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div id="ibkr-tab" hidden>
+        <div class="ibkr-watchlist-status">
+          <span>{{ 'enabled' if ibkr_status.get('enabled') else 'disabled' }}</span>
+          <strong>{{ ibkr_status.get('mode') }}</strong>
+        </div>
+        <button class="btn" type="button" id="load-ibkr-watchlists">Load IBKR Watchlists</button>
+        <div class="ibkr-watchlists" id="ibkr-watchlists"></div>
+      </div>
+    </div>
+  </section>
+
+  <main class="universe-main panel">
+    <div class="hd">
+      <div>
+        <h2 id="universe-title">{{ selected.name if selected else 'No universe' }}</h2>
+        <span class="muted" id="universe-subtitle">{{ selected.description if selected and selected.description else 'Build sector and thesis-aware instrument tables.' }}</span>
+      </div>
+      <div class="btnrow">
+        <button class="btn" type="button" id="add-section-btn" {{ '' if selected else 'disabled' }}>Add Section</button>
+        <button class="btn" type="button" id="toggle-section-reorder-btn" {{ '' if selected else 'disabled' }}>Reorder Sections</button>
+        <button class="btn" type="button" id="normalize-ibkr-btn" {{ '' if selected else 'disabled' }}>Repair IBKR</button>
+        <button class="btn" type="button" id="reconcile-providers-btn" {{ '' if selected else 'disabled' }}>Link IBKR</button>
+        <button class="btn primary" type="button" id="refresh-universe-btn" {{ '' if selected else 'disabled' }}>Refresh</button>
+      </div>
+    </div>
+    <div class="bd">
+      {% if selected %}
+        <div class="add-row-strip">
+          <select id="section-select" aria-label="Section">
+            {% for section in selected.sections %}
+              <option value="{{ section.id }}">{{ section.name }}</option>
+            {% endfor %}
+          </select>
+          <div class="universe-search-box">
+            <input id="instrument-search" type="text" autocomplete="off" placeholder="Search ticker, company, private company, or IBKR contract" />
+            <div class="candidate-menu" id="candidate-menu" hidden></div>
+          </div>
+          <input id="row-role" type="text" placeholder="Role, e.g. Equipment" list="role-suggestions" />
+          <input id="row-note" type="text" placeholder="Note, e.g. TC bonding equipment leader" />
+          <button class="btn primary" type="button" id="add-row-btn">Add</button>
+          <datalist id="role-suggestions"></datalist>
+        </div>
+
+        <div id="universe-sections" class="universe-sections">
+          {% for section in selected.sections %}
+            <section class="universe-section" data-section-id="{{ section.id }}" data-section-name="{{ section.name }}" data-section-description="{{ section.description or '' }}" data-drag-kind="section">
+              <div class="universe-section-head">
+                <div>
+                  <h3>{{ section.name }}</h3>
+                  {% if section.description %}
+                    <span>{{ section.description }}</span>
+                  {% endif %}
+                </div>
+                <div class="section-actions">
+                  <strong>{{ section.rows|length }}</strong>
+                  <button class="btn icon-btn section-edit-btn" type="button" data-section-id="{{ section.id }}" data-section-name="{{ section.name }}" data-section-description="{{ section.description or '' }}">Edit</button>
+                  <button class="btn icon-btn danger section-delete-btn" type="button" data-section-id="{{ section.id }}" data-section-name="{{ section.name }}">Delete</button>
+                </div>
+              </div>
+              <div class="universe-table">
+                <div class="universe-row universe-row-head">
+                  <span>Name</span>
+                  <span>Role</span>
+                  <span>Note</span>
+                  <span>Last</span>
+                  <span>Chg %</span>
+                  <span>YTD</span>
+                  <span>Bid</span>
+                  <span>Ask</span>
+                </div>
+                {% for row in section.rows %}
+                  {% set inst = row.instrument or {} %}
+                  {% set quote = inst.quote or {} %}
+                  <div class="universe-row universe-row-item" role="button" tabindex="0" draggable="true" data-drag-kind="row" data-instrument-id="{{ inst.id }}" data-row-id="{{ row.id }}" data-display-label="{{ row.display_label }}" data-role="{{ row.role or '' }}" data-exposure-type="{{ row.exposure_type or '' }}" data-exposure-strength="{{ row.exposure_strength or '' }}" data-conviction="{{ row.conviction or '' }}" data-notes="{{ row.notes or '' }}" data-quoteable="{{ 'true' if inst.is_public and (inst.yahoo_symbol or inst.ticker or inst.ibkr_conid) else 'false' }}">
+                    <span class="universe-name-cell">
+                      <span>
+                        <strong>{{ row.display_label }}</strong>
+                        <small>{{ inst.display_name }}{% if not inst.is_public %} · private{% endif %}</small>
+                      </span>
+                    </span>
+                    <span>{{ row.role or '—' }}</span>
+                    <span class="row-note">{{ row.notes or row.exposure_type or '—' }}</span>
+                    <span>{{ "%.2f"|format(quote.last) if quote.last is number else '—' }}</span>
+                    <span class="{{ 'pos' if quote.change_pct is number and quote.change_pct > 0 else 'neg' if quote.change_pct is number and quote.change_pct < 0 else '' }}">
+                      {{ "%.2f"|format(quote.change_pct) ~ '%' if quote.change_pct is number else '—' }}
+                    </span>
+                    <span class="{{ 'pos' if quote.ytd_return is number and quote.ytd_return > 0 else 'neg' if quote.ytd_return is number and quote.ytd_return < 0 else '' }}">
+                      {{ "%.1f"|format(quote.ytd_return) ~ '%' if quote.ytd_return is number else '—' }}
+                    </span>
+                    <span>{{ "%.2f"|format(quote.bid) if quote.bid is number else '—' }}</span>
+                    <span>{{ "%.2f"|format(quote.ask) if quote.ask is number else '—' }}</span>
+                  </div>
+                {% endfor %}
+              </div>
+            </section>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state">No universes are available.</div>
+      {% endif %}
+    </div>
+  </main>
+
+  <aside class="universe-detail panel">
+    <div class="hd">
+      <h2>Instrument</h2>
+      <button class="btn icon-btn" type="button" id="collapse-detail-btn" title="Collapse detail">›</button>
+    </div>
+    <div class="bd" id="instrument-detail">
+      {% if selected %}
+      <div class="universe-context-overview">
+        <div class="omori-kicker">Universe context</div>
+        <h3>{{ selected.name }}</h3>
+        <p>{{ selected.description or 'Sector and thesis-aware coverage ledger.' }}</p>
+        <dl>
+          <dt>Sections</dt><dd>{{ selected.sections|length }}</dd>
+          <dt>Constituents</dt><dd>{{ selected.row_count or 0 }}</dd>
+          <dt>Inspection</dt><dd>Choose any row</dd>
+        </dl>
+      </div>
+      {% else %}
+      <div class="empty-state">Select a row to inspect listings, earnings, identifiers, and semantic appearances.</div>
+      {% endif %}
+    </div>
+  </aside>
+  <div class="universe-context-menu" id="universe-context-menu" hidden></div>
+</div>
+
+<script>
+(() => {
+  const shell = document.querySelector(".universe-shell");
+  if (window.matchMedia("(max-width: 760px)").matches) shell?.classList.add("detail-collapsed");
+  const selectedSlug = shell?.dataset.selectedSlug || "";
+  const selectedUniverseId = shell?.dataset.universeId || "0";
+  let selectedCandidate = null;
+  const searchInput = document.getElementById("instrument-search");
+  const candidateMenu = document.getElementById("candidate-menu");
+  const roleInput = document.getElementById("row-role");
+  const noteInput = document.getElementById("row-note");
+  const detail = document.getElementById("instrument-detail");
+  const contextMenu = document.getElementById("universe-context-menu");
+  let searchAbort = null;
+  let detailAbort = null;
+  let detailSerial = 0;
+  const detailCache = new Map();
+  let dragState = null;
+  let sectionReorderMode = false;
+  let suppressClickUntil = 0;
+  let universeSnapshotSerial = 0;
+  let refreshingQuotes = false;
+
+  function fmtPct(v) {
+    return v !== null && v !== undefined && v !== "" && Number.isFinite(Number(v)) ? `${Number(v).toFixed(2)}%` : "—";
+  }
+
+  function fmtNum(v) {
+    return v !== null && v !== undefined && v !== "" && Number.isFinite(Number(v)) ? Number(v).toFixed(2) : "—";
+  }
+
+  function fmtPrice(v) {
+    if (v === null || v === undefined || v === "") return "—";
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "—";
+    if (Math.abs(n) > 0 && Math.abs(n) < 10) return n.toFixed(4);
+    return n.toFixed(2);
+  }
+
+  function setDetailExpanded(expanded) {
+    shell?.classList.toggle("detail-collapsed", !expanded);
+  }
+
+  async function api(url, options) {
+    if (url.startsWith("/api/universes") && options?.method && options.method.toUpperCase() !== "GET") universeSnapshotSerial++;
+    const response = await fetch(url, options || {});
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || payload.error || `HTTP ${response.status}`);
+    return payload;
+  }
+
+  function reportUniverseWriteError(err, fallback) {
+    const message = err?.message || fallback || "Universe update failed";
+    if (window.quickToast) quickToast(message, "error");
+    else console.error(message);
+  }
+
+  function orderedIds(selector, attr = "id", root = document) {
+    return Array.from(root.querySelectorAll(selector))
+      .map((el) => Number(el.dataset[attr] || 0))
+      .filter((id) => Number.isFinite(id) && id > 0);
+  }
+
+  function dragAfterElement(container, selector, y) {
+    const items = Array.from(container.querySelectorAll(selector)).filter((el) => !el.classList.contains("dragging"));
+    let closest = { offset: Number.NEGATIVE_INFINITY, element: null };
+    for (const item of items) {
+      const box = item.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) closest = { offset, element: item };
+    }
+    return closest.element;
+  }
+
+  function setSectionReorderMode(enabled) {
+    sectionReorderMode = Boolean(enabled);
+    shell?.classList.toggle("section-reorder-mode", sectionReorderMode);
+    document.querySelectorAll(".universe-section").forEach((section) => {
+      section.draggable = sectionReorderMode;
+    });
+    const button = document.getElementById("toggle-section-reorder-btn");
+    if (button) {
+      button.classList.toggle("active", sectionReorderMode);
+      button.textContent = sectionReorderMode ? "Done Reordering" : "Reorder Sections";
+    }
+  }
+
+  async function persistUniverseOrder() {
+    const universeIds = orderedIds(".universe-link[data-universe-id]", "universeId", document.getElementById("universe-list") || document);
+    if (!universeIds.length) return;
+    await api("/api/universes/reorder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ universe_ids: universeIds })
+    });
+    if (window.quickToast) quickToast("Universe order saved", "success");
+  }
+
+  async function persistSectionOrder() {
+    const root = document.getElementById("universe-sections");
+    const sectionIds = orderedIds(".universe-section[data-section-id]", "sectionId", root || document);
+    if (!selectedUniverseId || selectedUniverseId === "0" || !sectionIds.length) return;
+    await api(`/api/universes/${selectedUniverseId}/sections/reorder`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ section_ids: sectionIds })
+    });
+    if (window.quickToast) quickToast("Section order saved", "success");
+  }
+
+  async function persistRowOrder(sectionEl) {
+    const sectionId = sectionEl?.dataset?.sectionId;
+    if (!sectionId) return;
+    const rowIds = orderedIds(".universe-row-item[data-row-id]", "rowId", sectionEl);
+    if (!rowIds.length) return;
+    await api(`/api/universes/sections/${sectionId}/rows/reorder`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ row_ids: rowIds })
+    });
+    if (window.quickToast) quickToast("Row order saved", "success");
+  }
+
+  function handleDragStart(event) {
+    const universe = event.target.closest?.(".universe-link[data-drag-kind='universe']");
+    const row = event.target.closest?.(".universe-row-item[data-drag-kind='row']");
+    const section = event.target.closest?.(".universe-section[data-drag-kind='section']");
+    if (universe && document.getElementById("universe-list")?.contains(universe)) {
+      dragState = { kind: "universe", element: universe };
+    } else if (row && row.closest(".universe-table")) {
+      dragState = { kind: "row", element: row, section: row.closest(".universe-section") };
+    } else if (section && sectionReorderMode) {
+      dragState = { kind: "section", element: section };
+    } else {
+      event.preventDefault();
+      return;
+    }
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", dragState.kind);
+    window.requestAnimationFrame(() => dragState?.element?.classList.add("dragging"));
+  }
+
+  function handleDragOver(event) {
+    if (!dragState?.element) return;
+    let container = null;
+    let after = null;
+    if (dragState.kind === "universe") {
+      container = document.getElementById("universe-list");
+      if (!container?.contains(event.target)) return;
+      after = dragAfterElement(container, ".universe-link", event.clientY);
+    } else if (dragState.kind === "section") {
+      container = document.getElementById("universe-sections");
+      if (!container?.contains(event.target)) return;
+      after = dragAfterElement(container, ".universe-section", event.clientY);
+    } else if (dragState.kind === "row") {
+      const section = event.target.closest?.(".universe-section");
+      if (!section || section !== dragState.section) return;
+      container = section.querySelector(".universe-table");
+      if (!container) return;
+      after = dragAfterElement(container, ".universe-row-item", event.clientY);
+    }
+    if (!container) return;
+    event.preventDefault();
+    if (after) container.insertBefore(dragState.element, after);
+    else container.appendChild(dragState.element);
+  }
+
+  async function finishDrag() {
+    if (!dragState?.element) return;
+    const state = dragState;
+    dragState = null;
+    suppressClickUntil = Date.now() + 250;
+    state.element.classList.remove("dragging");
+    try {
+      if (state.kind === "universe") await persistUniverseOrder();
+      else if (state.kind === "section") await persistSectionOrder();
+      else if (state.kind === "row") await persistRowOrder(state.section);
+    } catch (err) {
+      reportUniverseWriteError(err, "Failed to save order");
+      if (state.kind === "universe") window.location.reload();
+      else await refreshUniverseSnapshot();
+    }
+  }
+
+  function clearAddRowInputs() {
+    if (searchAbort) {
+      searchAbort.abort();
+      searchAbort = null;
+    }
+    if (searchInput) searchInput.value = "";
+    if (roleInput) roleInput.value = "";
+    if (noteInput) noteInput.value = "";
+    if (candidateMenu) {
+      candidateMenu.hidden = true;
+      candidateMenu.innerHTML = "";
+    }
+    selectedCandidate = null;
+  }
+
+  function restoreAddRowInputsIfIdle({ typed, role, notes, candidate }) {
+    let restoredSearch = false;
+    if (searchInput && !searchInput.value) {
+      searchInput.value = typed || "";
+      restoredSearch = true;
+    }
+    if (roleInput && !roleInput.value) roleInput.value = role || "";
+    if (noteInput && !noteInput.value) noteInput.value = notes || "";
+    if (restoredSearch) selectedCandidate = candidate || null;
+  }
+
+  async function loadSuggestions(kind, datalistId, q) {
+    const payload = await api(`/api/universes/labels?kind=${encodeURIComponent(kind)}&q=${encodeURIComponent(q || "")}`);
+    const datalist = document.getElementById(datalistId);
+    if (!datalist) return;
+    datalist.innerHTML = "";
+    for (const item of payload.items || []) {
+      const opt = document.createElement("option");
+      opt.value = item.label;
+      datalist.appendChild(opt);
+    }
+  }
+
+  function renderUniverseRow(row) {
+    const inst = row.instrument || {};
+    const quote = inst.quote || {};
+    const button = document.createElement("div");
+    button.className = "universe-row universe-row-item";
+    button.draggable = true;
+    button.tabIndex = 0;
+    button.setAttribute("role", "button");
+    button.dataset.dragKind = "row";
+    button.dataset.instrumentId = inst.id || "";
+    button.dataset.rowId = row.id || "";
+    button.dataset.displayLabel = row.display_label || "";
+    button.dataset.role = row.role || "";
+    button.dataset.exposureType = row.exposure_type || "";
+    button.dataset.exposureStrength = row.exposure_strength || "";
+    button.dataset.conviction = row.conviction || "";
+    button.dataset.notes = row.notes || "";
+    button.dataset.sortOrder = row.sort_order == null ? "" : String(row.sort_order);
+    button.innerHTML = `
+      <span class="universe-name-cell">
+        <span>
+          <strong>${escapeHtml(row.display_label || inst.ticker || inst.display_name || "Instrument")}</strong>
+          <small>${escapeHtml(inst.display_name || "")}${inst.is_public === false ? " · private" : ""}</small>
+        </span>
+      </span>
+      <span>${escapeHtml(row.role || "—")}</span>
+      <span class="row-note">${escapeHtml(row.notes || row.exposure_type || "—")}</span>
+      <span>${fmtPrice(quote.last)}</span>
+      <span class="${Number(quote.change_pct) > 0 ? "pos" : Number(quote.change_pct) < 0 ? "neg" : ""}">${fmtPct(quote.change_pct)}</span>
+      <span class="${Number(quote.ytd_return) > 0 ? "pos" : Number(quote.ytd_return) < 0 ? "neg" : ""}">${fmtPct(quote.ytd_return)}</span>
+      <span>${fmtPrice(quote.bid)}</span>
+      <span>${fmtPrice(quote.ask)}</span>
+    `;
+    button.addEventListener("click", () => {
+      if (Date.now() < suppressClickUntil) return;
+      loadDetail(button.dataset.instrumentId, button);
+    });
+    button.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") loadDetail(button.dataset.instrumentId, button);
+    });
+    return button;
+  }
+
+  function renderUniverseSection(section) {
+    const sectionEl = document.createElement("section");
+    sectionEl.className = "universe-section";
+    sectionEl.dataset.sectionId = section.id;
+    sectionEl.dataset.sectionName = section.name || "";
+    sectionEl.dataset.sectionDescription = section.description || "";
+    sectionEl.dataset.dragKind = "section";
+    sectionEl.innerHTML = `
+      <div class="universe-section-head">
+        <div>
+          <h3>${escapeHtml(section.name || "Section")}</h3>
+          ${section.description ? `<span>${escapeHtml(section.description)}</span>` : ""}
+        </div>
+        <div class="section-actions">
+          <strong>${(section.rows || []).length}</strong>
+          <button class="btn icon-btn section-edit-btn" type="button" data-section-id="${section.id}" data-section-name="${escapeHtml(section.name || "")}" data-section-description="${escapeHtml(section.description || "")}">Edit</button>
+          <button class="btn icon-btn danger section-delete-btn" type="button" data-section-id="${section.id}" data-section-name="${escapeHtml(section.name || "Section")}">Delete</button>
+        </div>
+      </div>
+      <div class="universe-table">
+        <div class="universe-row universe-row-head">
+          <span>Name</span><span>Role</span><span>Note</span><span>Last</span><span>Chg %</span><span>YTD</span><span>Bid</span><span>Ask</span>
+        </div>
+      </div>
+    `;
+    const table = sectionEl.querySelector(".universe-table");
+    for (const row of section.rows || []) table.appendChild(renderUniverseRow(row));
+    return sectionEl;
+  }
+
+  function replaceUniverseSections(universe) {
+    const root = document.getElementById("universe-sections");
+    if (!root || !universe) return;
+    const selectedSection = document.getElementById("section-select")?.value || "";
+    const select = document.getElementById("section-select");
+    if (select) {
+      select.innerHTML = "";
+      for (const section of universe.sections || []) {
+        const option = document.createElement("option");
+        option.value = section.id;
+        option.textContent = section.name || "Section";
+        select.appendChild(option);
+      }
+    }
+    root.innerHTML = "";
+    for (const section of universe.sections || []) {
+      root.appendChild(renderUniverseSection(section));
+    }
+    if (select && selectedSection) select.value = selectedSection;
+    bindUniverseCrudControls(root);
+    setSectionReorderMode(sectionReorderMode);
+  }
+
+  function findSectionEl(sectionId) {
+    return Array.from(document.querySelectorAll(".universe-section")).find((el) => el.dataset.sectionId === String(sectionId));
+  }
+
+  function appendUniverseSection(section) {
+    const root = document.getElementById("universe-sections");
+    if (!root || !section?.id) return;
+    const select = document.getElementById("section-select");
+    if (select && !Array.from(select.options || []).some((opt) => opt.value === String(section.id))) {
+      const option = document.createElement("option");
+      option.value = section.id;
+      option.textContent = section.name || "Section";
+      select.appendChild(option);
+    }
+    const existing = findSectionEl(section.id);
+    const sectionEl = renderUniverseSection(section);
+    if (existing) existing.replaceWith(sectionEl);
+    else root.appendChild(sectionEl);
+    bindUniverseCrudControls(sectionEl);
+    setSectionReorderMode(sectionReorderMode);
+    if (select) select.value = String(section.id);
+  }
+
+  function updateSectionDom(section) {
+    const sectionEl = findSectionEl(section?.id);
+    if (!sectionEl) return;
+    sectionEl.dataset.sectionName = section.name || "";
+    sectionEl.dataset.sectionDescription = section.description || "";
+    const title = sectionEl.querySelector("h3");
+    if (title) title.textContent = section.name || "Section";
+    const description = sectionEl.querySelector(".universe-section-head > div:first-child span");
+    if (description) {
+      if (section.description) description.textContent = section.description;
+      else description.remove();
+    } else if (section.description) {
+      const span = document.createElement("span");
+      span.textContent = section.description;
+      sectionEl.querySelector(".universe-section-head > div:first-child")?.appendChild(span);
+    }
+    sectionEl.querySelectorAll(".section-edit-btn, .section-delete-btn").forEach((btn) => {
+      btn.dataset.sectionName = section.name || "";
+      if (btn.classList.contains("section-edit-btn")) btn.dataset.sectionDescription = section.description || "";
+    });
+    const option = Array.from(document.getElementById("section-select")?.options || []).find((opt) => opt.value === String(section.id));
+    if (option) option.textContent = section.name || "Section";
+  }
+
+  async function refreshUniverseSnapshot() {
+    if (!selectedSlug) return;
+    const serial = ++universeSnapshotSerial;
+    const payload = await api(`/api/universes/${encodeURIComponent(selectedSlug)}`);
+    if (payload.universe && serial === universeSnapshotSerial) replaceUniverseSections(payload.universe);
+  }
+
+  function updateSectionRowCount(sectionEl) {
+    const counter = sectionEl?.querySelector?.(".section-actions strong");
+    if (!counter) return;
+    counter.textContent = String(sectionEl.querySelectorAll(".universe-row-item").length);
+  }
+
+  function activeUniverseRow(rowEl) {
+    document.querySelectorAll(".universe-row-item.active").forEach((row) => row.classList.remove("active"));
+    if (rowEl) rowEl.classList.add("active");
+  }
+
+  function removeRowFromDom(rowId) {
+    const row = Array.from(document.querySelectorAll(".universe-row-item")).find((el) => el.dataset.rowId === String(rowId));
+    const section = row?.closest?.(".universe-section");
+    row?.remove();
+    updateSectionRowCount(section);
+  }
+
+  function removeSectionFromDom(sectionId) {
+    const section = Array.from(document.querySelectorAll(".universe-section")).find((el) => el.dataset.sectionId === String(sectionId));
+    section?.remove();
+    const select = document.getElementById("section-select");
+    const option = Array.from(select?.options || []).find((opt) => opt.value === String(sectionId));
+    option?.remove();
+    if (select && !select.value && select.options.length) select.value = select.options[0].value;
+  }
+
+  function appendOrReplaceUniverseRow(sectionId, row) {
+    if (!row?.id) return;
+    const section = findSectionEl(sectionId);
+    const table = section?.querySelector?.(".universe-table");
+    if (!section || !table) {
+      refreshUniverseSnapshot().catch((err) => reportUniverseWriteError(err, "Failed to refresh universe"));
+      return;
+    }
+    const existing = Array.from(table.querySelectorAll(".universe-row-item")).find((el) => el.dataset.rowId === String(row.id));
+    const rowEl = renderUniverseRow(row);
+    if (existing) existing.replaceWith(rowEl);
+    else table.appendChild(rowEl);
+    updateSectionRowCount(section);
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text == null ? "" : String(text);
+    return div.innerHTML;
+  }
+
+  async function runSearch() {
+    const q = (searchInput?.value || "").trim();
+    selectedCandidate = null;
+    if (!q || q.length < 2 || !candidateMenu) {
+      if (candidateMenu) candidateMenu.hidden = true;
+      return;
+    }
+    candidateMenu.innerHTML = '<div class="candidate-row muted">Searching...</div>';
+    candidateMenu.hidden = false;
+    try {
+      if (searchAbort) searchAbort.abort();
+      searchAbort = new AbortController();
+      const payload = await api(`/api/universes/instruments/search?q=${encodeURIComponent(q)}&limit=10`, { signal: searchAbort.signal });
+      renderCandidates(payload.items || [], payload.providers || {});
+    } catch (err) {
+      if (err.name === "AbortError") return;
+      candidateMenu.innerHTML = `<div class="candidate-row muted">${err.message}</div>`;
+    }
+  }
+
+  function renderCandidates(items, providers = {}) {
+    if (!candidateMenu) return;
+    candidateMenu.innerHTML = "";
+    for (const item of items || []) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "candidate-row";
+      btn.innerHTML = `<strong>${escapeHtml(item.ticker || item.display_name)}</strong><span>${escapeHtml(item.display_name || "")}</span><em>${escapeHtml(item.source)}${item.exchange ? " · " + escapeHtml(item.exchange) : ""}</em>`;
+      btn.addEventListener("click", () => {
+        selectedCandidate = item;
+        searchInput.value = item.ticker || item.display_name;
+        candidateMenu.hidden = true;
+      });
+      candidateMenu.appendChild(btn);
+    }
+    const ibkr = providers.ibkr || {};
+    if (ibkr.enabled && ibkr.queried && (!Number(ibkr.count))) {
+      const status = document.createElement("div");
+      status.className = "candidate-row muted";
+      const detailText = ibkr.auth_required
+        ? "auth required"
+        : ibkr.error
+          ? ibkr.error
+          : "no contract matches";
+      status.textContent = `IBKR: ${detailText}`;
+      candidateMenu.appendChild(status);
+    }
+    if (!(items || []).length && !candidateMenu.children.length) {
+      candidateMenu.innerHTML = '<div class="candidate-row muted">No matches.</div>';
+    }
+  }
+
+  async function addRow() {
+    const sectionId = document.getElementById("section-select")?.value;
+    const typed = (searchInput?.value || "").trim();
+    if (!sectionId || !typed) return;
+    const candidate = selectedCandidate || {
+      source: "manual_private",
+      display_name: typed,
+      security_type: "PRIVATE",
+      is_public: false,
+      metadata: { manual_candidate: true }
+    };
+    const role = roleInput?.value || "";
+    const notes = noteInput?.value || "";
+    clearAddRowInputs();
+    (async () => {
+      const payload = await api(`/api/universes/${selectedUniverseId}/rows`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          section_id: sectionId,
+          candidate,
+          role,
+          notes,
+        })
+      });
+      if (payload.row) appendOrReplaceUniverseRow(payload.section_id || sectionId, payload.row);
+      else if (payload.universe) replaceUniverseSections(payload.universe);
+    })().catch((err) => {
+      restoreAddRowInputsIfIdle({ typed, role, notes, candidate });
+      reportUniverseWriteError(err, "Failed to add company");
+    });
+  }
+
+  async function editSection(sectionId, defaults = {}) {
+    if (!sectionId) return;
+    const name = window.prompt("Section name", defaults.name || "");
+    if (!name) return;
+    const description = window.prompt("Section description", defaults.description || "") || "";
+    const payload = await api(`/api/universes/sections/${sectionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, description })
+    });
+    if (payload.section) updateSectionDom(payload.section);
+    else if (payload.universe) replaceUniverseSections(payload.universe);
+  }
+
+  async function deleteSectionAction(sectionId, name = "this section") {
+    if (!sectionId) return;
+    if (!window.confirm(`Delete ${name}? Rows in this table will be removed from the universe.`)) return;
+    removeSectionFromDom(sectionId);
+    try {
+      const payload = await api(`/api/universes/sections/${sectionId}`, { method: "DELETE" });
+      if (payload.universe) replaceUniverseSections(payload.universe);
+    } catch (err) {
+      reportUniverseWriteError(err, "Failed to delete section");
+      await refreshUniverseSnapshot();
+    }
+  }
+
+  async function editRowRole(rowEl) {
+    const rowId = rowEl?.dataset?.rowId;
+    if (!rowId) return;
+    const role = window.prompt("Role", rowEl.dataset.role || "") || "";
+    const payload = await api(`/api/universes/rows/${rowId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role })
+    });
+    if (payload.row) appendOrReplaceUniverseRow(payload.section_id || rowEl.closest?.(".universe-section")?.dataset.sectionId, payload.row);
+    else if (payload.universe) replaceUniverseSections(payload.universe);
+  }
+
+  async function editRowNote(rowEl) {
+    const rowId = rowEl?.dataset?.rowId;
+    if (!rowId) return;
+    const notes = window.prompt("Notes", rowEl.dataset.notes || "") || "";
+    const payload = await api(`/api/universes/rows/${rowId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes })
+    });
+    if (payload.row) appendOrReplaceUniverseRow(payload.section_id || rowEl.closest?.(".universe-section")?.dataset.sectionId, payload.row);
+    else if (payload.universe) replaceUniverseSections(payload.universe);
+  }
+
+  async function deleteRowAction(rowId, label = "this row") {
+    if (!rowId) return false;
+    if (!window.confirm(`Delete ${label}?`)) return false;
+    removeRowFromDom(rowId);
+    try {
+      const payload = await api(`/api/universes/rows/${rowId}`, { method: "DELETE" });
+      if (payload.universe) replaceUniverseSections(payload.universe);
+      return true;
+    } catch (err) {
+      reportUniverseWriteError(err, "Failed to delete company");
+      await refreshUniverseSnapshot();
+      return false;
+    }
+  }
+
+  async function refreshUniverseQuotes({ quiet = false } = {}) {
+    if (!selectedSlug || refreshingQuotes) return;
+    refreshingQuotes = true;
+    const serial = ++universeSnapshotSerial;
+    const button = document.getElementById("refresh-universe-btn");
+    const original = button?.textContent || "Refresh";
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Refreshing";
+    }
+    try {
+      const payload = await api(`/api/universes/${encodeURIComponent(selectedSlug)}?quotes=true`);
+      if (payload.universe && serial === universeSnapshotSerial) {
+        replaceUniverseSections(payload.universe);
+        if (payload.universe.quote_error && !quiet) reportUniverseWriteError({ message: payload.universe.quote_error.message }, "Some quotes are unavailable");
+      }
+    } catch (err) {
+      if (!quiet && window.quickToast) quickToast(err.message || "Failed to refresh quotes", "error");
+    } finally {
+      refreshingQuotes = false;
+      if (button) {
+        button.disabled = false;
+        button.textContent = original;
+      }
+    }
+  }
+
+  async function reconcileProviderLinks() {
+    if (!selectedUniverseId || selectedUniverseId === "0") return;
+    const button = document.getElementById("reconcile-providers-btn");
+    const original = button?.textContent || "Link IBKR";
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Linking";
+    }
+    try {
+      const payload = await api("/api/universes/provider-links/reconcile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ universe_id: Number(selectedUniverseId), limit: 25 })
+      });
+      if (payload.universe) replaceUniverseSections(payload.universe);
+      const linked = Number(payload.linked || 0);
+      const merged = Number(payload.merged || 0);
+      const ambiguous = Number(payload.ambiguous || 0);
+      const noMatch = Number(payload.no_match || 0);
+      if (window.quickToast) {
+        quickToast(`IBKR links: ${linked + merged} updated, ${ambiguous} ambiguous, ${noMatch} unmatched`, linked + merged ? "success" : "info");
+      }
+    } catch (err) {
+      if (window.quickToast) quickToast(err.message || "IBKR link check failed", "error");
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = original;
+      }
+    }
+  }
+
+  async function normalizeIbkrContracts() {
+    const button = document.getElementById("normalize-ibkr-btn");
+    const original = button?.textContent || "Repair IBKR";
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Repairing";
+    }
+    try {
+      const payload = await api("/api/universes/provider-links/normalize-sparse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ universe_id: Number(selectedUniverseId || 0), limit: 25 })
+      });
+      if (payload.universe) replaceUniverseSections(payload.universe);
+      const normalized = Number(payload.normalized || 0);
+      if (window.quickToast) {
+        quickToast(`IBKR repair: ${normalized} sparse contracts updated`, normalized ? "success" : "info");
+      }
+    } catch (err) {
+      if (window.quickToast) quickToast(err.message || "IBKR repair failed", "error");
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = original;
+      }
+    }
+  }
+
+  function hideContextMenu() {
+    if (contextMenu) contextMenu.hidden = true;
+  }
+
+  function showContextMenu(event, actions) {
+    if (!contextMenu || !actions.length) return;
+    event.preventDefault();
+    contextMenu.innerHTML = "";
+    for (const action of actions) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = action.label;
+      button.className = action.danger ? "danger" : "";
+      button.addEventListener("click", async () => {
+        hideContextMenu();
+        await action.run();
+      });
+      contextMenu.appendChild(button);
+    }
+    contextMenu.style.left = `${event.clientX}px`;
+    contextMenu.style.top = `${event.clientY}px`;
+    contextMenu.hidden = false;
+  }
+
+  function bindUniverseCrudControls(root = document) {
+    root.querySelectorAll(".section-edit-btn").forEach((btn) => {
+      btn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        editSection(btn.dataset.sectionId, { name: btn.dataset.sectionName, description: btn.dataset.sectionDescription });
+      });
+    });
+    root.querySelectorAll(".section-delete-btn").forEach((btn) => {
+      btn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        deleteSectionAction(btn.dataset.sectionId, btn.dataset.sectionName);
+      });
+    });
+  }
+
+  function universeRowEditorMarkup(rowEl) {
+    if (!rowEl?.dataset?.rowId) return "";
+    return `
+      <form class="universe-row-editor" data-row-id="${escapeHtml(rowEl.dataset.rowId || "")}">
+        <div class="row-editor-head">
+          <h4>Universe row</h4>
+          <span class="row-editor-status" data-row-editor-status></span>
+        </div>
+        <label class="editor-field">
+          <span>Name</span>
+          <input name="display_label" value="${escapeHtml(rowEl.dataset.displayLabel || "")}" autocomplete="off" />
+        </label>
+        <div class="editor-grid">
+          <label class="editor-field">
+            <span>Role</span>
+            <input name="role" value="${escapeHtml(rowEl.dataset.role || "")}" list="role-suggestions" autocomplete="off" />
+          </label>
+          <label class="editor-field">
+            <span>Conviction</span>
+            <select name="conviction">
+              ${["", "watch", "low", "medium", "high", "core"].map((value) => `<option value="${value}" ${value === (rowEl.dataset.conviction || "") ? "selected" : ""}>${value || "—"}</option>`).join("")}
+            </select>
+          </label>
+          <label class="editor-field">
+            <span>Exposure</span>
+            <input name="exposure_type" value="${escapeHtml(rowEl.dataset.exposureType || "")}" autocomplete="off" />
+          </label>
+          <label class="editor-field">
+            <span>Strength</span>
+            <select name="exposure_strength">
+              ${["", "watch", "low", "medium", "high", "critical"].map((value) => `<option value="${value}" ${value === (rowEl.dataset.exposureStrength || "") ? "selected" : ""}>${value || "—"}</option>`).join("")}
+            </select>
+          </label>
+        </div>
+        <label class="editor-field">
+          <span>Notes</span>
+          <textarea name="notes" rows="4">${escapeHtml(rowEl.dataset.notes || "")}</textarea>
+        </label>
+        <div class="row-editor-actions">
+          <button class="btn primary" type="submit">Save</button>
+          <button class="btn danger" type="button" data-row-editor-delete>Delete</button>
+        </div>
+      </form>
+    `;
+  }
+
+  function bindDetailRowEditor(rowEl) {
+    const form = detail?.querySelector?.(".universe-row-editor");
+    if (!form || !rowEl?.dataset?.rowId) return;
+    const rowId = rowEl.dataset.rowId;
+    const sectionId = rowEl.closest?.(".universe-section")?.dataset.sectionId || "";
+    const status = form.querySelector("[data-row-editor-status]");
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const button = form.querySelector("button[type='submit']");
+      if (button) button.disabled = true;
+      if (status) status.textContent = "Saving";
+      try {
+        const data = new FormData(form);
+        const payload = await api(`/api/universes/rows/${rowId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            display_label: data.get("display_label") || "",
+            role: data.get("role") || "",
+            exposure_type: data.get("exposure_type") || "",
+            exposure_strength: data.get("exposure_strength") || "",
+            conviction: data.get("conviction") || "",
+            notes: data.get("notes") || "",
+          })
+        });
+        if (payload.row) appendOrReplaceUniverseRow(payload.section_id || sectionId, payload.row);
+        else if (payload.universe) replaceUniverseSections(payload.universe);
+        const refreshed = Array.from(document.querySelectorAll(".universe-row-item")).find((el) => el.dataset.rowId === String(rowId));
+        if (status) status.textContent = "Saved";
+        if (refreshed) await loadDetail(refreshed.dataset.instrumentId, refreshed);
+      } catch (err) {
+        if (status) status.textContent = "Failed";
+        reportUniverseWriteError(err, "Failed to save row");
+      } finally {
+        if (button) button.disabled = false;
+      }
+    });
+    form.querySelector("[data-row-editor-delete]")?.addEventListener("click", async () => {
+      const deleted = await deleteRowAction(rowId, rowEl.dataset.displayLabel);
+      if (deleted) {
+        detail.innerHTML = '<div class="empty-state">Select a row to inspect listings, earnings, identifiers, and semantic appearances.</div>';
+        setDetailExpanded(false);
+      }
+    });
+  }
+
+  function renderInstrumentDetail(payload, rowEl = null) {
+      const inst = payload.instrument || {};
+      const q = inst.quote || {};
+      const earnings = payload.upcoming_earnings || [];
+      const appearances = payload.appearances || [];
+      const related = payload.related_listings || [];
+      const decision = payload.decision || {};
+      const catalysts = decision.catalysts || [];
+      const gaps = (decision.gaps || []).filter((g) => g.status !== "resolved");
+      const memo = (decision.memos || [])[0] || null;
+      const analystEvidence = decision.analyst_evidence || [];
+      const activeTheses = Array.isArray(decision.active_theses) ? decision.active_theses : null;
+      const snapshot = decision.decision_snapshot || null;
+      const requests = Array.isArray(decision.research_requests) ? decision.research_requests : null;
+      const rails = decision.source_rail_health || null;
+      const alerts = decision.alert_inventory || null;
+      detail.innerHTML = `
+        <div class="instrument-card">
+          <div class="instrument-kicker">${inst.security_type || "Instrument"} · ${inst.primary_provider || "local"}</div>
+          <h3>${inst.ticker || inst.display_name}</h3>
+          <p>${inst.display_name || ""}</p>
+          <div class="metric-grid">
+            <div><span>Last</span><strong>${fmtPrice(q.last)}</strong></div>
+            <div><span>Change</span><strong>${fmtPct(q.change_pct)}</strong></div>
+            <div><span>YTD</span><strong>${fmtPct(q.ytd_return)}</strong></div>
+            <div><span>Bid</span><strong>${fmtPrice(q.bid)}</strong></div>
+            <div><span>Ask</span><strong>${fmtPrice(q.ask)}</strong></div>
+            <div><span>Market Data</span><strong>${q.market_data || q.provider || "—"}</strong></div>
+            <div><span>Currency</span><strong>${inst.currency || q.currency || "—"}</strong></div>
+          </div>
+          <h4>Upcoming earnings</h4>
+          <div class="detail-list">${earnings.length ? earnings.map(e => `<div><strong>${e.scheduled_date || "TBD"}</strong><span>${e.period || ""} · ${e.date_provenance || ""}</span></div>`).join("") : "<div><span>No upcoming earnings in registry.</span></div>"}</div>
+          ${universeRowEditorMarkup(rowEl)}
+          <h4>Decision spine</h4>
+          <div class="detail-list">
+            <div><strong>${Number.isFinite(Number(decision.coverage_score)) ? decision.coverage_score + "% coverage" : "No coverage score"}</strong><span>${memo ? escapeHtml(memo.rating || memo.status || "memo") + " · " + escapeHtml(memo.title || "") : "No investment memo yet."}</span></div>
+            ${snapshot && (snapshot.what_changed || []).length ? `<div><strong>What changed</strong><span>${(snapshot.what_changed || []).slice(0, 2).map(escapeHtml).join(" · ")}</span></div>` : ""}
+            ${snapshot && (snapshot.why_it_matters || []).length ? `<div><strong>Why it matters</strong><span>${(snapshot.why_it_matters || []).slice(0, 2).map(escapeHtml).join(" · ")}</span></div>` : ""}
+            ${activeTheses ? (activeTheses.length ? activeTheses.slice(0, 3).map(t => `<div><strong>${escapeHtml(t.title || "Active thesis")}</strong><span>${escapeHtml((t.freshness || {}).state || "fresh")} · ${escapeHtml((t.freshness || {}).validity_horizon || "standard horizon")} · ${Number(t.evidence_count || 0)} evidence</span></div>`).join("") : "<div><span>No active thesis linked yet.</span></div>") : ""}
+            ${analystEvidence.length ? analystEvidence.slice(0, 3).map(e => `<div><strong>${escapeHtml(e.rating || e.evidence_kind || "analyst evidence")}${e.price_target !== null && e.price_target !== undefined ? " · " + escapeHtml(e.currency || "") + " " + Number(e.price_target).toLocaleString(undefined, {maximumFractionDigits: 0}) : ""}</strong><span>${escapeHtml(e.source_name || e.outlet || e.author || e.trust_label || "")}${e.summary ? " · " + escapeHtml(e.summary) : ""}</span></div>`).join("") : "<div><span>No analyst ratings, targets, estimates, or curated media claims yet.</span></div>"}
+            ${catalysts.length ? catalysts.slice(0, 3).map(c => `<div><strong>${escapeHtml(c.event_date || "TBD")} · ${escapeHtml(c.catalyst_kind || "")}</strong><span>${escapeHtml(c.title || "")}</span></div>`).join("") : "<div><span>No catalyst entries.</span></div>"}
+            ${gaps.length ? gaps.slice(0, 3).map(g => `<div><strong>${escapeHtml(g.gap_kind || "gap")} · severity ${escapeHtml(g.severity || "")}</strong><span>${escapeHtml(g.title || "")}</span></div>`).join("") : "<div><span>No open decision gaps.</span></div>"}
+            ${requests && requests.length ? `<div><strong>Research requests</strong><span>${requests.slice(0, 3).map(r => escapeHtml(r.title || "")).join(" · ")}</span></div>` : ""}
+            ${rails ? `<div><strong>Source rails</strong><span>${escapeHtml(String(rails.document_count || 0))} docs · IR artifacts incidental: ${escapeHtml(String(rails.ir_artifact_count || 0))}</span></div>` : ""}
+            ${alerts ? `<div><strong>Alerts</strong><span>${escapeHtml(String(alerts.active_notification_rule_count || 0))} active notification rules · ${escapeHtml(String(alerts.active_supply_chain_alert_rule_count || 0))} supply-chain rules · <a href="/alerts">open discovery</a></span></div>` : ""}
+          </div>
+          <h4>Semantic appearances</h4>
+          <div class="detail-list">${appearances.length ? appearances.map(a => `<div><strong>${a.display_label}</strong><span>${a.role || "—"} · ${a.exposure_type || "—"}</span></div>`).join("") : "<div><span>No other universe appearances.</span></div>"}</div>
+          <h4>Related listings</h4>
+          <div class="detail-list">${related.length ? related.map(r => `<div><strong>${r.ticker || r.display_name}</strong><span>${r.exchange || ""} ${r.currency || ""}</span></div>`).join("") : "<div><span>No linked alternate listings yet.</span></div>"}</div>
+        </div>
+      `;
+      bindDetailRowEditor(rowEl);
+  }
+
+  async function loadDetail(instrumentId, rowEl = null) {
+    if (!instrumentId || !detail) return;
+    const cacheKey = String(instrumentId);
+    setDetailExpanded(true);
+    activeUniverseRow(rowEl);
+    if (detailCache.has(cacheKey)) {
+      renderInstrumentDetail(detailCache.get(cacheKey), rowEl);
+      return;
+    }
+    if (detailAbort) detailAbort.abort();
+    detailAbort = new AbortController();
+    const serial = ++detailSerial;
+    detail.innerHTML = '<div class="empty-state">Loading...</div>';
+    try {
+      const payload = await api(`/api/universes/instruments/${encodeURIComponent(instrumentId)}`, { signal: detailAbort.signal });
+      if (serial !== detailSerial) return;
+      detailCache.set(cacheKey, payload);
+      renderInstrumentDetail(payload, rowEl);
+    } catch (err) {
+      if (err?.name === "AbortError" || serial !== detailSerial) return;
+      detail.innerHTML = `<div class="empty-state">${err.message}</div>`;
+    }
+  }
+
+  async function loadIbkrWatchlists() {
+    const root = document.getElementById("ibkr-watchlists");
+    if (!root) return;
+    root.dataset.loaded = "";
+    root.innerHTML = '<div class="muted">Loading IBKR watchlists...</div>';
+    try {
+      const payload = await api("/api/ibkr/watchlists");
+      const data = payload.data || payload.raw || {};
+      const lists = [...(data.user_lists || []), ...(data.system_lists || [])];
+      root.innerHTML = "";
+      for (const list of lists) {
+        const row = document.createElement("div");
+        row.className = "ibkr-watchlist-row";
+        const text = document.createElement("span");
+        const name = document.createElement("strong");
+        name.textContent = list.name || list.id || "IBKR Watchlist";
+        const meta = document.createElement("small");
+        meta.textContent = [
+          list.source === "portfolio_positions" ? "portfolio positions" : (list.type || "watchlist"),
+          Number.isFinite(Number(list.count)) ? `${Number(list.count)} instruments` : "",
+        ].filter(Boolean).join(" · ");
+        text.append(name, meta);
+        const button = document.createElement("button");
+        button.className = "btn";
+        button.type = "button";
+        button.textContent = "Import";
+        button.addEventListener("click", async () => {
+          await api("/api/universes/import/ibkr-watchlist", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ watchlist_id: list.id, universe_name: list.name })
+          });
+          window.location.reload();
+        });
+        row.append(text, button);
+        root.appendChild(row);
+      }
+      if (!lists.length) root.innerHTML = '<div class="muted">No IBKR watchlists returned.</div>';
+      root.dataset.loaded = "1";
+    } catch (err) {
+      root.innerHTML = `<div class="muted">${err.message}</div>`;
+    }
+  }
+
+  document.querySelectorAll(".universe-tabs button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".universe-tabs button").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById("thoth-tab").hidden = btn.dataset.tab !== "thoth";
+      document.getElementById("ibkr-tab").hidden = btn.dataset.tab !== "ibkr";
+      if (btn.dataset.tab === "ibkr") {
+        const root = document.getElementById("ibkr-watchlists");
+        if (root && root.dataset.loaded !== "1") loadIbkrWatchlists();
+      }
+    });
+  });
+  searchInput?.addEventListener("input", () => window.clearTimeout(searchInput._t) || (searchInput._t = window.setTimeout(runSearch, 180)));
+  searchInput?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      addRow();
+    }
+  });
+  document.getElementById("add-row-btn")?.addEventListener("click", addRow);
+  document.getElementById("toggle-section-reorder-btn")?.addEventListener("click", () => setSectionReorderMode(!sectionReorderMode));
+  document.getElementById("normalize-ibkr-btn")?.addEventListener("click", normalizeIbkrContracts);
+  document.getElementById("reconcile-providers-btn")?.addEventListener("click", reconcileProviderLinks);
+  document.getElementById("refresh-universe-btn")?.addEventListener("click", () => refreshUniverseQuotes());
+  document.getElementById("load-ibkr-watchlists")?.addEventListener("click", loadIbkrWatchlists);
+  document.getElementById("universe-list")?.addEventListener("click", (event) => {
+    if (Date.now() >= suppressClickUntil) return;
+    const link = event.target.closest?.(".universe-link");
+    if (link) event.preventDefault();
+  });
+  document.querySelectorAll(".universe-row-item").forEach((row) => {
+    row.addEventListener("click", () => {
+      if (Date.now() < suppressClickUntil) return;
+      loadDetail(row.dataset.instrumentId, row);
+    });
+    row.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") loadDetail(row.dataset.instrumentId, row);
+    });
+  });
+  bindUniverseCrudControls();
+  setSectionReorderMode(false);
+  shell?.addEventListener("dragstart", handleDragStart);
+  shell?.addEventListener("dragover", handleDragOver);
+  shell?.addEventListener("drop", (event) => {
+    if (!dragState) return;
+    event.preventDefault();
+    finishDrag();
+  });
+  shell?.addEventListener("dragend", finishDrag);
+  shell?.addEventListener("contextmenu", (event) => {
+    const row = event.target.closest?.(".universe-row-item");
+    if (row) {
+      showContextMenu(event, [
+        { label: "Edit role", run: () => editRowRole(row) },
+        { label: "Edit note", run: () => editRowNote(row) },
+        { label: "Delete row", danger: true, run: () => deleteRowAction(row.dataset.rowId, row.dataset.displayLabel) },
+      ]);
+      return;
+    }
+    const section = event.target.closest?.(".universe-section");
+    if (section) {
+      showContextMenu(event, [
+        { label: "Edit table", run: () => editSection(section.dataset.sectionId, { name: section.dataset.sectionName, description: section.dataset.sectionDescription }) },
+        { label: "Delete table", danger: true, run: () => deleteSectionAction(section.dataset.sectionId, section.dataset.sectionName) },
+      ]);
+      return;
+    }
+    const universe = event.target.closest?.(".universe-link");
+    if (universe) {
+      showContextMenu(event, [
+        { label: "Open universe", run: () => { window.location.href = universe.href; } },
+        {
+          label: "Rename universe",
+          run: async () => {
+            const name = window.prompt("Universe name", universe.dataset.universeName || "");
+            if (!name) return;
+            await api(`/api/universes/${universe.dataset.universeId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ name, description: universe.dataset.universeDescription || "" })
+            });
+            window.location.reload();
+          }
+        },
+        {
+          label: "Delete universe",
+          danger: true,
+          run: async () => {
+            if (!window.confirm(`Delete ${universe.dataset.universeName || "this universe"}?`)) return;
+            await api(`/api/universes/${universe.dataset.universeId}`, { method: "DELETE" });
+            window.location.href = "/universes";
+          }
+        },
+      ]);
+    }
+  });
+  document.addEventListener("click", hideContextMenu);
+  window.addEventListener("blur", hideContextMenu);
+  document.getElementById("collapse-detail-btn")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    setDetailExpanded(shell?.classList.contains("detail-collapsed"));
+  });
+  document.getElementById("add-section-btn")?.addEventListener("click", async () => {
+    const name = (window.prompt("Section name") || "").trim();
+    if (!name) return;
+    const button = document.getElementById("add-section-btn");
+    const original = button?.textContent || "Add Section";
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Adding";
+    }
+    try {
+      const payload = await api(`/api/universes/{{ selected.id if selected else 0 }}/sections`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name })
+      });
+      if (payload.section) appendUniverseSection(payload.section);
+      else if (payload.universe) replaceUniverseSections(payload.universe);
+      const select = document.getElementById("section-select");
+      if (select && payload.section_id) select.value = String(payload.section_id);
+    } catch (err) {
+      reportUniverseWriteError(err, "Failed to add section");
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = original;
+      }
+    }
+  });
+  document.getElementById("new-universe-btn")?.addEventListener("click", async () => {
+    const name = window.prompt("Universe name");
+    if (!name) return;
+    await api("/api/universes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name })
+    });
+    window.location.reload();
+  });
+  loadSuggestions("role", "role-suggestions", "");
+  if (selectedSlug && shell?.querySelector('.universe-row-item[data-quoteable="true"]')) {
+    window.requestAnimationFrame(() => refreshUniverseQuotes());
+  }
+})();
+</script>
+
+<style>
+.universe-shell {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) 320px;
+  gap: 14px;
+  align-items: start;
+}
+.universe-shell.detail-collapsed {
+  grid-template-columns: 260px minmax(0, 1fr) 44px;
+}
+.universe-rail,
+.universe-detail {
+  position: static;
+}
+.universe-detail .hd {
+  gap: 8px;
+}
+.universe-detail .hd h2 {
+  min-width: 0;
+}
+.universe-detail .hd .icon-btn {
+  margin-left: auto;
+}
+.universe-shell.detail-collapsed .universe-detail .bd,
+.universe-shell.detail-collapsed .universe-detail .hd h2 {
+  display: none;
+}
+.universe-shell.detail-collapsed .universe-detail .hd {
+  justify-content: center;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+.universe-shell.detail-collapsed #collapse-detail-btn {
+  transform: rotate(180deg);
+  margin-left: 0;
+}
+.muted {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.universe-tabs,
+.universe-list,
+.ibkr-watchlists,
+.detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.universe-list,
+.ibkr-watchlists,
+.detail-list,
+.universe-table,
+.detail-body {
+  scrollbar-width: none;
+}
+.universe-list::-webkit-scrollbar,
+.ibkr-watchlists::-webkit-scrollbar,
+.detail-list::-webkit-scrollbar,
+.universe-table::-webkit-scrollbar,
+.detail-body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+.universe-tabs {
+  flex-direction: row;
+  margin-bottom: 12px;
+}
+.universe-link,
+.ibkr-watchlist-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--border);
+  background: rgba(7, 10, 13, .55);
+  padding: 10px;
+  color: var(--text);
+  text-decoration: none;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.universe-link {
+  gap: 8px;
+}
+.universe-link-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.universe-link[draggable="true"],
+.universe-row-item[draggable="true"] {
+  cursor: grab;
+}
+.section-reorder-mode .universe-section {
+  cursor: grab;
+}
+.universe-link[draggable="true"]:active,
+.universe-row-item[draggable="true"]:active,
+.section-reorder-mode .universe-section:active {
+  cursor: grabbing;
+}
+.universe-link.dragging,
+.universe-section.dragging,
+.universe-row-item.dragging {
+  opacity: .46;
+  outline: 1px dashed var(--accent);
+  outline-offset: -2px;
+}
+#toggle-section-reorder-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.ibkr-watchlist-row > span {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+.ibkr-watchlist-row small {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.universe-link.active {
+  border-color: var(--accent);
+  background: rgba(126, 87, 255, .16);
+}
+.ibkr-watchlist-status {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.add-row-strip {
+  display: grid;
+  grid-template-columns: minmax(130px, 170px) minmax(220px, 1fr) minmax(96px, 136px) minmax(170px, .75fr) minmax(54px, 64px);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.add-row-strip input,
+.add-row-strip select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, .55);
+  color: var(--text);
+  padding: 9px 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.add-row-strip .btn {
+  min-width: 0;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+.universe-search-box {
+  position: relative;
+  min-width: 0;
+}
+.candidate-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  border: 1px solid var(--border);
+  background: #06080b;
+  max-height: 280px;
+  overflow: auto;
+  box-shadow: 0 12px 30px rgba(0,0,0,.5);
+}
+.candidate-row {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr) 100px;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  padding: 9px 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.candidate-row:hover {
+  background: rgba(126, 87, 255, .14);
+}
+.candidate-row.muted {
+  display: block;
+  color: var(--muted);
+}
+.candidate-row span,
+.candidate-row em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-style: normal;
+}
+.universe-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.universe-section {
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,.22);
+}
+.universe-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.universe-section h3 {
+  margin: 0;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 15px;
+  letter-spacing: 0;
+}
+.universe-section-head span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.universe-section-head > div:first-of-type {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.section-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.icon-btn {
+  padding: 5px 7px;
+  font-size: 10px;
+}
+.btn.danger,
+.icon-btn.danger,
+.universe-context-menu button.danger {
+  border-color: rgba(251, 113, 133, .42);
+  color: #fecdd3;
+}
+.universe-table {
+  overflow-x: auto;
+}
+body:not(.route-home) .universe-row {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.05fr) minmax(120px, .7fr) minmax(390px, 2.7fr) 70px 70px 66px 70px 70px;
+  gap: 8px;
+  width: 100%;
+  min-width: 1010px;
+  box-sizing: border-box;
+  align-items: center;
+  border: 0;
+  border-bottom: 1px solid rgba(148, 163, 184, .16);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  padding: 9px 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.universe-row-head {
+  color: var(--muted);
+  text-transform: uppercase;
+  background: rgba(255,255,255,.03);
+}
+.universe-row-item:hover {
+  background: rgba(126, 87, 255, .12);
+}
+.universe-row-item.active {
+  background: rgba(126, 87, 255, .18);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.universe-row-item:focus {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+.universe-row strong {
+  display: block;
+  color: var(--text);
+  font-size: 12px;
+}
+.universe-row small {
+  display: block;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.universe-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.universe-name-cell > span:last-child {
+  min-width: 0;
+}
+.row-note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.pos {
+  color: #67e8a5;
+}
+.neg {
+  color: #fb7185;
+}
+.empty-state {
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  padding: 18px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.instrument-card h3,
+.instrument-card h4 {
+  margin: 0 0 8px;
+  font-family: var(--mono);
+  letter-spacing: 0;
+}
+.instrument-card h3 {
+  color: var(--accent);
+}
+.instrument-card p {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.instrument-kicker {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+.metric-grid div,
+.detail-list div {
+  border: 1px solid var(--border);
+  background: rgba(7,10,13,.5);
+  padding: 8px;
+  min-width: 0;
+}
+.metric-grid span,
+.detail-list span {
+  display: block;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+.metric-grid strong,
+.detail-list strong {
+  display: block;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.universe-row-editor {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  background: rgba(7,10,13,.5);
+}
+.row-editor-head,
+.row-editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.row-editor-head h4 {
+  margin: 0;
+}
+.row-editor-status {
+  min-height: 14px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.editor-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.editor-field span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.editor-field input,
+.editor-field select,
+.editor-field textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,.48);
+  color: var(--text);
+  padding: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  border-radius: 0;
+}
+.editor-field textarea {
+  resize: vertical;
+  min-height: 88px;
+  line-height: 1.45;
+}
+.row-editor-actions .btn {
+  min-width: 72px;
+}
+.universe-context-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 168px;
+  border: 1px solid var(--border);
+  background: #06080b;
+  box-shadow: 0 18px 45px rgba(0,0,0,.55);
+  padding: 6px;
+}
+.universe-context-menu button {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  padding: 8px 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.universe-context-menu button:hover {
+  background: rgba(126, 87, 255, .16);
+}
+@media (max-width: 1180px) {
+  .universe-shell {
+    grid-template-columns: 1fr;
+  }
+  .universe-shell.detail-collapsed {
+    grid-template-columns: 1fr;
+  }
+  .universe-shell.detail-collapsed .universe-detail .bd,
+  .universe-shell.detail-collapsed .universe-detail .hd h2 {
+    display: block;
+  }
+  .universe-shell.detail-collapsed #collapse-detail-btn {
+    transform: none;
+    margin-left: auto;
+  }
+  .universe-rail,
+  .universe-detail {
+    position: static;
+  }
+  .add-row-strip {
+    grid-template-columns: 1fr;
+  }
+  .editor-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (min-width: 1181px) {
+  .route-universes .wrap.wide {
+    max-width: min(2480px, calc(100vw - 28px));
+    margin-top: 12px;
+    padding-left: 14px;
+    padding-right: 14px;
+    padding-bottom: 0;
+  }
+  .universe-shell {
+    grid-template-columns: 300px minmax(0, 1fr) 380px;
+    align-items: stretch;
+    height: calc(100vh - 214px);
+    min-height: 720px;
+  }
+  .universe-shell.detail-collapsed {
+    grid-template-columns: 300px minmax(0, 1fr) 44px;
+  }
+  .universe-shell > .panel {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .universe-shell > .panel > .hd {
+    flex: 0 0 auto;
+    padding: 12px 14px;
+  }
+  .universe-shell > .panel > .bd {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 12px 14px;
+  }
+  .universe-main > .bd {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .add-row-strip {
+    flex: 0 0 auto;
+    grid-template-columns: minmax(150px, 200px) minmax(280px, 1fr) minmax(96px, 136px) minmax(200px, .7fr) 58px;
+    margin-bottom: 10px;
+  }
+  .universe-sections {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    gap: 10px;
+    padding-right: 4px;
+  }
+  .universe-section-head {
+    padding: 10px 12px;
+  }
+  body:not(.route-home) .universe-row {
+    min-width: 1010px;
+    padding: 8px 12px;
+  }
+}
+</style>
+<link rel="stylesheet" href="/static/universes_omori.css?v={{ settings.static_assets_version }}&amp;omori=3" />
+{% endblock %}

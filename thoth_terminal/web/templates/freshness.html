@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="hd">
+    <div>
+      <h2>Freshness Reviews</h2>
+      <div class="muted">AI-assisted checks that confirm whether stale-marked objects are actually stale.</div>
+    </div>
+  </div>
+  <div class="bd">
+    {% if rows %}
+      <div class="stack-list">
+        {% for row in rows %}
+          <div class="stack-row">
+            <div class="stack-title">{{ row.object_type }} #{{ row.object_id }} · {{ row.disposition }}</div>
+            <div class="stack-meta">
+              {% if row.checked_at %}<span data-utc="{{ row.checked_at }}">{{ row.checked_at }}</span>{% endif %}
+              {% if row.model %}<span>{{ row.model }}</span>{% endif %}
+              {% if row.live_web_used %}<span>live web</span>{% endif %}
+            </div>
+            {% if row.summary %}<div class="muted" style="margin-top:6px;">{{ row.summary }}</div>{% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-copy">No freshness reviews yet.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

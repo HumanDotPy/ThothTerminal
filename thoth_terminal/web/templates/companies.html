@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="issuers-page">
+  <section class="workspace-header">
+    <div class="workspace-copy">
+      <div class="workspace-kicker">Issuer Coverage / Three-Rail Intake</div>
+      <h1>Issuer coverage</h1>
+      <p>Thoth should make the three rails obvious at a glance: statutory filings, exchange disclosures, and IR artifacts. This page is the coverage map, not just a card grid of company names.</p>
+    </div>
+    <div class="workspace-summary">
+      <div class="workspace-stat">
+        <span class="workspace-stat-label">Tracked issuers</span>
+        <span class="workspace-stat-value">{{ total_issuers }}</span>
+        <span class="workspace-stat-copy">Current issuer universe in the terminal.</span>
+      </div>
+      <div class="workspace-stat">
+        <span class="workspace-stat-label">Recent flow</span>
+        <span class="workspace-stat-value">{{ recent_filings|length if recent_filings else 0 }}</span>
+        <span class="workspace-stat-copy">Recent artifacts across the three rails.</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="issuer-overview">
+    <h3>Three-rail model</h3>
+    <p><strong>FIL</strong> tracks statutory filings. <strong>DISC</strong> tracks exchange disclosures. <strong>IR</strong> tracks investor relations artifacts like decks, releases, and transcripts.</p>
+    <div class="chiprow">
+      <a class="filter-chip {{ 'active' if not region_filter else '' }}" href="/companies">All regions</a>
+      <a class="filter-chip {{ 'active' if region_filter == 'US' else '' }}" href="/companies?region=US">US</a>
+      <a class="filter-chip {{ 'active' if region_filter == 'APAC' else '' }}" href="/companies?region=APAC">APAC</a>
+      <a class="filter-chip {{ 'active' if region_filter == 'EU' else '' }}" href="/companies?region=EU">EU</a>
+    </div>
+    <form class="issuer-search" method="get" action="/companies">
+      {% if region_filter %}<input type="hidden" name="region" value="{{ region_filter }}" />{% endif %}
+      <input type="search" name="q" value="{{ query }}" placeholder="Search issuer, sector, or jurisdiction" />
+      <select name="page_size" aria-label="Issuers per page">
+        {% for size in [25, 50, 100] %}<option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ size }} / page</option>{% endfor %}
+      </select>
+      <button class="btn primary" type="submit">Search</button>
+      {% if query %}<a class="btn" href="/companies{% if region_filter %}?region={{ region_filter }}{% endif %}">Clear</a>{% endif %}
+    </form>
+  </div>
+
+  <div class="panel terminal-page-panel">
+    <div class="hd">
+      <div class="hd-left">
+        <h2>Issuer map</h2>
+        <span class="pill">{{ pagination.start }}–{{ pagination.end }} of {{ total_issuers }}</span>
+      </div>
+    </div>
+    <div class="bd">
+      {% if issuers and issuers|length > 0 %}
+        <div class="issuer-grid">
+          {% for issuer in issuers %}
+            <a class="issuer-card" href="{{ issuer.href or ('/companies/' ~ issuer.slug) }}">
+              <div class="issuer-header">
+                <div class="issuer-name">{{ issuer.display_name }}</div>
+                {% if issuer.primary_ticker %}
+                  <span class="pill ticker">{{ issuer.primary_ticker }}</span>
+                {% endif %}
+              </div>
+
+              <div class="issuer-meta">
+                {% if issuer.jurisdiction %}<span>{{ issuer.jurisdiction }}</span>{% endif %}
+                {% if issuer.sector %}<span>{{ issuer.sector }}</span>{% endif %}
+                {% if issuer.lei %}<span>LEI verified</span>{% endif %}
+              </div>
+
+              <div class="issuer-rails">
+                <div class="rail-indicator {% if issuer.filing_count > 0 %}active{% endif %}" title="Statutory Filings">
+                  <span class="rail-icon">FIL</span>
+                  <span class="rail-count">{{ issuer.filing_count or 0 }}</span>
+                </div>
+                <div class="rail-indicator {% if issuer.disclosure_count > 0 %}active{% endif %}" title="Exchange Disclosures">
+                  <span class="rail-icon">DISC</span>
+                  <span class="rail-count">{{ issuer.disclosure_count or 0 }}</span>
+                </div>
+                <div class="rail-indicator {% if issuer.ir_count > 0 %}active{% endif %}" title="IR Artifacts">
+                  <span class="rail-icon">IR</span>
+                  <span class="rail-count">{{ issuer.ir_count or 0 }}</span>
+                </div>
+              </div>
+
+              {% if issuer.next_earnings %}
+                <div class="issuer-earnings">
+                  <span class="earnings-label">Next earnings</span>
+                  <span class="earnings-date" data-utc="{{ issuer.next_earnings }}">{{ issuer.next_earnings }}</span>
+                  <span class="provenance pill {{ issuer.earnings_provenance }}">{{ issuer.earnings_provenance }}</span>
+                </div>
+              {% endif %}
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-callout">
+          <h3>No issuers tracked yet.</h3>
+          <p>Add issuers to build out the three rails: statutory filings, exchange disclosures, and IR artifacts. This index becomes useful only when the rail coverage is visible and comparable.</p>
+        </div>
+      {% endif %}
+    </div>
+    {% set pagination_label = 'Issuer coverage pages' %}
+    {% include "_traditional_pagination.html" %}
+  </div>
+
+  {% if recent_filings and recent_filings|length > 0 %}
+    <div class="panel terminal-page-panel">
+      <div class="hd">
+        <div class="hd-left">
+          <h2>Recent flow</h2>
+          <span class="pill">Last 7 days</span>
+        </div>
+      </div>
+      <div class="bd">
+        <div class="filing-list">
+          {% for filing in recent_filings[:20] %}
+            <div class="filing-row">
+              <div class="filing-type">
+                <span class="pill {{ filing.rail }}">{{ filing.type_label }}</span>
+              </div>
+              <div class="filing-info">
+                <span class="filing-issuer">{{ filing.issuer_name }}</span>
+                <span class="filing-title">{{ filing.title }}</span>
+              </div>
+              <div class="filing-date" data-utc="{{ filing.filed_at }}">{{ filing.filed_at.strftime('%Y-%m-%d') }}</div>
+              <div class="filing-links">
+                {% if filing.url %}
+                  <a href="{{ filing.url }}" target="_blank" rel="noopener" class="btn">View</a>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

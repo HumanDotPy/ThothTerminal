@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="informal-detail-page">
+  <header class="informal-detail-header">
+    <a class="btn" href="{{ '/worldview-journal' if journal|default(false) else '/informal-research' }}">&larr; Back</a>
+    <div class="informal-detail-title">
+      <div class="workspace-kicker">{{ 'Worldview Journal / Living Research' if journal|default(false) else 'Informal Research / Durable Record' }}</div>
+      <h1>{{ doc.title }}</h1>
+      <p>{{ doc.subject or "Unscoped" }}{% if doc.category %} / {{ doc.category }}{% endif %} / {{ doc.word_count }} words</p>
+    </div>
+    <span class="informal-detail-mark" aria-hidden="true">☆</span>
+  </header>
+
+  {% if doc.failure_reason %}
+    <div class="callout informal-detail-failure">
+      <strong>Canonical write failed</strong>
+      <p>{{ doc.failure_reason }}</p>
+      {% if doc.retry_payload %}<span class="chip">retry payload stored</span>{% endif %}
+      {% if doc.promotion_target %}<span class="chip">promotion target stored</span>{% endif %}
+    </div>
+  {% endif %}
+
+  <div class="informal-detail-grid">
+    <article class="panel informal-detail-document">
+      {% if doc.summary %}
+      <section class="informal-detail-summary">
+        <h2><span>Summary</span></h2>
+        <p>{{ doc.summary }}</p>
+      </section>
+      {% endif %}
+      {% if journal|default(false) and doc.payload and doc.payload.get('source_document_ids') %}
+      <section class="informal-detail-summary">
+        <h2><span>Source documents</span></h2>
+        <p>{% for source_id in doc.payload.get('source_document_ids', []) %}<a href="/docs/{{ source_id }}">Document #{{ source_id }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+      </section>
+      {% endif %}
+      <section class="informal-detail-content">
+        <h2><span>Content</span></h2>
+        <div class="doc-content prose">{{ content_html|safe }}</div>
+      </section>
+    </article>
+
+    <aside class="panel informal-detail-inspector">
+      <div class="hd"><h2>Document Inspector</h2></div>
+      <div class="bd">
+        <dl>
+          <div><dt>Subject</dt><dd>{{ doc.subject or "Unscoped" }}</dd></div>
+          <div><dt>Category</dt><dd>{{ doc.category or "unclassified" }}</dd></div>
+          <div><dt>Word count</dt><dd>{{ doc.word_count }}</dd></div>
+          <div><dt>Created</dt><dd>{{ doc.created_at or "unknown" }}</dd></div>
+          <div><dt>Status</dt><dd><span class="pill">{{ doc.status or "recorded" }}</span></dd></div>
+          <div><dt>Events</dt><dd>{{ events|length }}</dd></div>
+        </dl>
+        <div class="informal-detail-assessment">
+          <div class="workspace-kicker">Assessment</div>
+          {% if doc.failure_reason %}
+            <strong>Needs repair</strong>
+            <p>Canonical promotion did not complete. Retry context is retained with this record.</p>
+          {% elif doc.promotion_target %}
+            <strong>Promotion staged</strong>
+            <p>This informal write has a stored canonical promotion target.</p>
+          {% else %}
+            <strong>Recorded</strong>
+            <p>No failure or promotion condition is currently attached.</p>
+          {% endif %}
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <section class="panel informal-detail-events">
+    <div class="hd"><h2>Durable Events</h2><span class="pill">{{ events|length }}</span></div>
+    <div class="bd table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Kind</th>
+            <th>Summary</th>
+            <th>Delta</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for event in events %}
+            <tr>
+              <td>{{ event.created_at }}</td>
+              <td>{{ event.event_kind }}</td>
+              <td>
+                <div>{{ event.summary or "" }}</div>
+                {% if event.failure_reason %}<div class="muted">{{ event.failure_reason[:220] }}{% if event.failure_reason|length > 220 %}...{% endif %}</div>{% endif %}
+              </td>
+              <td>
+                {% set words_added = event.payload.get('words_added') if event.payload else none %}
+                {% if words_added is not none %}{{ words_added }} words{% else %}<span class="muted">n/a</span>{% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="4" class="muted">No events recorded.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</section>
+{% endblock %}

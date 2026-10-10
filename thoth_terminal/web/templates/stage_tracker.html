@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="viz-page">
+  <div class="viz-header">
+    <div class="viz-title-row">
+      <div>
+        <div class="kicker">Product Stage Tracker V2</div>
+        <h1>Reviewed state, draft candidate, and claim conflict in one surface</h1>
+        <p style="color:var(--muted);margin:8px 0 0;max-width:860px;">This tracker stays stage-centric. Reviewed state remains stable until a draft claim is accepted, while the compare surface shows where corroboration is building or where candidate claims now diverge.</p>
+      </div>
+      <div class="btnrow">
+        <a href="/instruments/requests" class="btn">Instrument Requests</a>
+        <a href="/visualizations/datasets" class="btn">Datasets</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid" style="grid-template-columns:1.12fr .88fr;gap:20px;align-items:start;">
+    <div style="display:flex;flex-direction:column;gap:18px;">
+      <div class="panel">
+        <div class="hd"><h2>Compare Surface</h2></div>
+        <div class="bd">
+          <form method="get" action="/stage-tracker" class="grid" style="grid-template-columns:1.2fr .8fr .8fr;gap:12px;margin-bottom:16px;">
+            <div class="field" style="margin:0;">
+              <label>Search</label>
+              <input type="text" name="q" value="{{ query }}" placeholder="HBM4, CPO, Rubin, transceiver" />
+            </div>
+            <div class="field" style="margin:0;">
+              <label>Company</label>
+              <input type="text" name="company" value="{{ company_filter }}" placeholder="Lumentum" />
+            </div>
+            <div class="field" style="margin:0;">
+              <label>Product</label>
+              <input type="text" name="product" value="{{ product_filter }}" placeholder="1.6T transceivers" />
+            </div>
+            <div class="field" style="margin:0;">
+              <label>Reviewed stage</label>
+              <select name="stage">
+                <option value="">All</option>
+                {% for value in ['r_and_d','sampling','qualification','pre_production','mass_production'] %}
+                <option value="{{ value }}" {% if stage_filter == value %}selected{% endif %}>{{ value }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="field" style="margin:0;">
+              <label>Status</label>
+              <input type="text" name="status" value="{{ status_filter }}" placeholder="draft / review / live" />
+            </div>
+            <div class="field" style="margin:0;">
+              <label>Highest evidence tier</label>
+              <input type="text" name="evidence_tier" value="{{ evidence_tier_filter }}" placeholder="issuer_confirmed" />
+            </div>
+            <div class="field" style="margin:0;">
+              <label>Conflict state</label>
+              <select name="conflict_state">
+                <option value="">All</option>
+                {% for value in ['none','single_source','corroborated','candidate_differs','contested'] %}
+                <option value="{{ value }}" {% if conflict_state_filter == value %}selected{% endif %}>{{ value }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="btnrow" style="justify-content:flex-end;grid-column:2 / span 2;align-self:end;">
+              <a class="btn" href="/stage-tracker">Reset</a>
+              <button class="btn primary" type="submit">Apply Filters</button>
+            </div>
+          </form>
+
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            {% for item in items %}
+            <a href="/stage-tracker/{{ item.id }}" class="panel" style="text-decoration:none;border-radius:16px;background:rgba(255,255,255,.025);">
+              <div class="bd" style="display:flex;flex-direction:column;gap:12px;">
+                <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
+                  <div>
+                    <div style="font-size:16px;font-weight:700;letter-spacing:-.01em;">{{ item.company_name }} · {{ item.product_name }}</div>
+                    <div style="color:var(--muted);font-size:12px;margin-top:4px;">
+                      last claim {{ item.last_claim_at or item.updated_at or 'unknown' }}
+                    </div>
+                  </div>
+                  <div class="viz-equities" style="gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+                    <span class="pill mono">{{ item.status }}</span>
+                    <span class="pill mono">{{ item.conflict_state }}</span>
+                    <span class="pill mono">{{ item.claim_count }} claims</span>
+                    {% if item.highest_evidence_tier %}<span class="pill mono">{{ item.highest_evidence_tier }}</span>{% endif %}
+                  </div>
+                </div>
+
+                <div class="grid-2col" style="gap:12px;">
+                  <div style="padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.02);">
+                    <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;">Reviewed Current State</div>
+                    {% if item.current_reviewed %}
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                      <span class="pill mono">{{ item.current_reviewed.stage }}</span>
+                      <span class="pill mono">{{ item.current_reviewed.certainty or item.certainty }}</span>
+                      {% if item.current_reviewed.evidence_tier %}<span class="pill mono">{{ item.current_reviewed.evidence_tier }}</span>{% endif %}
+                    </div>
+                    <div style="margin-top:8px;font-size:13px;color:var(--text);">
+                      {{ item.current_reviewed.target_date or item.current_reviewed.date_text or 'No reviewed date yet.' }}
+                    </div>
+                    {% else %}
+                    <div style="color:var(--muted);font-size:12px;">No accepted claim yet.</div>
+                    {% endif %}
+                  </div>
+
+                  <div style="padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.02);">
+                    <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;">Best Draft Candidate</div>
+                    {% if item.current_candidate %}
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                      <span class="pill mono">{{ item.current_candidate.stage }}</span>
+                      <span class="pill mono">{{ item.current_candidate.review_status }}</span>
+                      {% if item.current_candidate.evidence_tier %}<span class="pill mono">{{ item.current_candidate.evidence_tier }}</span>{% endif %}
+                    </div>
+                    <div style="margin-top:8px;font-size:13px;color:var(--text);">
+                      {{ item.current_candidate.target_date or item.current_candidate.date_text or 'No candidate date yet.' }}
+                    </div>
+                    {% else %}
+                    <div style="color:var(--muted);font-size:12px;">No draft candidate.</div>
+                    {% endif %}
+                  </div>
+                </div>
+
+                {% if item.current_candidate and item.current_candidate.id != item.resolved_claim_id and item.current_candidate.summary %}
+                <div style="font-size:13px;line-height:1.5;color:var(--muted);">{{ item.current_candidate.summary }}</div>
+                {% elif item.notes %}
+                <div style="font-size:13px;line-height:1.5;color:var(--muted);">{{ item.notes }}</div>
+                {% endif %}
+              </div>
+            </a>
+            {% else %}
+            <div class="viz-empty">
+              <h3>No tracked stage entries</h3>
+              <p>Seed the ledger with a manual reviewed state, then let Codex and follow-up workflows add attributed draft claims underneath it.</p>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;">
+      <div class="panel">
+        <div class="hd"><h2>Manual Override</h2></div>
+        <div class="bd">
+          <div style="color:var(--muted);font-size:13px;line-height:1.55;margin-bottom:12px;">This is the backward-compatible reviewed-state path. It creates an accepted manual claim and updates the resolved current view.</div>
+          <form id="stage-tracker-form" style="display:flex;flex-direction:column;gap:12px;">
+            <div class="grid-2col" style="gap:12px;">
+              <div class="field">
+                <label>Company</label>
+                <input type="text" name="company_name" required placeholder="Lumentum" />
+              </div>
+              <div class="field">
+                <label>Product</label>
+                <input type="text" name="product_name" required placeholder="1.6T Transceivers" />
+              </div>
+            </div>
+            <div class="grid-2col" style="gap:12px;">
+              <div class="field">
+                <label>Stage</label>
+                <select name="stage">
+                  {% for value in ['r_and_d','sampling','qualification','pre_production','mass_production'] %}
+                  <option value="{{ value }}">{{ value }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="field">
+                <label>Certainty</label>
+                <input type="text" name="certainty" value="reviewed" />
+              </div>
+            </div>
+            <div class="grid-2col" style="gap:12px;">
+              <div class="field">
+                <label>Target Date</label>
+                <input type="date" name="target_date" />
+              </div>
+              <div class="field">
+                <label>Date Precision</label>
+                <select name="date_precision">
+                  {% for value in ['day','month','quarter','year','text'] %}
+                  <option value="{{ value }}" {% if value == 'text' %}selected{% endif %}>{{ value }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label>Date Text</label>
+              <input type="text" name="date_text" placeholder="2028 at the earliest" />
+            </div>
+            <div class="grid-2col" style="gap:12px;">
+              <div class="field">
+                <label>Status</label>
+                <input type="text" name="status" value="review" />
+              </div>
+              <div class="field">
+                <label>Evidence Tier</label>
+                <input type="text" name="evidence_tier" placeholder="issuer_confirmed / sell_side" />
+              </div>
+            </div>
+            <div class="field">
+              <label>Notes</label>
+              <textarea name="notes" rows="4" placeholder="Why this reviewed state should anchor the current tracker view."></textarea>
+            </div>
+            <div class="field">
+              <label>History Note</label>
+              <input type="text" name="history_note" placeholder="Manual override after corroboration review" />
+            </div>
+            <div class="btnrow" style="justify-content:flex-end;">
+              <button class="btn primary" type="submit">Save Reviewed State</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hd"><h2>Stage Ladder</h2></div>
+        <div class="bd" style="display:flex;flex-direction:column;gap:10px;">
+          {% for value, label in [('r_and_d','Early work and core architecture'), ('sampling','Customer or internal sampling'), ('qualification','Reliability, design-in, or certification gating'), ('pre_production','Capacity prep before broad ramp'), ('mass_production','Sustained commercial output')] %}
+          <div style="padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.02);">
+            <div style="font-size:12px;font-family:var(--mono);color:#f3b54a;">{{ value }}</div>
+            <div style="font-size:13px;color:var(--muted);margin-top:4px;">{{ label }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  const form = document.getElementById('stage-tracker-form');
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const fd = new FormData(form);
+    const payload = Object.fromEntries(fd.entries());
+    const resp = await fetch('/api/stage-tracker', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (data.ok && data.redirect) {
+      window.location.href = data.redirect;
+      return;
+    }
+    quickToast(data.error || 'Failed to save stage entry', 'error');
+  });
+})();
+</script>
+{% endblock %}

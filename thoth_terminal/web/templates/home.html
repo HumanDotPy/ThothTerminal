@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% set intel = intelligence or {} %}
+{% set command = intel.get('command_center') or {} %}
+{% set metrics = command.get('metrics') or {} %}
+{% set mood = intel.get('portfolio_mood') or {} %}
+{% set portfolio = intel.get('portfolio_state') or {} %}
+{% set portfolio_metrics = portfolio.get('metrics') or {} %}
+{% set ibkr = ((intel.get('system_status') or {}).get('ibkr') or {}) %}
+{% set initial_mood = mood.get('primary_mood') if ibkr.get('connected') else 'neutral' %}
+{% block content %}
+<main class="home-v3" data-home-mood-root data-mood="{{ initial_mood or 'neutral' }}">
+  <section class="home-v3-hero">
+    <div class="home-v3-identity">
+      <div class="workspace-kicker">Tactical research terminal</div>
+      <h1>THOTH</h1>
+      <p>Research memory, model changes, and active investigations.</p>
+      <nav><a class="btn" href="/feed">Review evidence</a><a class="btn" href="/consensus">Open models</a><a class="btn" href="/agents/cloud">Investigate</a></nav>
+    </div>
+    <div class="home-v3-omori">
+      <div class="omori-live-stage"><img data-home-omori src="/omori-mood-runtime/previews/portraits/omori-{{ initial_mood if initial_mood in ['neutral','happy','ecstatic','manic','sad','depressed','miserable','angry','enraged','furious','victory','defeated','injured'] else 'neutral' }}.gif" alt="Omori portfolio state" /></div>
+      <div class="omori-live-copy"><span>Portfolio state</span><b data-home-mood-label>{{ (initial_mood or 'neutral')|upper }}</b><small>{{ mood.get('caption') or ('IBKR is not connected.' if not ibkr.get('connected') else 'Live portfolio state') }}</small></div>
+      <div class="home-v3-portfolio-stats">
+        <div><span>Day</span><b data-home-day>{{ portfolio_metrics.get('daily_pnl_pct', '—') }}</b></div>
+        <div><span>YTD</span><b data-home-ytd>{{ portfolio_metrics.get('ytd_pnl_pct', '—') }}</b></div>
+        <div><span>IBKR</span><b>{{ 'LIVE' if ibkr.get('connected') else 'STANDBY' if ibkr.get('enabled') else 'OFF' }}</b></div>
+      </div>
+      {% if ibkr.get('enabled') and not ibkr.get('connected') %}<a class="home-v3-auth" href="/ibkr/auth">Connect IBKR</a>{% elif not ibkr.get('enabled') %}<a class="home-v3-auth" href="/settings#integrations">Configure portfolio</a>{% endif %}
+    </div>
+    <div class="home-v3-brief">
+      <div class="home-v3-brief-head"><span>Session briefing</span><time>{{ (command.get('generated_at') or '')[:16].replace('T',' ') }}</time></div>
+      <div class="home-v3-metrics"><a href="/instruments/requests"><b>{{ metrics.get('open_gaps', 0) }}</b><span>open gaps</span></a><a href="/consensus"><b>{{ metrics.get('model_revisions', 0) }}</b><span>recent estimates</span></a><a href="/agents"><b>{{ metrics.get('active_runs', 0) }}</b><span>active agents</span></a></div>
+      <div class="home-v3-now">
+        {% for item in (command.get('attention') or [])[:3] %}<a href="{{ item.get('href') or '/feed' }}"><span>{{ ((item.get('reason_badges') or [item.get('event_type')])[0]) }}</span><b>{{ item.get('title') }}</b></a>{% else %}<p>No urgent changes.</p>{% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="home-v3-priority">
+    <div class="home-v3-section-head"><div><span>01</span><h2>Research priorities</h2></div><a href="/instruments/requests">All gaps</a></div>
+    <div class="home-v3-priority-grid">
+      <div class="home-v3-gaps"><h3>Open gaps</h3>{% for row in (command.get('research_gaps') or [])[:5] %}<a href="{{ row.get('href') }}"><span>P{{ row.get('priority') }}</span><div><b>{{ row.get('title') }}</b><small>{{ row.get('status') }}</small></div></a>{% else %}<p>No open research gaps.</p>{% endfor %}</div>
+      <div class="home-v3-memory"><h3>Durable memory</h3><div class="home-v3-memory-cols"><div>{% for row in (command.get('reports') or [])[:4] %}<a href="{{ row.get('href') }}"><b>{{ row.get('title') }}</b><small>Report · {{ row.get('status') }}</small></a>{% endfor %}</div><div>{% for row in (command.get('theses') or [])[:4] %}<a href="{{ row.get('href') }}"><b>{{ row.get('title') }}</b><small>Thesis · {{ row.get('status') }}</small></a>{% endfor %}</div></div></div>
+    </div>
+  </section>
+
+  <section class="home-v3-models">
+    <div class="home-v3-section-head"><div><span>02</span><h2>Recent estimates</h2></div><a href="/consensus">All models</a></div>
+    <div class="home-v3-model-table"><div class="home-v3-model-row is-head"><span>Subject / owner</span><span>Metric</span><span>Period</span><span>Value</span></div>{% for row in (command.get('model_revisions') or [])[:6] %}<a class="home-v3-model-row" href="{{ row.get('href') }}"><span><b>{{ row.get('subject') }}</b><small>{{ row.get('owner') }}</small></span><span>{{ row.get('metric') }}</span><span>{{ row.get('period') }}</span><span>{{ row.get('value') }} {{ row.get('unit') }}</span></a>{% else %}<p>No recent model changes.</p>{% endfor %}</div>
+  </section>
+
+  <div class="home-v3-details">
+    <details><summary><span><b>Attention queue</b><small>Material changes and unresolved intake</small></span><strong>{{ metrics.get('attention', 0) }}</strong></summary><div class="home-v3-detail-list">{% for item in command.get('attention') or [] %}<a href="{{ item.get('href') or '/feed' }}"><time>{{ (item.get('event_time') or '')[:10] }}</time><div><b>{{ item.get('title') }}</b><small>{{ item.get('summary') }}</small></div></a>{% endfor %}</div></details>
+    <details><summary><span><b>Agent execution</b><small>Runs, tools, errors, and throughput</small></span><strong>{{ (command.get('agent_runs') or [])|length }}</strong></summary><div class="home-v3-agent-list">{% for run in command.get('agent_runs') or [] %}<a href="/agents"><span>#{{ run.get('id') }} {{ run.get('run_type') }}</span><b>{{ run.get('status') }}</b><small>{{ run.get('tool_calls') if run.get('tool_calls') is not none else '—' }} tools · {{ ('%.1f tok/s'|format(run.get('generation_tps'))) if run.get('generation_tps') is not none else 'throughput unavailable' }}</small></a>{% endfor %}</div></details>
+  </div>
+</main>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const root = document.querySelector('[data-home-mood-root]');
+  const portrait = document.querySelector('[data-home-omori]');
+  if (!root || !portrait) return;
+  const supported = new Set(['neutral','happy','ecstatic','manic','sad','depressed','miserable','angry','enraged','furious','victory','defeated','injured']);
+  const pct = (value) => Number.isFinite(Number(value)) ? `${Number(value).toFixed(2)}%` : '—';
+  const portraitMood = (mood) => supported.has(mood) ? mood : ['afraid','terrified'].includes(mood) ? 'defeated' : mood === 'stressed' ? 'injured' : 'neutral';
+  function render(mood, metrics = {}) {
+    const normalized = String(mood || 'neutral');
+    root.dataset.mood = normalized;
+    portrait.src = `/omori-mood-runtime/previews/portraits/omori-${portraitMood(normalized)}.gif`;
+    document.querySelector('[data-home-mood-label]').textContent = normalized.replaceAll('_',' ').toUpperCase();
+    document.querySelector('[data-home-day]').textContent = pct(metrics.daily_pnl_pct);
+    document.querySelector('[data-home-ytd]').textContent = pct(metrics.ytd_pnl_pct);
+  }
+  fetch('/api/home/portfolio?live=false&include_market=false')
+    .then((response) => response.ok ? response.json() : Promise.reject())
+    .then((payload) => {
+      const status = payload.ibkr_status || {};
+      const metrics = (payload.portfolio_state || {}).metrics || (payload.portfolio_mood || {}).metrics || {};
+      const mood = status.connected && window.ThothPortfolioMood?.moodFromPerformance ? window.ThothPortfolioMood.moodFromPerformance(metrics) : 'neutral';
+      window.ThothMoodState?.write?.({ mood, character: 'omori', source: status.connected ? 'portfolio' : 'default' });
+      render(mood, status.connected ? metrics : {});
+    }).catch(() => render('neutral', {}));
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,531 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="earnings-page">
+  <div class="earnings-layout">
+    <div class="panel sidebar">
+      <div class="hd">
+        <h2>Calendar</h2>
+      </div>
+      <div class="bd">
+        <div class="field">
+          <label>View</label>
+          <div class="chiprow">
+            <button class="filter-chip {{ 'active' if view == 'upcoming' else '' }}" type="button" data-view="upcoming">Upcoming</button>
+            <button class="filter-chip {{ 'active' if view == 'recent' else '' }}" type="button" data-view="recent">Recent</button>
+            <button class="filter-chip {{ 'active' if view == 'all' else '' }}" type="button" data-view="all">All</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Date Provenance</label>
+          <div class="provenance-legend">
+            <div class="legend-item">
+              <span class="legend-dot issuer"></span>
+              <span class="legend-label">Issuer Published</span>
+              <span class="legend-desc">Highest confidence</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot exchange"></span>
+              <span class="legend-label">Exchange Calendar</span>
+              <span class="legend-desc">High confidence</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot third_party"></span>
+              <span class="legend-label">Third-party Aggregated</span>
+              <span class="legend-desc">Medium confidence</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot estimated"></span>
+              <span class="legend-label">Estimated/Inferred</span>
+              <span class="legend-desc">Low confidence</span>
+            </div>
+          </div>
+        </div>
+
+        <hr style="border:0;border-top:1px solid var(--border);margin:14px 0;" />
+
+        <div class="field">
+          <label>Quick Filters</label>
+          <div class="chiprow" style="flex-wrap:wrap;">
+            <button class="filter-chip {{ 'active' if not sector_filter else '' }}" type="button" data-sector="">All Sectors</button>
+            <button class="filter-chip {{ 'active' if sector_filter == 'semis' else '' }}" type="button" data-sector="semis">Semiconductors</button>
+            <button class="filter-chip {{ 'active' if sector_filter == 'tech' else '' }}" type="button" data-sector="tech">Tech</button>
+            <button class="filter-chip {{ 'active' if sector_filter == 'materials' else '' }}" type="button" data-sector="materials">Materials</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="hd">
+        <div class="hd-left">
+          <h2>Earnings Calendar</h2>
+          <span class="pill">{{ events|length }} events</span>
+        </div>
+        <div class="btnrow">
+          <a class="btn" href="/earnings/export" target="_blank">Export iCal</a>
+        </div>
+      </div>
+
+      <div class="bd">
+        {% if events and events|length > 0 %}
+          <div class="earnings-timeline">
+            {% set current_date = namespace(value=None) %}
+            {% for event in events %}
+              {% if event.scheduled_date != current_date.value %}
+                {% set current_date.value = event.scheduled_date %}
+                <div class="date-header">
+                  <span class="date-day">{{ event.scheduled_date.strftime('%a') }}</span>
+                  <span class="date-full">{{ event.scheduled_date.strftime('%B %d, %Y') }}</span>
+                  {% if event.is_today %}
+                    <span class="pill today">Today</span>
+                  {% endif %}
+                </div>
+              {% endif %}
+              
+              <div class="earnings-event {{ 'completed' if event.status == 'completed' else '' }} {{ 'upcoming' if event.is_upcoming else '' }}">
+                <div class="event-time">
+                  {% if event.scheduled_time %}
+                    <span class="time">{{ event.scheduled_time }}</span>
+                    <span class="tz">{{ event.scheduled_tz or 'ET' }}</span>
+                  {% else %}
+                    <span class="time bmo-amc">{{ 'BMO' if event.is_bmo else 'AMC' if event.is_amc else '—' }}</span>
+                  {% endif %}
+                </div>
+                
+                <div class="event-provenance">
+                  <span class="provenance-dot {{ event.date_provenance }}" title="{{ event.date_provenance|replace('_', ' ')|title }}"></span>
+                </div>
+
+                <div class="event-info">
+                  <div class="event-header">
+                    {% if event.company_slug %}
+                      <a class="event-issuer" href="/companies/{{ event.company_slug }}">{{ event.issuer_name }}</a>
+                    {% else %}
+                      <span class="event-issuer">{{ event.issuer_name }}</span>
+                    {% endif %}
+                    {% if event.primary_ticker %}
+                      <span class="pill ticker">{{ event.primary_ticker }}</span>
+                    {% endif %}
+                    <span class="event-period">{{ event.period_label }}</span>
+                  </div>
+                  
+                  <div class="event-artifacts">
+                    {% if event.release_url %}
+                      <a href="{{ event.release_url }}" target="_blank" rel="noopener" class="artifact-link release" title="Earnings Release">📄</a>
+                    {% endif %}
+                    {% if event.presentation_url %}
+                      <a href="{{ event.presentation_url }}" target="_blank" rel="noopener" class="artifact-link presentation" title="Presentation">📊</a>
+                    {% endif %}
+                    {% if event.webcast_url %}
+                      <a href="{{ event.webcast_url }}" target="_blank" rel="noopener" class="artifact-link webcast" title="Webcast">🎥</a>
+                    {% endif %}
+                    {% if event.transcript_url %}
+                      <a href="{{ event.transcript_url }}" target="_blank" rel="noopener" class="artifact-link transcript" title="Transcript">📝</a>
+                    {% endif %}
+                    {% if event.filing_url %}
+                      <a href="{{ event.filing_url }}" target="_blank" rel="noopener" class="artifact-link filing" title="SEC Filing">📋</a>
+                    {% endif %}
+                  </div>
+                </div>
+
+                <div class="event-status">
+                  {% if event.status == 'completed' %}
+                    <span class="status-badge completed">✓ Completed</span>
+                  {% elif event.status == 'confirmed' %}
+                    <span class="status-badge confirmed">Confirmed</span>
+                  {% elif event.status == 'postponed' %}
+                    <span class="status-badge postponed">Postponed</span>
+                  {% else %}
+                    <span class="status-badge scheduled">Scheduled</span>
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-state">
+            <div class="empty-icon">📅</div>
+            <div class="empty-title">No earnings events</div>
+            <div class="empty-desc">
+              Earnings events will appear here once you add issuers to track.
+              <br><br>
+              <strong>How earnings dates are sourced:</strong>
+              <ul style="text-align:left;margin:12px auto;max-width:450px;">
+                <li><strong>Issuer IR Calendars</strong> (iCal/ICS) - highest confidence</li>
+                <li><strong>Exchange Event Calendars</strong> - high confidence</li>
+                <li><strong>SEC 8-K Item 2.02</strong> filings - confirms actual release</li>
+                <li><strong>Third-party aggregators</strong> - medium confidence</li>
+              </ul>
+              <p style="font-size:11px;opacity:0.7;">Provenance is labeled on each event so you know the source quality.</p>
+            </div>
+            <a class="btn primary" href="/companies">Browse Issuers</a>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="panel sidebar">
+      <div class="hd">
+        <h2>Recent Results</h2>
+      </div>
+      <div class="bd">
+        {% if recent_results and recent_results|length > 0 %}
+          <div class="results-list">
+            {% for result in recent_results[:10] %}
+              <div class="result-item">
+                <div class="result-header">
+                  {% if result.company_slug %}
+                    <a class="result-issuer" href="/companies/{{ result.company_slug }}">{{ result.issuer_name }}</a>
+                  {% else %}
+                    <span class="result-issuer">{{ result.issuer_name }}</span>
+                  {% endif %}
+                  <span class="result-period">{{ result.period_label }}</span>
+                </div>
+                <div class="result-date">{{ result.actual_release_at.strftime('%b %d') if result.actual_release_at else '—' }}</div>
+                <div class="result-links">
+                  {% if result.release_url %}
+                    <a href="{{ result.release_url }}" target="_blank" class="btn" style="padding:4px 8px;font-size:9px;">Release</a>
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div style="color:var(--muted);font-family:var(--mono);font-size:11px;text-align:center;padding:20px;">
+            No recent results available.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.earnings-page {
+  min-height: 100%;
+}
+
+.earnings-layout {
+  display: grid;
+  grid-template-columns: 240px 1fr 240px;
+  gap: 14px;
+}
+
+@media (max-width: 1200px) {
+  .earnings-layout {
+    grid-template-columns: 1fr;
+  }
+  .earnings-layout .sidebar {
+    display: none;
+  }
+}
+
+.provenance-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.legend-item {
+  display: grid;
+  grid-template-columns: 10px 1fr;
+  grid-template-rows: auto auto;
+  gap: 0 8px;
+  align-items: center;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  grid-row: span 2;
+}
+
+.legend-dot.issuer, .legend-dot.issuer_published { background: #22c55e; }
+.legend-dot.exchange, .legend-dot.exchange_calendar { background: #3b82f6; }
+.legend-dot.third_party, .legend-dot.third_party_aggregated { background: #a855f7; }
+.legend-dot.estimated { background: #9ca3af; }
+
+.legend-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+}
+
+.legend-desc {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--muted);
+}
+
+.earnings-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.date-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0 6px;
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
+}
+
+.date-header:first-child {
+  margin-top: 0;
+  border-top: none;
+  padding-top: 0;
+}
+
+.date-day {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+.date-full {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.pill.today {
+  background: rgba(255,176,32,.2);
+  color: var(--accent);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.earnings-event {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: rgba(7,10,13,.4);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: border-color 0.15s ease;
+}
+
+.earnings-event:hover {
+  border-color: var(--accent);
+}
+
+.earnings-event.completed {
+  opacity: 0.7;
+}
+
+.earnings-event.upcoming {
+  border-color: rgba(255,176,32,.3);
+  background: rgba(255,176,32,.05);
+}
+
+.event-time {
+  flex: 0 0 60px;
+  text-align: center;
+}
+
+.event-time .time {
+  display: block;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.event-time .tz {
+  display: block;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--muted);
+}
+
+.event-time .bmo-amc {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.event-provenance {
+  flex: 0 0 16px;
+}
+
+.provenance-dot {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.provenance-dot.issuer_published { background: #22c55e; }
+.provenance-dot.exchange_calendar { background: #3b82f6; }
+.provenance-dot.third_party_aggregated { background: #a855f7; }
+.provenance-dot.estimated { background: #9ca3af; }
+
+.event-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.event-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.event-issuer {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.pill.ticker {
+  background: rgba(255,176,32,.15);
+  color: var(--accent);
+  font-size: 9px;
+  padding: 2px 5px;
+}
+
+.event-period {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.event-artifacts {
+  display: flex;
+  gap: 8px;
+}
+
+.artifact-link {
+  font-size: 14px;
+  text-decoration: none;
+  opacity: 0.6;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.artifact-link:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.event-status {
+  flex: 0 0 auto;
+}
+
+.status-badge {
+  font-family: var(--mono);
+  font-size: 9px;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.status-badge.completed {
+  background: rgba(34,197,94,.15);
+  color: #22c55e;
+}
+
+.status-badge.confirmed {
+  background: rgba(59,130,246,.15);
+  color: #3b82f6;
+}
+
+.status-badge.scheduled {
+  background: rgba(156,163,175,.15);
+  color: #9ca3af;
+}
+
+.status-badge.postponed {
+  background: rgba(239,68,68,.15);
+  color: #ef4444;
+}
+
+.results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.result-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  background: rgba(7,10,13,.4);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.result-issuer {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.result-period {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--muted);
+}
+
+.result-date {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.result-links {
+  margin-top: 4px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--muted);
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.empty-title {
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.empty-desc {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+  max-width: 500px;
+  margin: 0 auto 20px;
+}
+</style>
+{% endblock %}

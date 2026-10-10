@@ -1,0 +1,6 @@
+.harness-workspace { display:flex; flex-direction:column; min-height:360px; height:calc(100dvh - 178px); overflow:hidden; border:1px solid var(--terminal-line); border-radius:12px; background:var(--terminal-bg-0); }
+.harness-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 12px; color:var(--muted); font-size:12px; }
+.harness-toolbar>div { display:flex; gap:6px; flex-wrap:wrap; }
+#harness-frame { flex:1; min-height:0; width:100%; border:0; background:var(--terminal-bg-0); }
+#harness-frame[hidden] { display:none; }
+@media(max-width:700px) { .harness-workspace { height:calc(100dvh - 210px); min-height:320px; } .harness-toolbar { align-items:flex-start; } }

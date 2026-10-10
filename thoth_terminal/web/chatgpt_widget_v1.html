@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Thoth Terminal</title>
+  <style>
+    :root{color-scheme:light dark;--bg:#f4efe6;--panel:rgba(255,255,255,.88);--line:rgba(32,24,15,.12);--ink:#1f1a14;--muted:#6b6358;--accent:#0f766e;--soft:rgba(15,118,110,.12)}
+    @media (prefers-color-scheme: dark){:root{--bg:#151210;--panel:rgba(31,26,22,.92);--line:rgba(255,255,255,.1);--ink:#f6efe2;--muted:#c9bca8;--soft:rgba(45,212,191,.14)}}
+    *{box-sizing:border-box}html,body{margin:0;background:radial-gradient(circle at top left,rgba(15,118,110,.14),transparent 30%),var(--bg);color:var(--ink);font:14px/1.5 "Segoe UI",Arial,sans-serif}
+    body{padding:14px}.shell{max-width:980px;margin:0 auto;display:grid;gap:14px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px}
+    .hero{display:grid;gap:10px}.hero-top,.row,.card-head{display:flex;gap:8px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap}.brand{display:flex;gap:12px;align-items:center}
+    .glyph{width:40px;height:40px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(145deg,rgba(15,118,110,.18),rgba(180,83,9,.18));color:var(--accent);font:700 18px/1 Georgia,serif}
+    .eyebrow,.meta{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}.meta{text-transform:none;letter-spacing:0}
+    h1,h2,h3{margin:0;font-family:Georgia,serif;line-height:1.15}h1{font-size:28px;max-width:22ch}h2{font-size:20px}h3{font-size:18px}
+    button,.chip{border:1px solid var(--line);border-radius:999px;padding:7px 12px;background:transparent;color:inherit;font:inherit}.primary{background:var(--accent);border-color:var(--accent);color:#f6fffd}
+    .chip{background:var(--soft);cursor:default}.stack,.grid{display:grid;gap:10px}.grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+    .card,.metric,.block{border:1px solid var(--line);border-radius:14px;padding:13px;background:rgba(255,255,255,.05)}.metric strong{display:block;font-size:20px}
+    .text,pre{white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,.04);border:1px solid var(--line);border-radius:14px;padding:13px;margin:0;overflow:auto}
+    .table{overflow:auto;border:1px solid var(--line);border-radius:14px}.table table{width:100%;border-collapse:collapse;min-width:520px}.table th,.table td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}.table th{font-size:12px;color:var(--muted)}
+    .empty{text-align:center;color:var(--muted);padding:40px 12px}.loading{opacity:.7}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="panel hero">
+      <div class="hero-top">
+        <div class="brand">
+          <div class="glyph">TT</div>
+          <div>
+            <div class="eyebrow">ChatGPT App</div>
+            <h1 id="title">Thoth Terminal</h1>
+          </div>
+        </div>
+        <div id="status" class="chip">Ready</div>
+      </div>
+      <div id="summary" class="meta">Interactive research views load here after a Thoth tool runs.</div>
+      <div class="row">
+        <button id="back" hidden>Back</button>
+        <button id="refresh" hidden>Refresh</button>
+      </div>
+    </section>
+    <section id="app" class="panel empty">Ask ChatGPT to search Thoth documents, open a company, fetch a report, or inspect a dataset.</section>
+  </div>
+  <script type="module">
+    const app = document.getElementById("app"), title = document.getElementById("title"), summary = document.getElementById("summary"), statusEl = document.getElementById("status"), back = document.getElementById("back"), refresh = document.getElementById("refresh");
+    const pending = new Map(), state = { current: null, history: [], drilldown: null };
+    const esc = (v) => String(v ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;");
+    const clip = (v, n = 420) => { const s = String(v ?? "").trim(); return s.length > n ? `${s.slice(0, n)}...` : s; };
+    const fmtDate = (v) => { if (!v) return "Unknown"; const d = new Date(v); return Number.isNaN(d.getTime()) ? String(v) : new Intl.DateTimeFormat(undefined,{year:"numeric",month:"short",day:"numeric"}).format(d); };
+    const chip = (v) => v ? `<span class="chip">${esc(v)}</span>` : "";
+    const metric = (k, v) => `<div class="metric"><div class="meta">${esc(k)}</div><strong>${esc(v)}</strong></div>`;
+    const toolData = (tool, args = {}) => esc(encodeURIComponent(JSON.stringify({ tool, args })));
+    const openData = (url) => esc(encodeURIComponent(JSON.stringify({ url })));
+    const btn = (label, tool, args = {}, cls = "") => `<button class="${esc(cls)}" data-tool="${toolData(tool, args)}">${esc(label)}</button>`;
+    const openBtn = (label, url) => url ? `<button data-open="${openData(url)}">${esc(label)}</button>` : "";
+    const normalize = (payload) => {
+      let value = payload;
+      if (value && typeof value === "object" && value.result) value = value.result;
+      if (value && typeof value === "object" && value.params) value = value.params;
+      if (!value || typeof value !== "object") return { structuredContent: {}, content: [], _meta: {} };
+      if (!("structuredContent" in value) && !("content" in value) && !("_meta" in value)) return { structuredContent: value, content: [], _meta: {} };
+      return { structuredContent: value.structuredContent ?? {}, content: Array.isArray(value.content) ? value.content : [], _meta: value._meta && typeof value._meta === "object" ? value._meta : {} };
+    };
+    const meta = (env) => env && env._meta && env._meta.thoth && typeof env._meta.thoth === "object" ? env._meta.thoth : {};
+    const payload = (env) => meta(env).result && typeof meta(env).result === "object" ? meta(env).result : env.structuredContent ?? {};
+    const rpc = (method, params = {}, timeoutMs = 20000) => new Promise((resolve, reject) => {
+      const id = `thoth-${Date.now()}-${Math.random().toString(16).slice(2)}`, timer = window.setTimeout(() => { pending.delete(id); reject(new Error(`Timed out waiting for ${method}`)); }, timeoutMs);
+      pending.set(id, { resolve: (value) => { clearTimeout(timer); resolve(value); }, reject: (error) => { clearTimeout(timer); reject(error); } });
+      window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, "*");
+    });
+    const callTool = async (tool, args = {}) => {
+      if (window.openai && typeof window.openai.callTool === "function") return normalize(await window.openai.callTool(tool, args));
+      return normalize(await rpc("tools/call", { name: tool, arguments: args }));
+    };
+    const openExternal = async (url) => {
+      if (!url) return;
+      if (window.openai && typeof window.openai.openExternal === "function") { await window.openai.openExternal(url); return; }
+      window.open(url, "_blank", "noopener,noreferrer");
+    };
+    const docCards = (items, tool) => `<div class="stack">${items.map((item) => `<article class="card"><div class="card-head"><div><h3>${esc(item.title || `Document ${item.id}`)}</h3><div class="meta">${esc(item.source || "Unknown source")} · ${esc(fmtDate(item.published_at))}</div></div></div><div>${esc(clip(item.summary || item.text || "", 300))}</div><div class="row">${btn("Open detail", tool, { id: item.id }, "primary")}${openBtn("Open source", item.url)}</div></article>`).join("")}</div>`;
+    const table = (rows) => { const items = Array.isArray(rows) ? rows.slice(0, 12) : []; const cols = items[0] ? Object.keys(items[0]).slice(0, 8) : []; return !cols.length ? `<div class="empty">No preview rows.</div>` : `<div class="table"><table><thead><tr>${cols.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${items.map((row) => `<tr>${cols.map((c) => `<td>${esc(row[c] ?? "")}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`; };
+    const renderBody = (tool, value) => {
+      if (tool === "search_documents") return docCards(value.documents || [], "get_document");
+      if (tool === "search") return docCards((value.results || []).map((row) => ({ ...row, summary: row.title })), "fetch");
+      if (tool === "get_document" || tool === "fetch") return `<div class="stack"><div class="row"><div>${chip(value.source || value.metadata?.source)}${chip(fmtDate(value.published_at || value.metadata?.published_at))}</div><div>${openBtn("Open source", value.url)}</div></div><div class="text">${esc(value.text || value.metadata?.text_excerpt || "No text available.")}</div></div>`;
+      if (tool === "list_companies") return `<div class="stack">${(value.companies || []).map((row) => `<article class="card"><h3>${esc(row.display_name || row.name || row.slug || "Company")}</h3><div class="meta">${esc(row.primary_ticker || row.ticker || "No ticker")} · ${esc(row.sector || "Unknown sector")} · ${esc(row.industry || "Unknown industry")}</div><div class="row">${btn("Overview", "get_company", row.slug ? { slug: row.slug } : { id: row.id }, "primary")}${row.company_slug ? btn("Company docs", "list_company_docs", { company_slug: row.company_slug }) : ""}</div></article>`).join("")}</div>`;
+      if (tool === "get_company") return `<div class="stack"><div class="row"><div>${chip(value.primary_ticker)}${chip(value.sector)}${chip(value.industry)}</div><div>${openBtn("IR site", value.ir_url)}</div></div><div class="grid">${metric("Filings", value.filing_count ?? 0)}${metric("Disclosures", value.disclosure_count ?? 0)}${metric("IR artifacts", value.ir_count ?? 0)}${metric("Evidence links", value.evidence_count ?? 0)}</div><div class="row">${value.company_slug ? btn("Company docs", "list_company_docs", { company_slug: value.company_slug }, "primary") : ""}${btn("Research report", "get_research_report", { subject: value.primary_ticker || value.slug || value.display_name })}</div></div>`;
+      if (tool === "list_company_docs") return docCards(value.documents || [], "get_document");
+      if (tool === "list_research_reports") return `<div class="stack">${(value.reports || []).map((row) => `<article class="card"><h3>${esc(row.display_name || row.title || row.slug || "Research report")}</h3><div class="meta">${esc(row.subject_kind || row.kind || "subject")} · ${esc(row.primary_ticker || row.subject_key || "unkeyed")}</div><div class="row">${btn("Open report", "get_research_report", { subject: row.subject_key || row.slug || row.display_name }, "primary")}</div></article>`).join("")}</div>`;
+      if (tool === "get_research_report") { const report = value.report || {}, version = value.version || {}, content = value.content || {}, timeline = Array.isArray(content.primary_source_timeline) ? content.primary_source_timeline.slice(0, 6) : []; return `<div class="stack"><div class="row"><div>${chip(report.subject_kind)}${chip(report.primary_ticker)}${version.version ? chip(`v${version.version}`) : ""}</div><div>${report.subject_key ? btn("Knowledge assets", "list_knowledge_assets", { subject: report.subject_key, published_only: true }) : ""}</div></div><div class="grid">${metric("Sections", (content.section_order || []).length)}${metric("Timeline", timeline.length)}${metric("Updated", fmtDate(version.published_at || report.updated_at))}</div><div class="block"><div class="meta">Freshness</div><div>${esc(clip(JSON.stringify(content.identity_freshness || {}), 520))}</div></div>${timeline.length ? `<div class="block"><div class="meta">Recent timeline</div>${timeline.map((row) => `<div><strong>${esc(row.title || row.label || "Untitled entry")}</strong><div class="meta">${esc(fmtDate(row.published_at || row.date))}</div></div>`).join("")}</div>` : ""}</div>`; }
+      if (tool === "list_knowledge_assets") return `<div class="stack">${(value.assets || []).map((row) => `<article class="card"><h3>${esc(row.title || row.slug || "Knowledge asset")}</h3><div class="meta">${esc(row.kind || "asset")} · ${esc(row.subject_display_name || row.subject_slug || "subject")}</div><div>${esc(clip(row.summary || "", 240))}</div><div class="row">${btn("Open asset", "get_knowledge_asset", row.slug ? { slug: row.slug } : { id: row.id }, "primary")}</div></article>`).join("")}</div>`;
+      if (tool === "get_knowledge_asset") { const asset = value.asset || value, version = asset.published_version || asset.draft_version || {}; return `<div class="stack"><div>${chip(asset.kind)}${chip(asset.subject_display_name || asset.subject_slug)}</div><div class="text">${esc(version.content_md || asset.summary || "No published or draft markdown content yet.")}</div></div>`; }
+      if (tool === "list_datasets") return `<div class="stack">${(value.datasets || []).map((row) => `<article class="card"><h3>${esc(row.title || row.slug || "Dataset")}</h3><div class="meta">${esc(row.family || row.category || "general")} · ${esc(row.status || "active")} · ${esc(row.row_count ?? 0)} rows</div><div class="row">${btn("Open dataset", "get_dataset", { id: row.id }, "primary")}</div></article>`).join("")}</div>`;
+      if (tool === "get_dataset" || tool === "query_dataset") return `<div class="stack"><div class="grid">${metric("Columns", Array.isArray(value.columns) ? value.columns.length : 0)}${metric("Rows", Array.isArray(value.rows) ? value.rows.length : value.row_count ?? 0)}${metric("Views", Array.isArray(value.views) ? value.views.length : 0)}</div>${table(value.rows)}</div>`;
+      if (tool === "list_supply_chains") return `<div class="stack">${(value.supply_chains || []).map((row) => `<article class="card"><h3>${esc(row.title || row.slug || "Supply chain")}</h3><div class="meta">${esc(row.product || row.category || "general")} · ${esc(row.status || "active")}</div><div class="row">${btn("Open chain", "get_supply_chain", { id: row.id }, "primary")}</div></article>`).join("")}</div>`;
+      if (tool === "get_supply_chain") return `<div class="stack"><div class="grid">${metric("Nodes", Array.isArray(value.nodes) ? value.nodes.length : 0)}${metric("Edges", Array.isArray(value.edges) ? value.edges.length : 0)}${metric("Alerts", Array.isArray(value.alerts) ? value.alerts.length : 0)}</div><div class="row">${(value.nodes || []).slice(0, 8).map((node) => btn(node.name || node.id || "Node", "get_supply_chain_node", { id: value.id, node_key: node.id || node.key || node.node_id })).join("")}</div></div>`;
+      if (tool === "list_earnings_calendar") return docCards(value.upcoming || [], "get_document");
+      return `<pre>${esc(JSON.stringify(value, null, 2))}</pre>`;
+    };
+    const render = () => {
+      back.hidden = state.history.length === 0;
+      if (!state.current) { title.textContent = "Thoth Terminal"; summary.textContent = "Interactive research views load here after a Thoth tool runs."; statusEl.textContent = "Ready"; app.className = "panel empty"; app.textContent = "Ask ChatGPT to search Thoth documents, open a company, fetch a report, or inspect a dataset."; refresh.hidden = true; return; }
+      const info = meta(state.current), value = payload(state.current), tool = info.toolName || "thoth";
+      title.textContent = info.toolTitle || tool.replaceAll("_", " ");
+      summary.textContent = info.summary || "Thoth returned a fresh result.";
+      statusEl.textContent = info.resultState || "Loaded";
+      app.className = "panel";
+      app.innerHTML = renderBody(tool, value);
+      refresh.hidden = !state.drilldown;
+    };
+    const setCurrent = (env, push = true, drilldown = null) => { if (push && state.current) state.history.push({ env: state.current, drilldown: state.drilldown }); state.current = env; state.drilldown = drilldown; app.classList.remove("loading"); render(); };
+    const startLoading = (tool) => { statusEl.textContent = tool ? `Running ${tool}` : "Loading"; app.classList.add("loading"); refresh.hidden = true; };
+    back.onclick = () => { const prev = state.history.pop(); if (!prev) return; state.current = prev.env; state.drilldown = prev.drilldown; render(); };
+    refresh.onclick = async () => { if (!state.drilldown) return; try { startLoading(state.drilldown.tool); setCurrent(await callTool(state.drilldown.tool, state.drilldown.args || {}), false, state.drilldown); } catch (error) { statusEl.textContent = "Refresh failed"; summary.textContent = String(error?.message || error || "Unknown error"); app.classList.remove("loading"); } };
+    app.onclick = async (event) => {
+      const target = event.target instanceof HTMLElement ? event.target.closest("button") : null;
+      if (!target) return;
+      const toolBlob = target.getAttribute("data-tool"), openBlob = target.getAttribute("data-open");
+      if (openBlob) { const { url } = JSON.parse(decodeURIComponent(openBlob)); await openExternal(url); return; }
+      if (!toolBlob) return;
+      const { tool, args } = JSON.parse(decodeURIComponent(toolBlob));
+      try { startLoading(tool); setCurrent(await callTool(tool, args || {}), true, { tool, args: args || {} }); } catch (error) { statusEl.textContent = "Action failed"; summary.textContent = String(error?.message || error || "Unknown error"); app.classList.remove("loading"); }
+    };
+    window.addEventListener("message", (event) => {
+      if (event.source !== window.parent) return;
+      const message = event.data;
+      if (!message || message.jsonrpc !== "2.0") return;
+      if (message.method === "ui/notifications/tool-result") { setCurrent(normalize(message.params), false); return; }
+      if (!message.id || !pending.has(message.id)) return;
+      const listener = pending.get(message.id); pending.delete(message.id);
+      if (message.error) { listener.reject(new Error(message.error.message || "Unknown bridge error")); return; }
+      listener.resolve(message.result);
+    });
+    const initial = window.openai && window.openai.toolOutput ? normalize(window.openai.toolOutput) : null;
+    if (initial) setCurrent(initial, false); else render();
+  </script>
+</body>
+</html>

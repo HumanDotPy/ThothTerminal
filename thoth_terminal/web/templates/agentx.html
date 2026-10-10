@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-section informal-surface worldview-surface">
+  <div class="section-header"><div><p class="eyebrow">Serving and architecture</p><h1>AgentX models</h1>
+    <p class="muted">Measured serving economics and research-backed architecture scenarios, with assumptions and missing inputs visible.</p></div>
+    <a class="btn" href="/datasets">Source datasets</a></div>
+  <div class="informal-row"><div class="informal-main">
+    <label for="agentx-mode">Calculation</label>
+    <select id="agentx-mode"><option value="canonical">Canonical — measured AgentX runs</option><option value="theoretical">Theoretical — documented mechanisms and resource bounds</option></select>
+    <label for="agentx-model">Benchmark model</label><select id="agentx-model">{% for item in context.model_options %}<option value="{{ item.source_model }}">{{ item.display_model }} · {{ item.source_model }}</option>{% endfor %}</select>
+    <p id="agentx-source" class="muted">{% if context.benchmark_version_id %}Published benchmark snapshot #{{ context.benchmark_version_id }}{% else %}No published AgentX snapshot. Import benchmarks through the existing AgentX sync before canonical evaluation.{% endif %}</p>
+    <button class="btn" id="agentx-refresh" type="button">Refresh published benchmarks</button>
+    <label for="agentx-input">Configuration and evidence</label>
+    <textarea id="agentx-input" rows="22" spellcheck="false" aria-describedby="agentx-help" style="width:100%;font-family:monospace"></textarea>
+    <p id="agentx-help" class="muted">Set prices, license terms and costs explicitly. Theoretical scenarios require exact mechanism references, composition reasoning and complete resource accounting. <a href="/api/agentx/context">Available snapshots</a> · <a href="/api/agentx/schema?mode=canonical">Economics schema</a> · <a href="/api/agentx/schema?mode=theoretical">Architecture schema</a>.</p>
+    <button class="btn" id="agentx-evaluate" type="button">Evaluate</button>
+  </div></div>
+  <p id="agentx-status" role="status" aria-live="polite"></p>
+  <div id="agentx-summary" class="informal-list"></div>
+  <details id="agentx-details"><summary>Calculation, assumptions and provenance</summary><pre id="agentx-result" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre></details>
+  <div class="informal-row"><div class="informal-main"><h2>Save a version</h2>
+    <label for="agentx-key">Configuration key</label><input id="agentx-key" placeholder="kimi-k3-owned-2026" />
+    <label for="agentx-rationale">What changed and why</label><textarea id="agentx-rationale" rows="3" style="width:100%"></textarea>
+    <button class="btn" id="agentx-save" type="button">Evaluate and save</button>
+    <p class="muted">Saved versions retain the inputs, evidence and evaluated result. Later releases can supersede a theoretical configuration; earlier versions remain available.</p>
+  </div></div>
+  <h2>Saved configurations</h2><div class="informal-list">{% for item in context.configurations %}<p><a href="/agentx?configuration_key={{ item.configuration_key|urlencode }}">{{ item.name }}</a> · <a href="/datasets/{{ item.dataset_id }}">Dataset</a></p>{% else %}<p class="muted">No saved configurations.</p>{% endfor %}</div>
+  <p class="muted">{{ context.configuration_count }} configurations; displaying at most {{ context.configuration_limit }}.</p>
+</section>
+<script>
+(() => {
+  const context = {{ context|tojson }};
+  const initial = {{ initial|tojson }};
+  const byId = id => document.getElementById(id);
+  const input = byId('agentx-input');
+  const mode = byId('agentx-mode');
+  const model = byId('agentx-model');
+  let expectedVersion = initial?.version_id ?? null;
+  let expectedKey = initial?.record.configuration_key ?? null;
+  const defaults = {
+    canonical: {configuration: {scenario_id:'explicit-economics', min_p90_interactivity_tok_s_user:45,
+      billable_utilization:0.6, availability:1,
+      prices:{input_usd_per_mtok:null,cached_input_usd_per_mtok:null,output_usd_per_mtok:null,realization_multiplier:1},
+      royalty_revenue_share:null,royalty_fixed_usd_per_gpu_hour:null,
+      tco:{mode:'owned',scope:'all_in',all_in_usd_per_gpu_hour:null,basis:''}, utility_power_w_per_gpu:null, annual_hours:8760}},
+    theoretical: {configuration:{scope:'serving_architecture',workload:{phase:'decode',context_tokens:4096,batch_tokens:8},
+      precision:{weight_bytes:2,kv_bytes:2,compute_format:'bf16'},components:[],composition:{rationale:'',interfaces:[]},
+      architecture_accounting:{full_forward_path:false,unresolved_gaps:['Define and source every component and resource budget'],coverage:{}},
+      hardware:{},assumptions:[]},evidence_catalog:[]}
+  };
+  function fill() { input.value = JSON.stringify(defaults[mode.value], null, 2); model.disabled = mode.value !== 'canonical'; }
+  mode.addEventListener('change', fill);
+  if (initial) {
+    const saved = initial.record.configuration;
+    mode.value = saved.mode;
+    if (saved.model && !Array.from(model.options).some(o => o.value === saved.model)) model.add(new Option(saved.model,saved.model));
+    if (saved.model) model.value = saved.model;
+    input.value = JSON.stringify(saved,null,2);
+    model.disabled = saved.mode !== 'canonical';
+    byId('agentx-key').value = initial.record.configuration_key;
+    byId('agentx-result').textContent = JSON.stringify(initial.record.evaluation,null,2);
+  } else fill();
+  function payload() {
+    const p = JSON.parse(input.value); p.mode = mode.value;
+    if (p.mode === 'canonical') { p.model = model.value; p.benchmark_version_id ??= context.benchmark_version_id; }
+    return p;
+  }
+  function show(result) {
+    byId('agentx-result').textContent = JSON.stringify(result,null,2);
+    const summary = byId('agentx-summary'); summary.replaceChildren();
+    const records = result.results || [result];
+    records.forEach(row => {
+      const article = document.createElement('article'); article.className='informal-row';
+      const main = document.createElement('div'); main.className='informal-main'; article.append(main);
+      const heading = document.createElement('h3'); heading.textContent=row.recipe?.hardware || row.status || 'Resource calculation'; main.append(heading);
+      const gap = document.createElement('p'); gap.textContent = (row.gaps || []).map(g => typeof g === 'string' ? g : JSON.stringify(g)).join(' · ') || 'No unresolved calculation inputs'; main.append(gap);
+      const pre = document.createElement('pre'); pre.style.whiteSpace='pre-wrap'; pre.textContent=JSON.stringify(row.metrics || row.bounds || {},null,2); main.append(pre); summary.append(article);
+    });
+  }
+  async function run(save) {
+    const evaluateButton=byId('agentx-evaluate'), saveButton=byId('agentx-save'); evaluateButton.disabled=saveButton.disabled=true;
+    byId('agentx-status').textContent=save?'Evaluating and saving…':'Evaluating…';
+    try {
+      const p=payload();
+      if(save){p.configuration_key=byId('agentx-key').value;p.change_summary=byId('agentx-rationale').value;
+        p.expected_version_id=p.configuration_key===expectedKey ? expectedVersion : null;}
+      const response=await fetch(save?'/api/agentx/configurations':'/api/agentx/evaluate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
+      const data=await response.json();if(!response.ok || !data.ok) throw new Error(data.error || 'Calculation failed');
+      show(save?data.evaluation:data.result);
+      if(save){expectedVersion=data.version_id;expectedKey=data.configuration_key;byId('agentx-status').textContent=`Saved version ${data.version} (snapshot #${data.version_id}).`;}
+      else byId('agentx-status').textContent=`Evaluation: ${data.result.status || 'complete'}`;
+    }catch(error){byId('agentx-status').textContent=error.message;}
+    finally{evaluateButton.disabled=saveButton.disabled=false;}
+  }
+  byId('agentx-evaluate').addEventListener('click',()=>run(false));
+  byId('agentx-save').addEventListener('click',()=>run(true));
+  byId('agentx-refresh').addEventListener('click',async()=>{
+    const button=byId('agentx-refresh');button.disabled=true;
+    byId('agentx-status').textContent='Refreshing public AgentX data and derived datasets…';
+    try{const response=await fetch('/api/agentx/refresh',{method:'POST'});const data=await response.json();
+      if(!response.ok || !data.ok) throw new Error(data.error || 'Refresh failed');
+      window.location.reload();
+    }catch(error){byId('agentx-status').textContent=error.message;button.disabled=false;}
+  });
+})();
+</script>
+{% endblock %}

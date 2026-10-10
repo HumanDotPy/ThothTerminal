@@ -1,0 +1,843 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="thesis-header">
+  <div>
+    <div class="kicker">Thesis</div>
+    <h1 style="margin:6px 0 4px;">{{ thesis.title }}</h1>
+    <div class="meta-row">
+      <span class="pill">{{ thesis.status }}</span>
+      <span class="pill">imp {{ thesis.importance }}</span>
+      {% if thesis.stale_after_days %}<span class="pill">stale {{ thesis.stale_after_days }}d</span>{% endif %}
+      <span class="pill">updated {{ thesis.updated_at.strftime('%Y-%m-%d') }}</span>
+    </div>
+  </div>
+  <div class="btnrow">
+    {% if edit_mode %}
+      <a class="btn" href="/theses/{{ thesis.id }}?tab={{ active_tab }}">View</a>
+    {% else %}
+      <a class="btn" href="/theses/{{ thesis.id }}?tab=evidence">Add evidence</a>
+      <a class="btn primary" href="/theses/{{ thesis.id }}?tab={{ active_tab }}&edit=1">Edit</a>
+    {% endif %}
+  </div>
+</div>
+
+{% if not edit_mode %}
+  <div class="tabbar">
+    {% set tabs = ['overview','data','evidence','notes','advanced'] %}
+    {% for t in tabs %}
+      <a class="tab {% if active_tab == t %}active{% endif %}" href="/theses/{{ thesis.id }}?tab={{ t }}">{{ t|capitalize }}</a>
+    {% endfor %}
+  </div>
+
+  {% if active_tab == 'overview' %}
+    <div class="grid" style="grid-template-columns: 1.15fr .85fr; gap: 16px; margin-top: 10px;">
+      <div>
+        <div class="panel" style="margin-bottom: 16px;">
+          <div class="hd"><h2>Statement</h2></div>
+          <div class="bd">
+            <div class="thesis-statement-box">{{ thesis.statement }}</div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom: 16px;">
+          <div class="hd"><h2>Key Metric</h2></div>
+          <div class="bd">
+            {% if primary_prop %}
+              <div class="metric-title">
+                {{ metric.subject or 'Subject' }}
+                {% if metric.topic %} · {{ metric.topic }}{% endif %}
+                {% if metric.name %} · {{ metric.name }}{% elif metric.key %} · {{ metric.key }}{% endif %}
+              </div>
+              <div class="metric-sub">
+                Unit: {{ metric.unit or primary_prop.unit or '—' }} · Type: {{ metric.value_type }}
+              </div>
+              <div class="metric-key">Key: {{ metric.key }}</div>
+              {% if latest_obs %}
+                <div class="metric-latest">
+                  Latest: 
+                  {% if latest_obs.value_number is not none %}{{ latest_obs.value_number }}{% elif latest_obs.value_text %}{{ latest_obs.value_text }}{% else %}{{ 'true' if latest_obs.value_bool else 'false' }}{% endif %}
+                  {% if latest_obs.target_year %}
+                    <span class="pill">{{ latest_obs.target_year }}{% if latest_obs.target_quarter %}Q{{ latest_obs.target_quarter }}{% endif %}{{ latest_obs.estimate_flag or '' }}</span>
+                  {% endif %}
+                </div>
+              {% endif %}
+            {% else %}
+              <div style="color:var(--muted);font-family:var(--mono);font-size:12px;">No primary metric set yet.</div>
+              <div class="btnrow" style="margin-top:8px;">
+                <a class="btn" href="/theses/{{ thesis.id }}?edit=1#metric">Set primary metric</a>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="hd"><h2>Metadata</h2></div>
+          <div class="bd">
+            {% if thesis.entities %}
+              <div class="thesis-link-row"><span class="pill">Entities</span>
+                {% for e in entity_chips %}
+                  {% if e.href %}
+                    <a class="pill" href="{{ e.href }}">{{ e.name }} · {{ e.kind }}</a>
+                  {% else %}
+                    <span class="pill">{{ e.name }} · {{ e.kind }}</span>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            {% endif %}
+            {% if thesis.domains %}
+              <div class="thesis-link-row"><span class="pill">Domains</span>
+                {% for d in thesis.domains %}<span class="pill">{{ d.slug }}</span>{% endfor %}
+              </div>
+            {% endif %}
+            {% if thesis.tags %}
+              <div class="thesis-link-row"><span class="pill">Tags</span>
+                {% for t in thesis.tags %}<span class="pill">{{ t.slug }}</span>{% endfor %}
+              </div>
+            {% endif %}
+            {% if thesis.event_types %}
+              <div class="thesis-link-row"><span class="pill">Events</span>
+                {% for e in thesis.event_types %}<span class="pill">{{ e.slug }}</span>{% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel" style="margin-bottom: 16px;">
+          <div class="hd"><h2>Confidence</h2></div>
+          <div class="bd">
+            <div class="confidence-score">{{ confidence.score }}%</div>
+            <div class="confidence-bar">
+              <div class="confidence-fill" style="width: {{ confidence.score }}%;"></div>
+            </div>
+            <div class="confidence-meta">
+              support {{ confidence.support }} · neutral {{ confidence.neutral }} · contradict {{ confidence.contradict }}
+              {% if confidence.overdue_days is not none and confidence.overdue_days > 0 %}
+                · overdue {{ confidence.overdue_days }}d
+              {% elif confidence.days_until_stale is not none and confidence.days_until_stale > 0 %}
+                · due in {{ confidence.days_until_stale }}d
+              {% elif confidence.is_stale %}
+                · due
+              {% endif %}
+            </div>
+            {% if confidence.trend_values and confidence.trend_values|length > 1 %}
+              <canvas class="sparkline" data-sparkline data-values="{{ confidence.trend_values|join(',') }}"></canvas>
+              <div class="confidence-meta">evidence trend ({{ confidence.trend_values|length }} points)</div>
+            {% endif %}
+          </div>
+        </div>
+        <div class="panel" style="margin-bottom: 16px;">
+          <div class="hd"><h2>Autopilot</h2><span class="pill">{{ evidence_need.score }}/100</span></div>
+          <div class="bd">
+            <div class="confidence-meta">
+              Evidence need {{ evidence_need.label }}
+              {% if evidence_need.overdue_days is not none and evidence_need.overdue_days > 0 %}· overdue {{ evidence_need.overdue_days }}d{% endif %}
+              · {{ autopilot.candidate_count }} candidate{% if autopilot.candidate_count != 1 %}s{% endif %}
+            </div>
+            {% if thesis_actions %}
+              <div style="margin:10px 0 12px;">
+                {% for action in thesis_actions %}
+                  <div class="evidence-item compact" style="margin-bottom:8px;">
+                    <div class="evidence-top">
+                      <div class="evidence-meta">
+                        <span class="pill">{{ action.kind }}</span>
+                        <span class="pill">{{ action.status }}</span>
+                        <span class="pill">prio {{ action.priority }}</span>
+                      </div>
+                    </div>
+                    <div class="evidence-title">{{ action.title }}</div>
+                    {% if action.rationale %}<div class="evidence-note">{{ action.rationale }}</div>{% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+            {% if autopilot.top_candidates %}
+              {% for cand in autopilot.top_candidates[:3] %}
+                <div class="evidence-item compact" style="margin-bottom:8px;">
+                  <div class="evidence-top">
+                    <div class="evidence-meta">
+                      <span class="pill">{{ cand.score_pct }}%</span>
+                      <span class="pill">{{ cand.source or 'source' }}</span>
+                      {% if cand.matched_entities %}
+                        <span class="pill">{{ cand.matched_entities|join(', ') }}</span>
+                      {% endif %}
+                    </div>
+                  </div>
+                  <div class="evidence-title"><a href="/docs/{{ cand.document_id }}" target="_blank" rel="noopener noreferrer">{{ cand.title }}</a></div>
+                  <div class="evidence-note">{{ cand.precedence_note }}</div>
+                  {% if cand.reasons %}
+                    <div class="confidence-meta">{{ cand.reasons|join(' · ') }}</div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            {% else %}
+              <div style="color:var(--muted);font-family:var(--mono);font-size:12px;">No recent candidate evidence met the autopilot threshold.</div>
+            {% endif %}
+          </div>
+        </div>
+        <div class="panel" style="margin-bottom: 16px;">
+          <div class="hd"><h2>Evidence highlights</h2><span class="pill">{{ evidence_highlights|length }}</span></div>
+          <div class="bd">
+            {% for ev in evidence_highlights %}
+              {% set doc = ev.document %}
+              <div class="evidence-item compact">
+                <div class="evidence-top">
+                  <div class="evidence-meta">
+                    <span class="pill {{ 'ok' if ev.polarity == 'support' else ('bad' if ev.polarity == 'contradict' else '') }}">{{ ev.polarity }}</span>
+                    <span class="pill">{{ doc.source.name if doc and doc.source else 'source' }}</span>
+                    {% if doc %}
+                      <span data-utc="{{ (doc.published_at or doc.ingested_at).strftime('%Y-%m-%dT%H:%M:%S') }}">{{ (doc.published_at or doc.ingested_at).strftime("%Y-%m-%d %H:%M") }}</span>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="evidence-title">
+                  {% if doc %}
+                    {% set t = doc.title %}
+                    {% if doc.translation_en and doc.extra and doc.extra.get('translation_title_en') %}
+                      {% set t = doc.extra.get('translation_title_en') %}
+                    {% endif %}
+                    <a href="/docs/{{ doc.id }}" target="_blank" rel="noopener noreferrer">{{ t or (doc.url or ('doc ' ~ doc.id)) }}</a>
+                  {% else %}
+                    (missing document)
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+            {% if evidence_highlights|length == 0 %}
+              <div style="color:var(--muted);font-family:var(--mono);font-size:12px;">No evidence yet.</div>
+            {% endif %}
+            <div class="btnrow" style="margin-top:10px;justify-content:flex-end;">
+              <a class="btn" href="/theses/{{ thesis.id }}?tab=evidence">View all</a>
+            </div>
+          </div>
+        </div>
+        <div class="panel" style="margin-bottom: 16px;">
+          <div class="hd"><h2>Research Context</h2></div>
+          <div class="bd" style="display:flex;flex-direction:column;gap:14px;">
+            <div>
+              <div class="pill">Datasets</div>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+                {% for link, dataset in linked_dataset_rows %}
+                  <div class="link-row">
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                      <span class="pill">{{ link.relation }}</span>
+                      <a class="btn" href="/visualizations/datasets/{{ dataset.id }}">{{ dataset.title }}</a>
+                    </div>
+                    <form method="post" action="/theses/{{ thesis.id }}/unlink/dataset" onsubmit="return confirm('Unlink dataset from thesis?');">
+                      <input type="hidden" name="dataset_id" value="{{ dataset.id }}" />
+                      <button class="btn" type="submit" style="padding:6px 10px;">✕</button>
+                    </form>
+                  </div>
+                {% else %}
+                  <div style="color:var(--muted);font-size:12px;">No linked datasets.</div>
+                {% endfor %}
+              </div>
+              <details style="margin-top:10px;">
+                <summary style="cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--muted);">Link dataset</summary>
+                <form method="post" action="/theses/{{ thesis.id }}/link/dataset" style="margin-top:10px;" class="link-form">
+                  <div class="field">
+                    <label>Search</label>
+                    <input type="text" class="thesis-input" data-search="dataset" placeholder="Search datasets..." />
+                    <div class="search-results" data-results="dataset" style="display:none;"></div>
+                    <input type="hidden" name="dataset_id" data-selected-id="dataset" value="" />
+                    <input type="hidden" name="relation" value="context" />
+                  </div>
+                  <div class="btnrow" style="justify-content:flex-end;">
+                    <button class="btn primary" type="submit">Link</button>
+                  </div>
+                </form>
+              </details>
+            </div>
+            <div>
+              <div class="pill">Charts</div>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+                {% for chart in linked_charts %}
+                  <a class="btn" href="/visualizations/{{ chart.id }}">{{ chart.title }}</a>
+                {% else %}
+                  <div style="color:var(--muted);font-size:12px;">No linked charts.</div>
+                {% endfor %}
+              </div>
+            </div>
+            <div>
+              <div class="pill">Supply Chains</div>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+                {% for link, chain in linked_supply_chain_rows %}
+                  <div class="link-row">
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                      <span class="pill">{{ link.relation }}</span>
+                      <a class="btn" href="/visualizations/supply-chains/{{ chain.id }}/command-center">{{ chain.title }}</a>
+                    </div>
+                    <form method="post" action="/theses/{{ thesis.id }}/unlink/supply-chain" onsubmit="return confirm('Unlink supply chain from thesis?');">
+                      <input type="hidden" name="chain_id" value="{{ chain.id }}" />
+                      <button class="btn" type="submit" style="padding:6px 10px;">✕</button>
+                    </form>
+                  </div>
+                {% else %}
+                  <div style="color:var(--muted);font-size:12px;">No linked supply chains.</div>
+                {% endfor %}
+              </div>
+              <details style="margin-top:10px;">
+                <summary style="cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--muted);">Link supply chain</summary>
+                <form method="post" action="/theses/{{ thesis.id }}/link/supply-chain" style="margin-top:10px;" class="link-form">
+                  <div class="field">
+                    <label>Search</label>
+                    <input type="text" class="thesis-input" data-search="supply_chain" placeholder="Search supply chains..." />
+                    <div class="search-results" data-results="supply_chain" style="display:none;"></div>
+                    <input type="hidden" name="chain_id" data-selected-id="supply_chain" value="" />
+                    <input type="hidden" name="relation" value="context" />
+                  </div>
+                  <div class="btnrow" style="justify-content:flex-end;">
+                    <button class="btn primary" type="submit">Link</button>
+                  </div>
+                </form>
+              </details>
+            </div>
+            <div>
+              <div class="pill">Stage Tracker</div>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+                {% for row in linked_stage_rows %}
+                  <div class="link-row">
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                      <span class="pill">{{ row.conflict_state }}</span>
+                      <a class="btn" href="/stage-tracker/{{ row.id }}">{{ row.company_name }} · {{ row.product_name }}</a>
+                    </div>
+                    <form method="post" action="/theses/{{ thesis.id }}/unlink/stage-tracker" onsubmit="return confirm('Unlink stage tracker entry from thesis?');">
+                      <input type="hidden" name="entry_id" value="{{ row.id }}" />
+                      <button class="btn" type="submit" style="padding:6px 10px;">✕</button>
+                    </form>
+                  </div>
+                  <div style="color:var(--muted);font-size:12px;">
+                    reviewed {{ row.current_reviewed.stage if row.current_reviewed else 'none' }}
+                    {% if row.current_candidate and (not row.current_reviewed or row.current_candidate.id != row.current_reviewed.id) %}
+                    · candidate {{ row.current_candidate.stage }}
+                    {% endif %}
+                  </div>
+                {% else %}
+                  <div style="color:var(--muted);font-size:12px;">No linked stage tracker entries.</div>
+                {% endfor %}
+              </div>
+              <details style="margin-top:10px;">
+                <summary style="cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--muted);">Link stage tracker entry</summary>
+                <form method="post" action="/theses/{{ thesis.id }}/link/stage-tracker" style="margin-top:10px;" class="link-form">
+                  <div class="field">
+                    <label>Search</label>
+                    <input type="text" class="thesis-input" data-search="product_stage" placeholder="Search stage tracker entries..." />
+                    <div class="search-results" data-results="product_stage" style="display:none;"></div>
+                    <input type="hidden" name="entry_id" data-selected-id="product_stage" value="" />
+                  </div>
+                  <div class="btnrow" style="justify-content:flex-end;">
+                    <button class="btn primary" type="submit">Link</button>
+                  </div>
+                </form>
+              </details>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% elif active_tab == 'data' %}
+    <div class="panel" style="margin-top: 10px;">
+      <div class="hd"><h2>Data</h2></div>
+      <div class="bd">
+        {% if data_rows|length > 0 %}
+          <div class="table-preview">
+            <table class="table-preview-table">
+              <thead>
+                <tr>
+                  <th>Period</th>
+                  {% for label in data_labels %}
+                    <th>{{ label }}</th>
+                  {% endfor %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in data_rows %}
+                  <tr>
+                    <td>{{ row.period }}</td>
+                    {% for v in row.values %}
+                      <td>{{ v }}</td>
+                    {% endfor %}
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div style="color:var(--muted);font-family:var(--mono);font-size:12px;">No datapoints yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  {% elif active_tab == 'evidence' %}
+    <div class="panel" style="margin-top: 10px;">
+      <div class="hd"><h2>Evidence</h2><span class="pill">{{ evidence_total }}</span></div>
+      <div class="bd">
+        <details style="margin-bottom:12px;">
+          <summary style="cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--muted);">Add evidence</summary>
+          <form method="post" action="/theses/{{ thesis.id }}/evidence/add" style="margin-top:10px;">
+            <div class="field">
+              <label>Search documents</label>
+              <input type="text" class="thesis-input" data-search="doc" placeholder="Search docs..." />
+              <div class="search-results" data-results="doc" style="display:none;"></div>
+              <input type="hidden" name="document_id" data-selected-id="doc" value="" />
+            </div>
+            <div class="field">
+              <label>Recent documents</label>
+              <select name="document_id_recent" id="evidence-doc-select">
+                <option value="">None / use search or link below</option>
+                {% for d in recent_docs %}
+                  {% set t = d.title %}
+                  {% if d.translation_en and d.extra and d.extra.get('translation_title_en') %}
+                    {% set t = d.extra.get('translation_title_en') %}
+                  {% endif %}
+                  <option value="{{ d.id }}">#{{ d.id }} · {{ (t or d.url or 'doc')[:90] }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="field">
+              <label>Attach external link (optional)</label>
+              <input type="url" name="link_url" placeholder="https://..." />
+              <input type="text" name="link_title" placeholder="Optional title" style="margin-top:8px;" />
+            </div>
+            <div class="field">
+              <label>Polarity</label>
+              <select name="polarity">
+                <option value="neutral">none</option>
+                <option value="support" selected>support</option>
+                <option value="contradict">contradict</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Snippet (optional)</label>
+              <textarea name="snippet" rows="2" placeholder="Short excerpt"></textarea>
+            </div>
+            <div class="field">
+              <label>Note (optional)</label>
+              <input type="text" name="note" placeholder="Context / why it matters" />
+            </div>
+            <div class="btnrow" style="justify-content:flex-end;">
+              <button class="btn primary" type="submit">Attach evidence</button>
+            </div>
+          </form>
+        </details>
+
+        <form method="get" action="/theses/{{ thesis.id }}" class="grid" style="grid-template-columns:1fr 1fr 1fr auto; gap:10px; align-items:end;">
+          <input type="hidden" name="tab" value="evidence" />
+          <div class="field">
+            <label>Search</label>
+            <input type="text" name="ev_q" value="{{ evidence_q }}" placeholder="title or url" />
+          </div>
+          <div class="field">
+            <label>Polarity</label>
+            <select name="ev_polarity">
+              <option value="">Any</option>
+              {% for p in ['support','neutral','contradict'] %}
+                <option value="{{ p }}" {% if evidence_polarity == p %}selected{% endif %}>{{ p }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label>Source</label>
+            <select name="ev_source">
+              <option value="">Any</option>
+              {% for s in evidence_sources %}
+                <option value="{{ s }}" {% if evidence_source == s %}selected{% endif %}>{{ s }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field" style="display:flex;align-items:flex-end;">
+            <button class="btn" type="submit">Filter</button>
+          </div>
+        </form>
+
+        <div style="margin-top:12px;">
+          {% for ev in evidence_items %}
+            {% set doc = ev.document %}
+            <div class="evidence-item">
+              <div class="evidence-top">
+                <div class="evidence-meta">
+                  <span class="pill {{ 'ok' if ev.polarity == 'support' else ('bad' if ev.polarity == 'contradict' else '') }}">{{ ev.polarity }}</span>
+                  <span class="pill">{{ doc.source.name if doc and doc.source else 'source' }}</span>
+                  {% if doc %}
+                    <span data-utc="{{ (doc.published_at or doc.ingested_at).strftime('%Y-%m-%dT%H:%M:%S') }}">{{ (doc.published_at or doc.ingested_at).strftime("%Y-%m-%d %H:%M") }}</span>
+                  {% endif %}
+                </div>
+                <form method="post" action="/theses/{{ thesis.id }}/evidence/{{ ev.id }}/delete" onsubmit="return confirm('Remove this evidence link?');">
+                  <button class="btn" type="submit" style="padding:6px 10px;">✕</button>
+                </form>
+              </div>
+              <div class="evidence-title">
+                {% if doc %}
+                  {% set t = doc.title %}
+                  {% if doc.translation_en and doc.extra and doc.extra.get('translation_title_en') %}
+                    {% set t = doc.extra.get('translation_title_en') %}
+                  {% endif %}
+                  <a href="/docs/{{ doc.id }}" target="_blank" rel="noopener noreferrer">{{ t or (doc.url or ('doc ' ~ doc.id)) }}</a>
+                {% else %}
+                  (missing document)
+                {% endif %}
+              </div>
+              {% if ev.snippet %}
+                <div class="evidence-snippet">{{ ev.snippet }}</div>
+              {% endif %}
+              {% if ev.note %}
+                <div class="evidence-note">{{ ev.note }}</div>
+              {% endif %}
+            </div>
+          {% endfor %}
+          {% if evidence_items|length == 0 %}
+            <div style="color:var(--muted);font-family:var(--mono);font-size:12px;">No evidence yet.</div>
+          {% endif %}
+        </div>
+
+        {% if evidence_pages > 1 %}
+          <div class="btnrow" style="margin-top:12px;justify-content:flex-end;">
+            {% if evidence_page > 1 %}
+              <a class="btn" href="/theses/{{ thesis.id }}?tab=evidence&ev_page={{ evidence_page - 1 }}&ev_q={{ evidence_q }}&ev_polarity={{ evidence_polarity }}&ev_source={{ evidence_source }}">Prev</a>
+            {% endif %}
+            <span class="pill">Page {{ evidence_page }} / {{ evidence_pages }}</span>
+            {% if evidence_page < evidence_pages %}
+              <a class="btn" href="/theses/{{ thesis.id }}?tab=evidence&ev_page={{ evidence_page + 1 }}&ev_q={{ evidence_q }}&ev_polarity={{ evidence_polarity }}&ev_source={{ evidence_source }}">Next</a>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  {% elif active_tab == 'notes' %}
+    <div class="panel" style="margin-top: 10px;">
+      <div class="hd"><h2>Notes</h2></div>
+      <div class="bd">
+        {% if note_links|length > 0 %}
+          {% for link in note_links %}
+            <div class="note-link">
+              <div>
+                <a href="/notes/{{ link.note.id }}" target="_blank" rel="noopener noreferrer">{{ link.note.title }}</a>
+                <div class="pill" style="display:inline-block;margin-left:8px;">{{ link.relation }}</div>
+              </div>
+              <form method="post" action="/theses/{{ thesis.id }}/notes/unlink" onsubmit="return confirm('Unlink note?');">
+                <input type="hidden" name="note_id" value="{{ link.note.id }}" />
+                <button class="btn" type="submit" style="padding:6px 10px;">✕</button>
+              </form>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div style="color:var(--muted);font-family:var(--mono);font-size:12px;">No linked notes yet.</div>
+        {% endif %}
+
+        <details style="margin-top:10px;">
+          <summary style="cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--muted);">Link existing note</summary>
+          <form method="post" action="/theses/{{ thesis.id }}/notes/link" style="margin-top:10px;" class="link-form" data-link-kind="note">
+            <div class="field">
+              <label>Search</label>
+              <input type="text" class="thesis-input" data-search="note" placeholder="Search notes..." />
+              <div class="search-results" data-results="note" style="display:none;"></div>
+              <input type="hidden" name="note_id" data-selected-id="note" value="" />
+            </div>
+            <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+              <div class="field">
+                <label>Relation</label>
+                <select name="relation">
+                  {% for r in note_link_relations %}
+                    <option value="{{ r }}">{{ r }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="field" style="display:flex;align-items:flex-end;">
+                <button class="btn primary" type="submit" style="width:100%;">Link</button>
+              </div>
+            </div>
+          </form>
+        </details>
+      </div>
+    </div>
+  {% else %}
+    <div class="panel" style="margin-top: 10px;">
+      <div class="hd"><h2>Advanced</h2></div>
+      <div class="bd">
+        <div style="color:var(--muted);font-family:var(--mono);font-size:12px;">Drivers, risks, and raw propositions.</div>
+        {% if prop_links|length > 0 %}
+          <div style="margin-top:12px;">
+            {% for link in prop_links %}
+              {% set p = link.proposition %}
+              <div class="prop-card">
+                <div class="prop-top">
+                  <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+                    <span class="pill">{{ link.role }}</span>
+                    <span class="pill">{{ p.kind }}</span>
+                    {% if p.unit %}<span class="pill">{{ p.unit }}</span>{% endif %}
+                    <span class="pill">id {{ p.id }}</span>
+                  </div>
+                </div>
+                <div class="prop-key">{{ p.key }}</div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div style="color:var(--muted);font-family:var(--mono);font-size:12px;">No propositions linked.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top: 12px;">
+      <div class="hd"><h2>Merge thesis</h2></div>
+      <div class="bd">
+        <form method="post" action="/theses/{{ thesis.id }}/merge" onsubmit="return confirm('Merge selected thesis into this one? This cannot be undone.');">
+          <div class="field">
+            <label>Find thesis to merge</label>
+            <input type="text" class="thesis-input" data-search="thesis" placeholder="Search theses..." />
+            <div class="search-results" data-results="thesis" style="display:none;"></div>
+            <input type="hidden" name="merge_id" data-selected-id="thesis" value="" />
+          </div>
+          <div class="btnrow" style="justify-content:flex-end;">
+            <button class="btn" type="submit">Merge into this</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  {% endif %}
+
+{% else %}
+  <div class="tabbar">
+    <a class="tab active" href="#metric">Edit</a>
+    <a class="tab" href="#data">Data entry</a>
+    <a class="tab" href="#meta">Metadata</a>
+    <a class="tab" href="#advanced">Advanced</a>
+  </div>
+
+  <div class="panel" id="metric" style="margin-top:10px;">
+    <div class="hd"><h2>Primary Metric</h2></div>
+    <div class="bd">
+      <form method="post" action="/theses/{{ thesis.id }}/metric">
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="field">
+            <label>Subject</label>
+            <input type="text" name="metric_subject" value="{{ metric.subject }}" placeholder="TSMC" />
+          </div>
+          <div class="field">
+            <label>Topic / Object</label>
+            <input type="text" name="metric_topic" value="{{ metric.topic }}" placeholder="CoWoS" />
+          </div>
+        </div>
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="field">
+            <label>Metric</label>
+            <input type="text" name="metric_name" value="{{ metric.name }}" placeholder="Exit WPM" />
+          </div>
+          <div class="field">
+            <label>Unit</label>
+            <input type="text" name="metric_unit" value="{{ metric.unit }}" placeholder="WPM / % / GB" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Value type</label>
+          <select name="metric_value_type">
+            {% for t in ['number','percent','bool','text'] %}
+              <option value="{{ t }}" {% if metric.value_type == t %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <details style="margin-top:10px;">
+          <summary style="cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--muted);">Advanced: raw key</summary>
+          <div class="field" style="margin-top:10px;">
+            <label>Raw key</label>
+            <input type="text" name="metric_key_raw" value="{{ metric.key }}" placeholder="tsmc:cowos:exit_wpm" />
+          </div>
+          <div class="field">
+            <label><input type="checkbox" name="metric_use_raw" value="1" /> Use raw key</label>
+          </div>
+        </details>
+        <div class="btnrow" style="justify-content:flex-end;">
+          <button class="btn primary" type="submit">Save metric</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="panel" id="data" style="margin-top:10px;">
+    <div class="hd"><h2>Data entry</h2></div>
+    <div class="bd">
+      {% if primary_prop %}
+        <form method="post" action="/theses/{{ thesis.id }}/observations/add_primary" style="margin-bottom:16px;">
+          <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="field">
+              <label>Value</label>
+              <input type="text" name="value" placeholder="e.g. 75.0k" required />
+            </div>
+            <div class="field">
+              <label>Target period</label>
+              <input type="text" name="target_period" placeholder="2026Q4 or 2027E" />
+            </div>
+          </div>
+          <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="field">
+              <label>Doc id (optional)</label>
+              <input type="text" name="document_id" placeholder="e.g. 358" />
+            </div>
+            <div class="field">
+              <label>Note (optional)</label>
+              <input type="text" name="note" placeholder="context / source" />
+            </div>
+          </div>
+          <div class="btnrow" style="justify-content:flex-end;">
+            <button class="btn" type="submit">Add datapoint</button>
+          </div>
+        </form>
+
+        <details open>
+          <summary style="cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--muted);">Paste table / grid</summary>
+          <form method="post" action="/theses/{{ thesis.id }}/propositions/table" style="margin-top:10px;" data-table-entry data-scenarios-enabled="{{ 'true' if scenarios_enabled else 'false' }}" data-scenario-labels="{{ scenario_labels|join(',') }}">
+            <input type="hidden" name="base_key" value="{{ metric.key }}" />
+            <input type="hidden" name="unit" value="{{ metric.unit }}" />
+            <input type="hidden" name="role" value="key" />
+            <div class="field">
+              <label>Paste table (tab/space separated)</label>
+              <textarea name="table_data" data-table-data rows="8" placeholder="Quarter  base&#10;2025Q1 45.0k"></textarea>
+              <div class="table-editor" data-table-editor>
+                <div class="btnrow" style="margin-top:10px;">
+                  <button class="btn" type="button" data-table-add-series>Add scenario column</button>
+                  <button class="btn" type="button" data-table-add-row>Add row</button>
+                  <button class="btn" type="button" data-table-clear>Clear</button>
+                </div>
+                <div class="table-editor-scroll">
+                  <table class="table-editor-table">
+                    <thead></thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="table-preview" data-table-preview style="margin-top:10px;"></div>
+              <canvas class="table-chart" data-table-chart width="520" height="220" style="margin-top:10px;"></canvas>
+            </div>
+            <div class="btnrow" style="justify-content:flex-end;">
+              <button class="btn primary" type="submit">Save table</button>
+            </div>
+          </form>
+        </details>
+      {% else %}
+        <div style="color:var(--muted);font-family:var(--mono);font-size:12px;">Set a primary metric first.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="panel" id="meta" style="margin-top:10px;">
+    <div class="hd">
+      <h2>Metadata</h2>
+      <div class="btnrow" style="gap:8px;">
+        <span class="pill" id="thesis-save-status" style="opacity:.8;">saved</span>
+      </div>
+    </div>
+    <div class="bd">
+      <form method="post" action="/theses/{{ thesis.id }}/edit" id="thesis-edit-form" data-thesis-id="{{ thesis.id }}">
+        <div class="field">
+          <label>Title</label>
+          <input type="text" name="title" value="{{ thesis.title }}" required />
+        </div>
+        <div class="field">
+          <label>Statement</label>
+          <textarea name="statement" required>{{ thesis.statement }}</textarea>
+        </div>
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="field">
+            <label>Status</label>
+            <select name="status">
+              {% for opt in ['watching','active','confirmed','disproven','paused'] %}
+                <option value="{{ opt }}" {% if thesis.status == opt %}selected{% endif %}>{{ opt }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label>Importance</label>
+            <input type="number" name="importance" min="1" max="5" value="{{ thesis.importance }}" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Stale-after (days)</label>
+          <input type="number" name="stale_after_days" value="{{ thesis.stale_after_days or '' }}" />
+        </div>
+        <div class="field">
+          <label>Entities (comma-separated)</label>
+          <input type="text" name="entities" value="{{ thesis.entities|map(attribute='canonical_name')|join(', ') }}" />
+        </div>
+        <div class="field">
+          <label>Domains (comma-separated)</label>
+          <input type="text" name="domains" value="{{ thesis.domains|map(attribute='slug')|join(', ') }}" />
+        </div>
+        <div class="field">
+          <label>Tags (comma-separated)</label>
+          <input type="text" name="tags" value="{{ thesis.tags|map(attribute='slug')|join(', ') }}" />
+        </div>
+        <div class="field">
+          <label>Event types (comma-separated)</label>
+          <input type="text" name="event_types" value="{{ thesis.event_types|map(attribute='slug')|join(', ') }}" />
+        </div>
+        <div class="btnrow" style="justify-content:flex-end;">
+          <button class="btn primary" type="submit">Save metadata</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="panel" id="advanced" style="margin-top:10px;">
+    <div class="hd"><h2>Advanced</h2></div>
+    <div class="bd">
+      <form method="post" action="/theses/{{ thesis.id }}/scenarios" style="margin-bottom:14px;">
+        <div class="field">
+          <label><input type="checkbox" name="scenarios_enabled" value="1" {% if scenarios_enabled %}checked{% endif %}/> Enable scenarios (low/base/high)</label>
+        </div>
+        <div class="field">
+          <label>Scenario labels (comma-separated)</label>
+          <input type="text" name="scenario_labels" value="{{ scenario_labels|join(', ') }}" placeholder="low, base, high" />
+        </div>
+        <div class="btnrow" style="justify-content:flex-end;">
+          <button class="btn" type="submit">Save scenarios</button>
+        </div>
+      </form>
+
+      <details>
+        <summary style="cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--muted);">Drivers / risks (manual props)</summary>
+        <form method="post" action="/theses/{{ thesis.id }}/propositions/add" style="margin-top:10px;">
+          <div class="field">
+            <label>Key (raw)</label>
+            <input type="text" name="proposition_key" placeholder="supply_constraint_hbm" list="prop-registry" required />
+            <datalist id="prop-registry">
+              {% for p in prop_registry %}
+                <option value="{{ p.key }}"></option>
+              {% endfor %}
+            </datalist>
+          </div>
+          <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="field">
+              <label>Role</label>
+              <select name="role">
+                {% for r in ['supporting','risk','watch'] %}
+                  <option value="{{ r }}">{{ r }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="field">
+              <label>Doc (optional)</label>
+              <input type="text" name="document_id" placeholder="e.g. 358" />
+            </div>
+          </div>
+          <div class="btnrow" style="justify-content:flex-end;">
+            <button class="btn" type="submit">Add driver</button>
+          </div>
+        </form>
+      </details>
+
+      <div style="margin-top:14px;">
+        <form method="post" action="/theses/{{ thesis.id }}/delete" onsubmit="return confirm('Delete this thesis?');">
+          <button class="btn" type="submit" style="border-color:rgba(239,68,68,.5);color:var(--bad);">Delete thesis</button>
+        </form>
+      </div>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+  <script src="/static/entity_search_widgets.js?v={{ settings.static_assets_version }}"></script>
+  <script src="/static/sparkline_charts.js?v={{ settings.static_assets_version }}"></script>
+  <script src="/static/thesis_table_entry.js?v={{ settings.static_assets_version }}"></script>
+  <script src="/static/thesis_autosave.js?v={{ settings.static_assets_version }}"></script>
+{% endblock %}

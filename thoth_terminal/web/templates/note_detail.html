@@ -1,0 +1,481 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="hd">
+    <h2>Note</h2>
+    <div class="btnrow">
+      <a class="btn" href="/notes">Back</a>
+      <form method="post" action="/actions/export-note" style="display:inline;">
+        <input type="hidden" name="note_id" value="{{ note.id }}" />
+        <button class="btn" type="submit">📤 Export</button>
+      </form>
+      {% if note.pinned %}
+        <form method="post" action="/notes/{{ note.id }}/unpin" style="display:inline;">
+          <button class="btn" type="submit">Unpin</button>
+        </form>
+      {% else %}
+        <form method="post" action="/notes/{{ note.id }}/pin" style="display:inline;">
+          <button class="btn" type="submit">Pin</button>
+        </form>
+      {% endif %}
+      {% if note.status == 'archived' %}
+        <form method="post" action="/notes/{{ note.id }}/unarchive" style="display:inline;">
+          <button class="btn" type="submit">Unarchive</button>
+        </form>
+      {% else %}
+        <form method="post" action="/notes/{{ note.id }}/archive" style="display:inline;">
+          <button class="btn" type="submit">Archive</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+  <div class="bd">
+    <div class="note-head">
+      <div>
+        <div class="note-h1">{{ note.title }}</div>
+        <div class="note-meta">
+          <span class="pill">{{ note.note_type.replace('_',' ') }}</span>
+          <span class="pill">{{ note.status }}</span>
+          <span class="pill">imp {{ note.importance }}</span>
+          {% if note.pinned %}<span class="pill">pinned</span>{% endif %}
+          <span class="pill">id {{ note.id }}</span>
+        </div>
+      </div>
+      <div class="note-meta" style="text-align:right;">
+        <div style="color:var(--muted);font-family:var(--mono);font-size:11px;">
+          updated <span data-utc="{{ note.updated_at.strftime('%Y-%m-%dT%H:%M:%S') }}">{{ note.updated_at.strftime("%Y-%m-%d %H:%M") }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid" style="grid-template-columns: 1.2fr .8fr; gap: 16px; margin-top: 16px;">
+      <div class="panel" style="border-radius: 12px;">
+        <div class="hd">
+          <h2>Editor</h2>
+          <div class="btnrow" style="gap:8px;">
+            <button class="btn" type="button" id="note-cite-doc">Cite doc</button>
+            <button class="btn" type="button" id="note-cite-thesis">Cite thesis</button>
+            <div class="pill" id="note-save-status" style="opacity:.8;">saved</div>
+          </div>
+        </div>
+        <div class="bd" id="note-editor" data-note-id="{{ note.id }}">
+          <div class="field">
+            <label>Title</label>
+            <input type="text" id="note-title" value="{{ note.title }}" />
+          </div>
+          <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="field" style="margin:0;">
+              <label>Body (Markdown)</label>
+              <textarea id="note-body" style="min-height: 360px;">{{ note.body_md }}</textarea>
+              <div style="margin-top:6px;color:var(--muted);font-family:var(--mono);font-size:11px;">
+                Tokens: <span class="pill">[[doc:123]]</span> <span class="pill">[[thesis:5]]</span>
+              </div>
+            </div>
+            <div class="field" style="margin:0;">
+              <label>Preview</label>
+              <div id="note-preview" class="note-preview">{{ preview_html | safe }}</div>
+            </div>
+          </div>
+          <div class="note-attachments">
+            <div class="note-attachments-head">
+              <div>
+                <label>Attachments</label>
+                <div class="muted" style="font-size:11px;">Upload images to insert markdown inline.</div>
+              </div>
+              <div class="note-attachments-actions">
+                <input type="text" id="note-attach-alt" placeholder="Alt text (optional)" />
+                <label class="btn" for="note-attach-input">Upload image</label>
+                <input type="file" id="note-attach-input" accept="image/*" style="display:none;" />
+              </div>
+            </div>
+            {% if note_attachments and note_attachments|length > 0 %}
+              <div class="note-attachments-grid" id="note-attachments-grid">
+                {% for a in note_attachments %}
+                  {% set alt = a.alt or a.filename or '' %}
+                  <button class="note-attachment-thumb" type="button" data-attachment-path="{{ a.object_path }}" data-attachment-alt="{{ alt }}">
+                    <img src="/objects/{{ a.object_path }}" alt="" loading="lazy" />
+                  </button>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="muted" id="note-attachments-empty" style="font-size:11px;">No attachments yet.</div>
+              <div class="note-attachments-grid" id="note-attachments-grid"></div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel" style="margin-bottom: 16px;">
+          <div class="hd"><h2>Metadata</h2></div>
+          <div class="bd">
+            <form method="post" action="/notes/{{ note.id }}/edit">
+              <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="field">
+                  <label>Type</label>
+                  <select name="note_type">
+                    {% for t in note_types %}
+                      <option value="{{ t }}" {% if note.note_type == t %}selected{% endif %}>{{ t.replace('_',' ') }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Status</label>
+                  <select name="status">
+                    {% for s in note_statuses %}
+                      <option value="{{ s }}" {% if note.status == s %}selected{% endif %}>{{ s }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label>Importance</label>
+                <input type="number" name="importance" min="1" max="5" value="{{ note.importance }}" />
+              </div>
+              <div class="field">
+                <label>Entities (comma-separated)</label>
+                <input type="text" name="entities" value="{{ note.entities|map(attribute='canonical_name')|join(',') }}" />
+              </div>
+              <div class="field">
+                <label>Domains (comma-separated slugs; max 2)</label>
+                <input type="text" name="domains" value="{{ note.domains|map(attribute='slug')|join(',') }}" />
+              </div>
+              <div class="field">
+                <label>Tags (comma-separated slugs)</label>
+                <input type="text" name="tags" value="{{ note.tags|map(attribute='slug')|join(',') }}" />
+              </div>
+              <div class="field">
+                <label>Event types (comma-separated slugs)</label>
+                <input type="text" name="event_types" value="{{ note.event_types|map(attribute='slug')|join(',') }}" />
+              </div>
+              <div class="btnrow" style="justify-content:flex-end;">
+                <button class="btn primary" type="submit">Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom: 16px;">
+          <div class="hd"><h2>Autosave history</h2></div>
+          <div class="bd">
+            <div id="note-history" style="display:flex;flex-direction:column;gap:8px;"></div>
+            <div style="margin-top:8px;color:var(--muted);font-family:var(--mono);font-size:11px;">
+              Stored locally in your browser. Latest 6 snapshots.
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom: 16px;">
+          <div class="hd"><h2>Linked Theses</h2></div>
+          <div class="bd">
+            {% if note.thesis_links|length > 0 %}
+              {% for link in note.thesis_links %}
+                <div class="link-row">
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    <span class="pill">{{ link.relation }}</span>
+                    <a class="pill" href="/theses/{{ link.thesis.id }}" target="_blank" rel="noopener noreferrer">{{ link.thesis.title }}</a>
+                    <span class="pill">id {{ link.thesis.id }}</span>
+                  </div>
+                  <form method="post" action="/notes/{{ note.id }}/unlink/thesis" onsubmit="return confirm('Unlink thesis from note?');">
+                    <input type="hidden" name="thesis_id" value="{{ link.thesis.id }}" />
+                    <button class="btn" type="submit" style="padding:6px 10px;">✕</button>
+                  </form>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div style="color:var(--muted);font-family:var(--mono);font-size:12px;">No linked theses yet.</div>
+            {% endif %}
+
+            <details style="margin-top:10px;">
+              <summary style="cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--muted);">Link thesis</summary>
+              <form method="post" action="/notes/{{ note.id }}/link/thesis" style="margin-top:10px;" class="link-form" data-link-kind="thesis">
+                <div class="field">
+                  <label>Search</label>
+                  <input type="text" class="thesis-input" data-search="thesis" placeholder="Search theses..." />
+                  <div class="search-results" data-results="thesis" style="display:none;"></div>
+                  <input type="hidden" name="thesis_id" data-selected-id="thesis" value="" />
+                </div>
+                <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+                  <div class="field">
+                    <label>Relation</label>
+                    <select name="relation">
+                      {% for r in note_link_relations %}
+                        <option value="{{ r }}">{{ r }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="field" style="display:flex;align-items:flex-end;">
+                    <button class="btn primary" type="submit" style="width:100%;">Link</button>
+                  </div>
+                </div>
+              </form>
+            </details>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom: 16px;">
+          <div class="hd"><h2>Research Context</h2></div>
+          <div class="bd" style="display:flex;flex-direction:column;gap:14px;">
+            <div>
+              <div class="pill">Datasets</div>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+                {% for link, dataset in linked_dataset_rows %}
+                  <div class="link-row">
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                      <span class="pill">{{ link.relation }}</span>
+                      <a class="btn" href="/visualizations/datasets/{{ dataset.id }}">{{ dataset.title }}</a>
+                    </div>
+                    <form method="post" action="/notes/{{ note.id }}/unlink/dataset" onsubmit="return confirm('Unlink dataset from note?');">
+                      <input type="hidden" name="dataset_id" value="{{ dataset.id }}" />
+                      <button class="btn" type="submit" style="padding:6px 10px;">✕</button>
+                    </form>
+                  </div>
+                {% else %}
+                  <div style="color:var(--muted);font-size:12px;">No linked datasets.</div>
+                {% endfor %}
+              </div>
+              <details style="margin-top:10px;">
+                <summary style="cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--muted);">Link dataset</summary>
+                <form method="post" action="/notes/{{ note.id }}/link/dataset" style="margin-top:10px;" class="link-form">
+                  <div class="field">
+                    <label>Search</label>
+                    <input type="text" class="thesis-input" data-search="dataset" placeholder="Search datasets..." />
+                    <div class="search-results" data-results="dataset" style="display:none;"></div>
+                    <input type="hidden" name="dataset_id" data-selected-id="dataset" value="" />
+                    <input type="hidden" name="relation" value="context" />
+                  </div>
+                  <div class="btnrow" style="justify-content:flex-end;">
+                    <button class="btn primary" type="submit">Link</button>
+                  </div>
+                </form>
+              </details>
+            </div>
+            <div>
+              <div class="pill">Charts</div>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+                {% for chart in linked_charts %}
+                  <a class="btn" href="/visualizations/{{ chart.id }}">{{ chart.title }}</a>
+                {% else %}
+                  <div style="color:var(--muted);font-size:12px;">No linked charts.</div>
+                {% endfor %}
+              </div>
+            </div>
+            <div>
+              <div class="pill">Supply Chains</div>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+                {% for link, chain in linked_supply_chain_rows %}
+                  <div class="link-row">
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                      <span class="pill">{{ link.relation }}</span>
+                      <a class="btn" href="/visualizations/supply-chains/{{ chain.id }}/command-center">{{ chain.title }}</a>
+                    </div>
+                    <form method="post" action="/notes/{{ note.id }}/unlink/supply-chain" onsubmit="return confirm('Unlink supply chain from note?');">
+                      <input type="hidden" name="chain_id" value="{{ chain.id }}" />
+                      <button class="btn" type="submit" style="padding:6px 10px;">✕</button>
+                    </form>
+                  </div>
+                {% else %}
+                  <div style="color:var(--muted);font-size:12px;">No linked supply chains.</div>
+                {% endfor %}
+              </div>
+              <details style="margin-top:10px;">
+                <summary style="cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--muted);">Link supply chain</summary>
+                <form method="post" action="/notes/{{ note.id }}/link/supply-chain" style="margin-top:10px;" class="link-form">
+                  <div class="field">
+                    <label>Search</label>
+                    <input type="text" class="thesis-input" data-search="supply_chain" placeholder="Search supply chains..." />
+                    <div class="search-results" data-results="supply_chain" style="display:none;"></div>
+                    <input type="hidden" name="chain_id" data-selected-id="supply_chain" value="" />
+                    <input type="hidden" name="relation" value="context" />
+                  </div>
+                  <div class="btnrow" style="justify-content:flex-end;">
+                    <button class="btn primary" type="submit">Link</button>
+                  </div>
+                </form>
+              </details>
+            </div>
+            <div>
+              <div class="pill">Stage Tracker</div>
+              <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+                {% for row in linked_stage_rows %}
+                  <div class="link-row">
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                      <span class="pill">{{ row.conflict_state }}</span>
+                      <a class="btn" href="/stage-tracker/{{ row.id }}">{{ row.company_name }} · {{ row.product_name }}</a>
+                    </div>
+                    <form method="post" action="/notes/{{ note.id }}/unlink/stage-tracker" onsubmit="return confirm('Unlink stage tracker entry from note?');">
+                      <input type="hidden" name="entry_id" value="{{ row.id }}" />
+                      <button class="btn" type="submit" style="padding:6px 10px;">✕</button>
+                    </form>
+                  </div>
+                  <div style="color:var(--muted);font-size:12px;">
+                    reviewed {{ row.current_reviewed.stage if row.current_reviewed else 'none' }}
+                    {% if row.current_candidate and (not row.current_reviewed or row.current_candidate.id != row.current_reviewed.id) %}
+                    · candidate {{ row.current_candidate.stage }}
+                    {% endif %}
+                  </div>
+                {% else %}
+                  <div style="color:var(--muted);font-size:12px;">No linked stage tracker entries.</div>
+                {% endfor %}
+              </div>
+              <details style="margin-top:10px;">
+                <summary style="cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--muted);">Link stage tracker entry</summary>
+                <form method="post" action="/notes/{{ note.id }}/link/stage-tracker" style="margin-top:10px;" class="link-form">
+                  <div class="field">
+                    <label>Search</label>
+                    <input type="text" class="thesis-input" data-search="product_stage" placeholder="Search stage tracker entries..." />
+                    <div class="search-results" data-results="product_stage" style="display:none;"></div>
+                    <input type="hidden" name="entry_id" data-selected-id="product_stage" value="" />
+                  </div>
+                  <div class="btnrow" style="justify-content:flex-end;">
+                    <button class="btn primary" type="submit">Link</button>
+                  </div>
+                </form>
+              </details>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom: 16px;">
+          <div class="hd"><h2>Linked Documents</h2></div>
+          <div class="bd">
+            {% if note.document_links|length > 0 %}
+              {% for link in note.document_links %}
+                {% set d = link.document %}
+                <div class="link-row">
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    <a class="pill" href="/docs/{{ d.id }}" target="_blank" rel="noopener noreferrer">doc {{ d.id }}</a>
+                    <span class="pill">{{ d.source.name if d.source else '' }}</span>
+                    {% set t = d.title or d.url or ('doc ' ~ d.id) %}
+                    {% if d.translation_en and d.extra and d.extra.get('translation_title_en') %}{% set t = d.extra.get('translation_title_en') %}{% endif %}
+                    <span style="font-size:12px;color:var(--muted);">{{ t[:80] }}{% if t|length > 80 %}…{% endif %}</span>
+                  </div>
+                  <form method="post" action="/notes/{{ note.id }}/unlink/document" onsubmit="return confirm('Unlink document from note?');">
+                    <input type="hidden" name="document_id" value="{{ d.id }}" />
+                    <button class="btn" type="submit" style="padding:6px 10px;">✕</button>
+                  </form>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div style="color:var(--muted);font-family:var(--mono);font-size:12px;">No linked documents yet.</div>
+            {% endif %}
+
+            <details style="margin-top:10px;">
+              <summary style="cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--muted);">Link document</summary>
+              <form method="post" action="/notes/{{ note.id }}/link/document" style="margin-top:10px;" class="link-form" data-link-kind="doc">
+                <div class="field">
+                  <label>Search</label>
+                  <input type="text" class="thesis-input" data-search="doc" placeholder="Search documents..." />
+                  <div class="search-results" data-results="doc" style="display:none;"></div>
+                  <input type="hidden" name="document_id" data-selected-id="doc" value="" />
+                </div>
+                <div class="field">
+                  <label>Snippet (optional)</label>
+                  <input type="text" name="snippet" placeholder="claim sentence / why cited" />
+                </div>
+                <div class="btnrow" style="justify-content:flex-end;">
+                  <button class="btn primary" type="submit">Link</button>
+                </div>
+              </form>
+            </details>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="hd"><h2>Linked Propositions</h2></div>
+          <div class="bd">
+            {% if note.proposition_links|length > 0 %}
+              {% for link in note.proposition_links %}
+                {% set p = link.proposition %}
+                <div class="link-row">
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    <span class="pill">{{ link.relation }}</span>
+                    <span class="pill">{{ p.kind }}</span>
+                    {% if p.unit %}<span class="pill">{{ p.unit }}</span>{% endif %}
+                    <span class="pill">id {{ p.id }}</span>
+                  </div>
+                  <form method="post" action="/notes/{{ note.id }}/unlink/proposition" onsubmit="return confirm('Unlink proposition from note?');">
+                    <input type="hidden" name="proposition_id" value="{{ p.id }}" />
+                    <button class="btn" type="submit" style="padding:6px 10px;">✕</button>
+                  </form>
+                </div>
+                <div class="prop-key" style="margin-top:6px;">{{ p.key }}</div>
+              {% endfor %}
+            {% else %}
+              <div style="color:var(--muted);font-family:var(--mono);font-size:12px;">No linked propositions yet.</div>
+            {% endif %}
+
+            <details style="margin-top:10px;">
+              <summary style="cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--muted);">Link proposition</summary>
+              <form method="post" action="/notes/{{ note.id }}/link/proposition" style="margin-top:10px;">
+                <div class="field">
+                  <label>Proposition key</label>
+                  <input type="text" name="proposition_key" placeholder="tsmc:cowos_capacity:total:WPM" required />
+                </div>
+                <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+                  <div class="field">
+                    <label>Relation</label>
+                    <select name="relation">
+                      {% for r in note_prop_relations %}
+                        <option value="{{ r }}">{{ r }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="field" style="display:flex;align-items:flex-end;">
+                    <button class="btn primary" type="submit" style="width:100%;">Link</button>
+                  </div>
+                </div>
+              </form>
+            </details>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ===== Citation Modal (docs) ===== #}
+<div class="note-cite-overlay" id="note-cite-overlay" style="display:none;">
+  <div class="note-cite-modal" role="dialog" aria-modal="true" aria-label="Insert citation">
+    <div class="note-cite-header">
+      <div>
+        <div class="note-cite-title">Insert citation</div>
+        <div class="note-cite-sub">Search documents and insert <span class="pill">[[doc:id]]</span></div>
+      </div>
+      <button class="thesis-modal-close" type="button" id="note-cite-close" title="Close">×</button>
+    </div>
+    <div class="note-cite-body">
+      <input type="text" class="thesis-input" id="note-cite-search" placeholder="Search documents..." />
+      <div class="search-results" id="note-cite-results"></div>
+      <div class="btnrow" style="justify-content:flex-end;margin-top:10px;">
+        <button class="btn" type="button" id="note-cite-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ===== Citation Modal (theses) ===== #}
+<div class="note-cite-overlay" id="note-cite-thesis-overlay" style="display:none;">
+  <div class="note-cite-modal" role="dialog" aria-modal="true" aria-label="Insert thesis citation">
+    <div class="note-cite-header">
+      <div>
+        <div class="note-cite-title">Insert thesis citation</div>
+        <div class="note-cite-sub">Search theses and insert <span class="pill">[[thesis:id]]</span></div>
+      </div>
+      <button class="thesis-modal-close" type="button" id="note-cite-thesis-close" title="Close">×</button>
+    </div>
+    <div class="note-cite-body">
+      <input type="text" class="thesis-input" id="note-cite-thesis-search" placeholder="Search theses..." />
+      <div class="search-results" id="note-cite-thesis-results"></div>
+      <div class="btnrow" style="justify-content:flex-end;margin-top:10px;">
+        <button class="btn" type="button" id="note-cite-thesis-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="/static/entity_search_widgets.js?v={{ settings.static_assets_version }}"></script>
+  <script src="/static/note_editor.js?v={{ settings.static_assets_version }}"></script>
+{% endblock %}

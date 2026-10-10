@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="research-shell">
+  <section class="panel">
+    <div class="hd">
+      <h2>{{ play.name }}</h2>
+      <div class="btnrow">
+        <a class="btn" href="/research/plays">Back</a>
+        <form method="post" action="/research/plays/{{ play.id }}/run">
+          <button class="btn primary" type="submit">Queue run</button>
+        </form>
+        <form method="post" action="/research/plays/{{ play.id }}/run">
+          <input type="hidden" name="sync" value="true" />
+          <button class="btn" type="submit">Run inline</button>
+        </form>
+      </div>
+    </div>
+    <div class="bd">
+      <div class="research-card-meta">{{ play.slug }}{% if play.owner %} · {{ play.owner }}{% endif %} · {{ play.status }}</div>
+      {% if play.description %}
+        <p class="research-card-copy">{{ play.description }}</p>
+      {% endif %}
+      {% if notice %}
+        <div class="notice success">{{ notice }}</div>
+      {% endif %}
+      {% if error %}
+        <div class="notice error">{{ error }}</div>
+      {% endif %}
+      <div class="research-stat-row">
+        <span class="pill">skills {{ play.skill_count }}</span>
+        <span class="pill">interval {{ play.schedule_json.get('interval_minutes') or 0 }}m</span>
+        <span class="pill">lookback {{ play.schedule_json.get('lookback_hours') or 24 }}h</span>
+      </div>
+      {% if play.latest_run %}
+        <div class="research-run-summary">{{ play.latest_run.summary or 'No summary yet.' }}</div>
+      {% endif %}
+    </div>
+  </section>
+
+  <div class="research-play-grid">
+    <section class="panel">
+      <div class="hd"><h2>Bound Skills</h2></div>
+      <div class="bd">
+        {% if play.skills %}
+          <div class="research-card-stack">
+            {% for link in play.skills %}
+              <article class="research-card">
+                <div class="research-card-top">
+                  <div>
+                    <div class="research-card-title">{{ link.skill.name if link.skill else ('skill #' ~ link.skill_id) }}</div>
+                    <div class="research-card-meta">
+                      {% if link.skill %}{{ link.skill.slug }}{% endif %}
+                      · position {{ link.position }}
+                      {% if link.required %} · required{% endif %}
+                    </div>
+                  </div>
+                </div>
+                {% if link.skill and link.skill.description %}
+                  <p class="research-card-copy">{{ link.skill.description }}</p>
+                {% endif %}
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty-state">No skills bound yet.</p>
+        {% endif %}
+        <hr class="research-divider" />
+        <form method="post" action="/research/plays/{{ play.id }}/skills" class="stack-form">
+          <div class="field">
+            <label>Skill</label>
+            <select name="skill_id">
+              {% for skill in available_skills %}
+                <option value="{{ skill.id }}">{{ skill.name }} · {{ skill.slug }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="research-inline-fields">
+            <div class="field">
+              <label>Position</label>
+              <input type="number" name="position" value="{{ play.skill_count + 1 }}" min="0" max="100" />
+            </div>
+            <div class="field checkbox">
+              <label><input type="checkbox" name="required" value="true" checked /> Required</label>
+            </div>
+          </div>
+          <div class="btnrow">
+            <button class="btn primary" type="submit">Bind skill</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="hd"><h2>Recent Runs</h2></div>
+      <div class="bd">
+        {% if runs %}
+          <div class="research-card-stack">
+            {% for run in runs %}
+              <article class="research-card">
+                <div class="research-card-top">
+                  <div class="research-card-title">Run #{{ run.id }}</div>
+                  <span class="pill">{{ run.status }}</span>
+                </div>
+                <div class="research-card-meta">{{ run.trigger_kind }}{% if run.started_at %} · {{ run.started_at }}{% endif %}</div>
+                <div class="research-run-summary">{{ run.summary or 'No summary.' }}</div>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty-state">No runs yet.</p>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="hd"><h2>Recent Signals</h2></div>
+    <div class="bd">
+      {% if signals %}
+        <div class="research-card-stack">
+          {% for signal in signals %}
+            {% set observed = signal.observed_json or {} %}
+            <article class="research-card research-signal-card">
+              <div class="research-card-top">
+                <div>
+                  <div class="research-card-title">{{ signal.summary or signal.signal_key }}</div>
+                  <div class="research-card-meta">{{ signal.signal_kind }}{% if signal.score is not none %} · score {{ signal.score }}{% endif %}</div>
+                </div>
+                {% if observed.get('document_id') %}
+                  <a class="btn" href="/docs/{{ observed.get('document_id') }}">Doc</a>
+                {% endif %}
+              </div>
+              {% if observed.get('url') %}
+                <div class="research-source-link">
+                  <a href="{{ observed.get('url') }}" target="_blank" rel="noopener noreferrer">{{ observed.get('url') }}</a>
+                </div>
+              {% endif %}
+              <div class="research-observed-grid">
+                <div><span class="label">Source</span><span class="value">{{ observed.get('source') or 'n/a' }}</span></div>
+                <div><span class="label">Published</span><span class="value">{{ observed.get('published_at') or observed.get('ingested_at') or 'n/a' }}</span></div>
+              </div>
+              {% set feedback_rows = feedback_by_signal.get(signal.id, []) %}
+              {% if feedback_rows %}
+                <div class="research-feedback-list">
+                  {% for row in feedback_rows %}
+                    <div class="research-feedback-chip">{{ row.feedback_kind }}{% if row.actor %} · {{ row.actor }}{% endif %}{% if row.note %} · {{ row.note }}{% endif %}</div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+              <form method="post" action="/research/plays/{{ play.id }}/feedback" class="stack-form compact-form">
+                <input type="hidden" name="signal_id" value="{{ signal.id }}" />
+                <div class="research-inline-fields">
+                  <div class="field">
+                    <label>Feedback</label>
+                    <select name="feedback_kind">
+                      <option value="confirmed">confirmed</option>
+                      <option value="rejected">rejected</option>
+                      <option value="watch">watch</option>
+                      <option value="comment">comment</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Actor</label>
+                    <input type="text" name="actor" placeholder="analyst" />
+                  </div>
+                </div>
+                <div class="field">
+                  <label>Note</label>
+                  <input type="text" name="note" placeholder="Why this signal mattered or failed." />
+                </div>
+                <div class="btnrow">
+                  <button class="btn" type="submit">Record feedback</button>
+                </div>
+              </form>
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="empty-state">No signals yet.</p>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}

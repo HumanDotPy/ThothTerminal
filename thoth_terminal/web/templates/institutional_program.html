@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="hd">
+    <h2>{{ program.title }}</h2>
+    <div class="btnrow">
+      <a class="btn" href="/institutional/ops">Back</a>
+    </div>
+  </div>
+  <div class="bd">
+    <div style="margin-bottom:12px;color:var(--muted);">{{ program.category }}</div>
+
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+      <div class="panel">
+        <div class="hd"><h2>Bottleneck</h2></div>
+        <div class="bd">
+          {% if payload.bottleneck %}
+            <pre style="white-space:pre-wrap;">{{ payload.bottleneck | tojson(indent=2) }}</pre>
+          {% else %}
+            <div style="color:var(--muted);">No bottleneck assessment yet.</div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="panel">
+        <div class="hd"><h2>State Vector</h2></div>
+        <div class="bd">
+          {% if payload.state_vector %}
+            <pre style="white-space:pre-wrap;">{{ payload.state_vector | tojson(indent=2) }}</pre>
+          {% else %}
+            <div style="color:var(--muted);">No state vector yet.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:12px;">
+      <div class="hd"><h2>Dependency Graph</h2></div>
+      <div class="bd">
+        <pre style="white-space:pre-wrap;">{{ program | tojson(indent=2) }}</pre>
+      </div>
+    </div>
+
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="panel">
+        <div class="hd"><h2>Observations</h2></div>
+        <div class="bd">
+          <pre style="white-space:pre-wrap;">{{ payload.observations | tojson(indent=2) }}</pre>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="hd"><h2>Coverage Gaps</h2></div>
+        <div class="bd">
+          <pre style="white-space:pre-wrap;">{{ payload.gaps | tojson(indent=2) }}</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

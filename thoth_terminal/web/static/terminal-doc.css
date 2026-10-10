@@ -1,0 +1,283 @@
+.doc-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.doc-command {
+  position: relative;
+  padding: 24px 26px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 28px;
+  background:
+    linear-gradient(110deg, rgba(255, 91, 52, 0.1), transparent 30%),
+    linear-gradient(180deg, rgba(9, 13, 18, 0.92), rgba(7, 11, 16, 0.86)),
+    repeating-linear-gradient(90deg, transparent 0 28px, var(--terminal-grid) 28px 29px);
+  overflow: hidden;
+}
+
+.doc-command::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--terminal-red-strong), var(--terminal-amber), transparent);
+}
+
+.doc-command-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.doc-command-main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.doc-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--terminal-copy-faint);
+}
+
+.doc-code::before {
+  content: "DOC";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  color: var(--accent2);
+}
+
+.doc-command-main h1 {
+  margin: 0;
+  max-width: 18ch;
+  font-family: var(--sans);
+  font-size: clamp(26px, 4vw, 44px);
+  line-height: 1.02;
+  color: var(--text-bright);
+}
+
+.doc-command-main p {
+  margin: 0;
+  max-width: 74ch;
+  color: var(--terminal-copy-dim);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.doc-command-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: flex-start;
+}
+
+.doc-command-actions form {
+  margin: 0;
+}
+
+.doc-command-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.doc-command-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.doc-command-stat .label {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--terminal-copy-faint);
+}
+
+.doc-command-stat .value {
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-bright);
+}
+
+.doc-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.85fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.doc-reading-panel,
+.doc-side-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.doc-side-stack {
+  position: sticky;
+  top: 92px;
+}
+
+.doc-reading-copy pre,
+.doc-reading-copy .doc-text-panel pre {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.85;
+  color: var(--terminal-copy);
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+.doc-reading-copy .panel .bd {
+  padding: 20px 22px 22px;
+}
+
+.doc-reading-copy .section-label,
+.doc-side-stack .section-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--terminal-copy-faint);
+}
+
+.doc-reading-copy .section-label::before,
+.doc-side-stack .section-label::before {
+  content: "";
+  width: 24px;
+  height: 1px;
+  background: var(--terminal-line-strong);
+}
+
+.doc-link-grid,
+.doc-chip-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.doc-link-grid .pill,
+.doc-chip-cluster .pill {
+  max-width: 100%;
+}
+
+.doc-link-grid .link-card {
+  min-width: min(100%, 280px);
+  padding: 12px 14px;
+  border-radius: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.filing-review-head,
+.filing-review-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--terminal-copy-muted);
+}
+
+.filing-review-head span,
+.filing-review-flags span {
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 8px;
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.filing-review-flags span {
+  color: var(--terminal-amber);
+  border-color: rgba(255, 184, 77, 0.22);
+}
+
+.filing-review-jump {
+  margin-bottom: 14px;
+}
+
+.filing-review-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.filing-review-section {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.filing-review-section summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--terminal-copy-muted);
+  list-style: none;
+}
+
+.filing-review-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.filing-review-section summary span:first-child {
+  color: var(--terminal-copy);
+  text-transform: uppercase;
+}
+
+.filing-review-text {
+  margin: 0 12px 12px;
+}
+
+.doc-reading-copy .filing-review-text pre {
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.doc-link-grid .link-url {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.doc-side-card .bd {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+

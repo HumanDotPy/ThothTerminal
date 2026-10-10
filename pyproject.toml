@@ -1,0 +1,76 @@
+[project]
+name = "thoth-terminal"
+version = "0.3.1-beta.1"
+description = "Local-first research workspace for sources, datasets, evidence, reports, and agent workflows."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "aiohttp>=3.12.0,<4.0.0",
+  "beautifulsoup4>=4.12.0,<5.0.0",
+  "feedparser>=6.0.0,<7.0.0",
+  "fastapi>=0.115.0,<1.0.0",
+  "googletrans==4.0.0rc1",
+  "google-api-python-client>=2.0.0,<3.0.0",
+  "google-auth>=2.0.0,<3.0.0",
+  "google-auth-oauthlib>=1.2.0,<2.0.0",
+  "uvicorn[standard]>=0.30.0,<1.0.0",
+  "orjson>=3.10.0,<4.0.0",
+  "jinja2>=3.1.0,<4.0.0",
+  "langdetect>=1.0.9,<2.0.0",
+  "markdown-it-py>=4.0.0,<5.0.0",
+  "openpyxl>=3.1.0,<4.0.0",
+  "playwright>=1.41.0,<2.0.0",
+  "duckdb>=1.1.0,<2.0.0",
+  "psycopg[binary]>=3.2.0,<4.0.0",
+  "pypdf>=5.0.0,<7.0.0",
+  "pypdfium2>=4.30.0,<5.0.0",
+  "pydantic>=2.7.0,<3.0.0",
+  "pydantic-settings>=2.2.0,<3.0.0",
+  "python-multipart>=0.0.9,<1.0.0",
+  "requests>=2.32.0,<3.0.0",
+  "sqlalchemy>=2.0.0,<3.0.0",
+  "tiktoken>=0.12.0,<1.0.0",
+  "tzdata>=2024.1,<2027.0; platform_system=='Windows'",
+  "typer>=0.12.0,<1.0.0",
+  "rich>=13.7.0,<14.0.0",
+]
+
+[project.optional-dependencies]
+hunyuan = [
+  "transformers>=4.41.0,<5.0.0",
+  "torch>=2.3.0,<3.0.0",
+  "bitsandbytes>=0.43.0,<1.0.0",
+  "accelerate>=0.31.0,<1.0.0",
+]
+discord = [
+  "discord.py>=2.4.0,<3.0.0",
+]
+ocr = [
+  "glmocr>=0.1.5,<0.2.0",
+]
+desktop = [
+  "Pillow>=10.0.0,<12.0.0",
+  "PySide6>=6.8.0,<7.0.0",
+  "pywin32>=311,<400; sys_platform=='win32'",
+]
+
+[project.scripts]
+thoth = "thoth_terminal.cli:app"
+thoth-desktop = "thoth_terminal.desktop.bootstrap:main"
+thoth-local-agent-worker = "thoth_terminal.local_agent_worker:main"
+thoth-version = "thoth_terminal.versioning:main"
+
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+
+[tool.hatch.build.targets.wheel]
+packages = ["thoth_terminal"]
+exclude = ["**/__pycache__/**", "**/*.pyc", "**/*.pyo"]
+
+[tool.hatch.build.targets.sdist]
+include = ["/thoth_terminal", "/native/thoth_html", "/pyproject.toml", "/README.md", "/LICENSE", "/docs/public_release_quickstart.md", "/docs/native_html.md", "/scripts/build-native-html.ps1"]
+exclude = ["**/__pycache__/**", "**/*.pyc", "**/*.pyo", "/native/thoth_html/target"]

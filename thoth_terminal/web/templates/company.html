@@ -1,0 +1,636 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="company-page">
+  <div class="panel">
+    <div class="hd">
+      <div>
+        <h2>{{ company.display_name }}</h2>
+        <div class="company-subtitle">{{ company.legal_name }}</div>
+      </div>
+      <div class="btnrow">
+        <a class="btn" href="/companies">Back</a>
+      </div>
+    </div>
+    <div class="bd">
+      <div class="meta" style="margin-bottom:12px;">
+        {% if company.primary_ticker %}<span class="pill">{{ company.primary_ticker }}</span>{% endif %}
+        {% if company.exchange %}<span class="pill">{{ company.exchange }}</span>{% endif %}
+        {% if company.jurisdiction %}<span class="pill">{{ company.jurisdiction }}</span>{% endif %}
+        {% if company.sector %}<span class="pill">{{ company.sector }}</span>{% endif %}
+        {% if company.industry %}<span class="pill">{{ company.industry }}</span>{% endif %}
+        {% if company.is_private %}<span class="pill">Private</span>{% endif %}
+      </div>
+
+      <div class="company-stats">
+        <div class="stat-card">
+          <div class="stat-label">Evidence</div>
+          <div class="stat-value">{{ company.evidence_count or 0 }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Open Resolution Requests</div>
+          <div class="stat-value">{{ company.open_company_resolution_request_count or 0 }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Filings</div>
+          <div class="stat-value">{{ company.filing_count or 0 }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Disclosures</div>
+          <div class="stat-value">{{ company.disclosure_count or 0 }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">IR Artifacts</div>
+          <div class="stat-value">{{ company.ir_count or 0 }}</div>
+        </div>
+      </div>
+
+      {% if decision_payload %}
+      <div class="section-block decision-spine-block">
+        <div class="section-title">Decision Spine</div>
+        <div class="decision-grid">
+          <div class="decision-score">
+            <span>Coverage</span>
+            <strong>{{ decision_payload.coverage_score or 0 }}%</strong>
+          </div>
+          <div class="decision-list">
+            <h3>Memo</h3>
+            {% if decision_payload.memos %}
+              {% for memo in decision_payload.memos[:1] %}
+                <div class="decision-item">
+                  <strong>{{ memo.rating or memo.status or 'memo' }}</strong>
+                  <span>{{ memo.title }}</span>
+                  {% if memo.summary_md %}<small>{{ memo.summary_md[:220] }}</small>{% endif %}
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="empty-copy">No investment memo yet.</div>
+            {% endif %}
+          </div>
+          <div class="decision-list">
+            <h3>Analyst Evidence</h3>
+            {% if decision_payload.analyst_evidence %}
+              {% for evidence in decision_payload.analyst_evidence[:4] %}
+                <div class="decision-item">
+                  <strong>
+                    {{ evidence.rating or evidence.evidence_kind }}
+                    {% if evidence.price_target is not none %} · {{ evidence.currency or '' }} {{ "{:,.0f}".format(evidence.price_target) }}{% endif %}
+                  </strong>
+                  <span>{{ evidence.source_name or evidence.outlet or evidence.author or evidence.trust_label or 'Analyst source' }}</span>
+                  {% if evidence.summary %}<small>{{ evidence.summary[:180] }}</small>{% endif %}
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="empty-copy">No analyst ratings, targets, estimates, or curated media claims yet.</div>
+            {% endif %}
+          </div>
+          <div class="decision-list">
+            <h3>Next Catalysts</h3>
+            {% if decision_payload.catalysts %}
+              {% for catalyst in decision_payload.catalysts[:4] %}
+                <div class="decision-item">
+                  <strong>{{ catalyst.event_date or 'TBD' }} · {{ catalyst.catalyst_kind }}</strong>
+                  <span>{{ catalyst.title }}</span>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="empty-copy">No catalyst entries.</div>
+            {% endif %}
+          </div>
+          <div class="decision-list">
+            <h3>Open Gaps</h3>
+            {% set open_gaps = decision_payload.gaps|selectattr("status", "ne", "resolved")|list %}
+            {% if open_gaps %}
+              {% for gap in open_gaps[:4] %}
+                <div class="decision-item">
+                  <strong>{{ gap.gap_kind }} · severity {{ gap.severity }}</strong>
+                  <span>{{ gap.title }}</span>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="empty-copy">No open decision gaps.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if identifiers %}
+      <div class="section-block">
+        <div class="section-title">Identifiers</div>
+        <div class="identifier-list">
+          {% for ident in identifiers %}
+            <div class="identifier-row">
+              <span class="identifier-type">{{ ident.type }}</span>
+              <span class="identifier-value">{{ ident.value }}</span>
+              {% if ident.exchange %}<span class="identifier-extra">{{ ident.exchange }}</span>{% endif %}
+              {% if ident.is_primary %}<span class="pill">Primary</span>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if investor_metrics %}
+      <div class="section-block">
+        <div class="section-title">Investor Metrics</div>
+        <div class="metric-grid">
+          {% for row in investor_metrics %}
+            <div class="metric-card">
+              <div class="metric-label">{{ row.metric_label }}</div>
+              <div class="metric-value">
+                {% if row.value_number is not none %}
+                  {% if row.unit == '%' %}
+                    {{ "%.1f"|format(row.value_number) }}%
+                  {% elif row.unit == 'currency' and row.currency %}
+                    {{ row.currency }} {{ "{:,.0f}".format(row.value_number) }}
+                  {% elif row.unit == 'per_share' and row.currency %}
+                    {{ row.currency }} {{ "{:,.2f}".format(row.value_number) }}
+                  {% else %}
+                    {{ "{:,.2f}".format(row.value_number) }}
+                  {% endif %}
+                {% else %}
+                  {{ row.value_text or 'n/a' }}
+                {% endif %}
+              </div>
+              <div class="metric-meta">
+                {% if row.period_label %}<span>{{ row.period_label }}</span>{% endif %}
+                {% if row.statement_type %}<span>{{ row.statement_type }}</span>{% endif %}
+                {% if row.as_of_date %}<span>{{ row.as_of_date }}</span>{% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if investor_datasets %}
+      <div class="section-block">
+        <div class="section-title">Structured Datasets</div>
+        <div class="identifier-list">
+          {% for row in investor_datasets %}
+            <div class="identifier-row">
+              <span class="identifier-type">{{ row.family }}</span>
+              <a class="identifier-value" href="{{ row.href }}">{{ row.title }}</a>
+              {% if row.updated_at %}<span class="identifier-extra" data-utc="{{ row.updated_at }}">{{ row.updated_at.strftime("%Y-%m-%d %H:%M") }}</span>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="link-grid" style="margin-bottom:12px;">
+        <a class="link-card" href="/reports/{{ company.slug }}">Research Report</a>
+        {% if company.website %}<a class="link-card" href="{{ company.website }}" target="_blank" rel="noopener noreferrer">Website</a>{% endif %}
+        {% if company.ir_url %}<a class="link-card" href="{{ company.ir_url }}" target="_blank" rel="noopener noreferrer">IR Site</a>{% endif %}
+        {% if company.filings_url %}<a class="link-card" href="{{ company.filings_url }}" target="_blank" rel="noopener noreferrer">Filings</a>{% endif %}
+        {% if company.reports_url %}<a class="link-card" href="{{ company.reports_url }}" target="_blank" rel="noopener noreferrer">Reports</a>{% endif %}
+        {% if company.calendar_url %}<a class="link-card" href="{{ company.calendar_url }}" target="_blank" rel="noopener noreferrer">Calendar</a>{% endif %}
+      </div>
+
+      {% if latest_report %}
+      <div class="section-block">
+        <div class="section-title">Latest Research Report</div>
+        <div class="identifier-list">
+          <div class="identifier-row">
+            <span class="identifier-type">Version</span>
+            <span class="identifier-value">{{ latest_report.latest_version or 'n/a' }}</span>
+            {% if latest_report.latest_published_at %}<span class="identifier-extra" data-utc="{{ latest_report.latest_published_at }}">{{ latest_report.latest_published_at }}</span>{% endif %}
+            <a class="btn" href="{{ latest_report.href }}">Open</a>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if linked_knowledge_assets %}
+      <div class="section-block">
+        <div class="section-title">Knowledge Assets</div>
+        <div class="identifier-list">
+          {% for row in linked_knowledge_assets %}
+            <div class="identifier-row">
+              <span class="identifier-type">{{ row.kind }}</span>
+              <a class="identifier-value" href="{{ row.href }}">{{ row.title }}</a>
+              {% if row.published %}<span class="identifier-extra">v{{ row.published.version }}</span>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="panel">
+      <div class="hd"><h2>Investor Timeline</h2></div>
+      <div class="bd">
+        {% if investor_timeline %}
+          <div class="stack-list">
+            {% for row in investor_timeline %}
+              <div class="stack-row">
+                <div class="stack-title">
+                  {% if row.href %}<a href="{{ row.href }}" target="_blank" rel="noopener noreferrer">{{ row.title }}</a>{% else %}{{ row.title }}{% endif %}
+                </div>
+                <div class="stack-meta">
+                  {% if row.date %}<span>{{ row.date }}</span>{% endif %}
+                  {% if row.detail %}<span>{{ row.detail }}</span>{% endif %}
+                  {% if row.value_number is not none %}
+                    <span>
+                      {% if row.unit == '%' %}
+                        {{ "%.1f"|format(row.value_number) }}%
+                      {% elif row.currency %}
+                        {{ row.currency }} {{ "{:,.0f}".format(row.value_number) }}
+                      {% else %}
+                        {{ "{:,.2f}".format(row.value_number) }}
+                      {% endif %}
+                    </span>
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          {% if decision_payload and decision_payload.earnings_packets %}
+            <div class="stack-list">
+              {% for packet in decision_payload.earnings_packets[:6] %}
+                <div class="stack-row">
+                  <div class="stack-title">{{ packet.period_label }} earnings packet</div>
+                  <div class="stack-meta">
+                    <span>{{ packet.status }}</span>
+                    <span>{{ "%.0f"|format((packet.completeness_score or 0) * 100) }}% complete</span>
+                    {% if packet.missing %}<span>missing {{ packet.missing|join(", ") }}</span>{% endif %}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="empty-copy">No structured investor facts yet.</div>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="hd"><h2>Linked Evidence</h2></div>
+      <div class="bd">
+        {% if evidence_items %}
+          <div class="stack-list">
+            {% for item in evidence_items %}
+              <div class="stack-row">
+                <div class="stack-title"><a href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.title or item.url }}</a></div>
+                <div class="stack-meta">
+                  <span data-utc="{{ item.created_at }}">{{ item.created_at.strftime("%Y-%m-%d %H:%M") if item.created_at else "" }}</span>
+                  {% if item.target_label %}<span>{{ item.target_label }}</span>{% endif %}
+                  {% if item.source_type %}<span>{{ item.source_type }}</span>{% endif %}
+                  {% if item.sentiment %}<span>{{ item.sentiment }}</span>{% endif %}
+                  {% if item.resolution_state %}<span>{{ item.resolution_state }}</span>{% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-copy">No linked Discord evidence yet.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="hd"><h2>Open Routing Requests</h2></div>
+      <div class="bd">
+        {% if open_requests %}
+          <div class="stack-list">
+            {% for row in open_requests %}
+              <div class="stack-row">
+                <div class="stack-title"><a href="/instruments/requests/{{ row.id }}">{{ row.title }}</a></div>
+                <div class="stack-meta">
+                  <span>{{ row.status }}</span>
+                  <span data-utc="{{ row.updated_at }}">{{ row.updated_at.strftime("%Y-%m-%d %H:%M") if row.updated_at else "" }}</span>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-copy">No open company-resolution requests.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="panel">
+      <div class="hd"><h2>Rail 1 Filings</h2></div>
+      <div class="bd">
+        {% if filings %}
+          <div class="stack-list">
+            {% for row in filings %}
+              <div class="stack-row">
+                <div class="stack-title">
+                  {% if row.document_id %}
+                    <a href="/docs/{{ row.document_id }}">{{ row.title or row.filing_type }}</a>
+                  {% else %}
+                    <a href="{{ (row.primary_document_url or row.filing_url)|clean_url }}" target="_blank" rel="noopener noreferrer">{{ row.title or row.filing_type }}</a>
+                  {% endif %}
+                </div>
+                <div class="stack-meta">
+                  <span>{{ row.filing_type }}</span>
+                  <span data-utc="{{ row.filed_at }}">{{ row.filed_at.strftime("%Y-%m-%d %H:%M") if row.filed_at else "" }}</span>
+                  {% if row.document_id %}
+                    <a href="{{ (row.primary_document_url or row.filing_url)|clean_url }}" target="_blank" rel="noopener noreferrer">SEC source</a>
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-copy">No statutory filings linked.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="hd"><h2>Rail 2 Disclosures</h2></div>
+      <div class="bd">
+        {% if disclosures %}
+          <div class="stack-list">
+            {% for row in disclosures %}
+              <div class="stack-row">
+                <div class="stack-title"><a href="{{ row.disclosure_url }}" target="_blank" rel="noopener noreferrer">{{ row.title or row.disclosure_type }}</a></div>
+                <div class="stack-meta">
+                  <span>{{ row.disclosure_type }}</span>
+                  <span data-utc="{{ row.announced_at }}">{{ row.announced_at.strftime("%Y-%m-%d %H:%M") if row.announced_at else "" }}</span>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-copy">No exchange disclosures linked.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="panel">
+      <div class="hd"><h2>Rail 3 IR Artifacts</h2></div>
+      <div class="bd">
+        {% if ir_artifacts %}
+          <div class="stack-list">
+            {% for row in ir_artifacts %}
+              <div class="stack-row">
+                <div class="stack-title"><a href="{{ row.canonical_url }}" target="_blank" rel="noopener noreferrer">{{ row.title or row.artifact_type }}</a></div>
+                <div class="stack-meta">
+                  <span>{{ row.artifact_type }}</span>
+                  <span data-utc="{{ row.published_at or row.created_at }}">{{ (row.published_at or row.created_at).strftime("%Y-%m-%d %H:%M") if (row.published_at or row.created_at) else "" }}</span>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-copy">No IR artifacts linked.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="hd"><h2>Legacy Company Docs</h2></div>
+      <div class="bd">
+        {% if legacy_documents %}
+          <div class="stack-list">
+            {% for link, doc in legacy_documents %}
+              <div class="stack-row">
+                <div class="stack-title"><a href="/docs/{{ doc.id }}">{{ doc.title or doc.url or ('doc ' ~ doc.id) }}</a></div>
+                <div class="stack-meta">
+                  <span>{{ link.doc_type }}</span>
+                  <span data-utc="{{ doc.published_at or doc.ingested_at }}">{{ (doc.published_at or doc.ingested_at).strftime("%Y-%m-%d %H:%M") if (doc.published_at or doc.ingested_at) else "" }}</span>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-copy">No legacy company-doc links.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.company-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.company-subtitle {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.company-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.stat-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: rgba(7,10,13,.38);
+}
+
+.stat-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.stat-value {
+  font-family: var(--mono);
+  font-size: 22px;
+  margin-top: 6px;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.decision-grid {
+  display: grid;
+  grid-template-columns: 140px repeat(3, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.decision-score,
+.decision-list {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(7,10,13,.32);
+}
+
+.decision-score span,
+.decision-list h3 {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+.decision-score strong {
+  display: block;
+  font-family: var(--mono);
+  font-size: 28px;
+}
+
+.decision-item {
+  display: grid;
+  gap: 3px;
+  padding: 7px 0;
+  border-top: 1px solid rgba(255,255,255,.06);
+}
+
+.decision-item:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.decision-item strong,
+.decision-item span,
+.decision-item small {
+  font-family: var(--mono);
+}
+
+.decision-item strong {
+  font-size: 11px;
+}
+
+.decision-item span {
+  font-size: 12px;
+}
+
+.decision-item small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.metric-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(7,10,13,.32);
+}
+
+.metric-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.metric-value {
+  font-family: var(--mono);
+  font-size: 18px;
+  margin-top: 6px;
+}
+
+.metric-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.two-col {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.section-block {
+  margin-bottom: 14px;
+}
+
+.section-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.identifier-list,
+.stack-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.identifier-row,
+.stack-row {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: rgba(7,10,13,.32);
+}
+
+.identifier-type,
+.identifier-extra,
+.stack-meta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.identifier-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.identifier-type {
+  min-width: 54px;
+  color: var(--text);
+}
+
+.identifier-value,
+.stack-title a {
+  color: var(--text);
+}
+
+.stack-title {
+  font-family: var(--mono);
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.stack-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.empty-copy {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+@media (max-width: 980px) {
+  .decision-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+{% endblock %}

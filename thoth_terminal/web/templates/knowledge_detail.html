@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="company-page">
+  <div class="panel">
+    <div class="hd">
+      <div>
+        <h2>{{ asset.title }}</h2>
+        <div class="company-subtitle">{{ asset.kind }} · {{ asset.subject_display_name }} · {{ asset.subject_kind }}</div>
+      </div>
+      <div class="btnrow">
+        <a class="btn" href="/knowledge">Back</a>
+        <a class="btn" href="/reports/{{ asset.subject_slug }}">Open Report</a>
+      </div>
+    </div>
+    <div class="bd">
+      <div class="meta" style="margin-bottom:12px;">
+        <span class="pill">{{ asset.kind }}</span>
+        <span class="pill">{{ asset.subject_display_name }}</span>
+        {% if asset.stale_after_days %}<span class="pill">{{ asset.stale_after_days }}d stale policy</span>{% endif %}
+        {% if asset.stale_check_state %}<span class="pill">{{ asset.stale_check_state }}</span>{% endif %}
+      </div>
+      <div class="btnrow" style="margin-bottom:12px;">
+        <form method="post" action="/knowledge/{{ asset.slug }}/publish">
+          <button class="btn" type="submit">Publish</button>
+        </form>
+        <form method="post" action="/knowledge/{{ asset.slug }}/review">
+          <button class="btn" type="submit">Run Freshness Review</button>
+        </form>
+      </div>
+      {% if asset.summary %}<div class="muted">{{ asset.summary }}</div>{% endif %}
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="panel">
+      <div class="hd"><h2>Draft</h2></div>
+      <div class="bd">
+        <form method="post" action="/knowledge/draft" class="stack-form">
+          <input type="hidden" name="subject" value="{{ asset.subject_slug }}" />
+          <input type="hidden" name="kind" value="{{ asset.kind }}" />
+          <input type="text" name="title" value="{{ asset.draft.title if asset.draft else asset.title }}" />
+          <textarea name="summary" rows="2">{{ asset.draft.summary if asset.draft else asset.summary or '' }}</textarea>
+          <textarea name="content_md" rows="24">{{ asset.draft.content_md if asset.draft else '' }}</textarea>
+          <input type="number" name="stale_after_days" min="30" max="3650" step="30" value="{{ asset.stale_after_days or '' }}" />
+          <button class="btn" type="submit">Save Draft</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="hd"><h2>Published</h2></div>
+      <div class="bd">
+        {% if asset.published %}
+          <div class="stack-list">
+            <div class="stack-row"><div class="stack-title">Version</div><div class="stack-meta"><span>{{ asset.published.version }}</span></div></div>
+            <div class="stack-row"><div class="stack-title">Published</div><div class="stack-meta"><span data-utc="{{ asset.published.published_at }}">{{ asset.published.published_at }}</span></div></div>
+            <div class="stack-row"><div class="stack-title">As Of</div><div class="stack-meta"><span data-utc="{{ asset.published.as_of_at }}">{{ asset.published.as_of_at }}</span></div></div>
+          </div>
+          <div class="section-title" style="margin-top:12px;">Content</div>
+          <pre class="code-block">{{ asset.published.content_md }}</pre>
+        {% else %}
+          <div class="empty-copy">No published version yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="panel">
+      <div class="hd"><h2>Links</h2></div>
+      <div class="bd">
+        {% if asset.links %}
+          <div class="stack-list">
+            {% for row in asset.links %}
+              <div class="stack-row">
+                <div class="stack-title">{{ row.object_type }} #{{ row.object_id }}</div>
+                <div class="stack-meta"><span>{{ row.relation }}</span><span data-utc="{{ row.created_at }}">{{ row.created_at }}</span></div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-copy">No explicit links saved.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="hd"><h2>Freshness Reviews</h2></div>
+      <div class="bd">
+        {% if reviews %}
+          <div class="stack-list">
+            {% for row in reviews %}
+              <div class="stack-row">
+                <div class="stack-title">{{ row.disposition }}</div>
+                <div class="stack-meta"><span data-utc="{{ row.checked_at }}">{{ row.checked_at }}</span><span>{{ row.model }}</span></div>
+                {% if row.summary %}<div class="muted" style="margin-top:6px;">{{ row.summary }}</div>{% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-copy">No freshness reviews yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.company-page { display:flex; flex-direction:column; gap:14px; }
+.company-subtitle { font-family: var(--mono); font-size:12px; color: var(--muted); margin-top:4px; }
+.two-col { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:14px; }
+.stack-form { display:flex; flex-direction:column; gap:10px; }
+.code-block { white-space:pre-wrap; background:rgba(7,10,13,.38); border:1px solid var(--border); border-radius:10px; padding:12px; font-size:12px; }
+.section-title { margin-bottom:8px; font-family: var(--mono); font-size:11px; color: var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+</style>
+{% endblock %}

@@ -1,0 +1,2 @@
+"""Discord command registration modules."""
+

@@ -1,0 +1,660 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="hd">
+    <h2>{{ "New Source" if not source else "Edit Source" }}</h2>
+    <div class="btnrow">
+      <a class="btn" href="/sources">Back</a>
+      {% if not source %}
+        <a class="btn" href="/sources/new?preset=gmail_substack">Preset: Gmail Substack</a>
+        <a class="btn" href="/sources/new?preset=substack_inbox_browser">Preset: Substack Reader</a>
+        <a class="btn" href="/sources/new?preset=note_creator_browser">Preset: note.com Reader</a>
+        <a class="btn" href="/sources/new?preset=google_drive_folder">Preset: Google Drive</a>
+      {% endif %}
+    </div>
+  </div>
+  <div class="bd">
+    {% if source %}
+      <div class="panel" style="margin-bottom:14px;">
+        <div class="hd"><h2>Health</h2></div>
+        <div class="bd">
+          {% set st = source.state %}
+          {% if st and st.last_success_at %}
+            <div>Last success: {{ last_success_local }}</div>
+            <div style="color:var(--muted);font-size:11px;">{{ last_success_utc }}</div>
+          {% else %}
+            <div>Last success: <span class="pill">never</span></div>
+          {% endif %}
+          {% if st and st.last_run_at %}
+            <div>Last run: {{ last_run_local }}</div>
+            <div style="color:var(--muted);font-size:11px;">{{ last_run_utc }}</div>
+          {% endif %}
+          {% if st and st.next_run_at %}
+            <div>Next run: {{ next_run_local }}</div>
+            <div style="color:var(--muted);font-size:11px;">{{ next_run_utc }}</div>
+          {% endif %}
+          {% if st and st.backoff_until %}
+            <div>Backoff until: {{ backoff_local }}</div>
+            <div style="color:var(--muted);font-size:11px;">{{ backoff_utc }}</div>
+          {% endif %}
+          {% if st and st.consecutive_failures %}<div>Consecutive failures: {{ st.consecutive_failures }}</div>{% endif %}
+          {% if last_run %}
+            <div style="margin-top:8px;">
+              <span class="pill {% if last_run.status != 'success' %}red{% endif %}">{{ last_run.status }}</span>
+              <span class="pill">{{ last_run.items_new }} new</span>
+              <span class="pill">{{ last_run.items_updated }} upd</span>
+              {% if last_run.error %}<span class="pill red">{{ last_run.error }}</span>{% endif %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+
+    <form method="post" action="{{ '/sources/new' if not source else ('/sources/' ~ source.id) }}">
+      {% set profile = source_profile or {} %}
+      {% if source %}
+        <div class="field">
+          <label>Name</label>
+          <input type="text" value="{{ source.name }}" disabled />
+        </div>
+      {% else %}
+        <div class="field">
+          <label>Name</label>
+          <input type="text" name="name" placeholder="trendforce_presscenter" required />
+        </div>
+      {% endif %}
+
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>Category</label>
+          <input type="text" name="category" value="{{ source.category if source else 'web' }}" />
+        </div>
+        <div class="field">
+          <label>Priority (1-5)</label>
+          <input type="number" name="priority" value="{{ source.priority if source else 2 }}" min="1" max="5" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Polling interval (minutes, fixed)</label>
+        <input type="number" name="polling_interval_minutes" value="{{ (source.polling_interval_seconds // 60) if source and source.polling_interval_seconds else '' }}" placeholder="e.g. 30" />
+      </div>
+
+      <div class="field">
+        <label>Freshness SLA (minutes)</label>
+        <input type="number" name="freshness_sla_minutes" value="{{ source.config.get('freshness_sla_minutes','') if source else '' }}" placeholder="e.g. 180" />
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">
+          Optional. Used for health checks (fresh vs stale). If blank, SLA is derived from the polling interval.
+        </div>
+      </div>
+
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>Polling min (minutes, jitter)</label>
+          <input type="number" name="poll_min_minutes" value="{{ (source.config.get('poll_min_seconds') // 60) if source and source.config.get('poll_min_seconds') else '' }}" placeholder="e.g. 30" />
+        </div>
+        <div class="field">
+          <label>Polling max (minutes, jitter)</label>
+          <input type="number" name="poll_max_minutes" value="{{ (source.config.get('poll_max_seconds') // 60) if source and source.config.get('poll_max_seconds') else '' }}" placeholder="e.g. 60" />
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:14px;">
+        <div class="hd"><h2>Institutional Profile</h2></div>
+        <div class="bd">
+          <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:12px;">
+            <div class="field">
+              <label>Source family</label>
+              {% set pf = profile.get('source_family', '') %}
+              <select name="source_family">
+                <option value="" {% if not pf %}selected{% endif %}>auto</option>
+                <option value="general" {% if pf == 'general' %}selected{% endif %}>general</option>
+                <option value="disclosure" {% if pf == 'disclosure' %}selected{% endif %}>disclosure</option>
+                <option value="trade" {% if pf == 'trade' %}selected{% endif %}>trade</option>
+                <option value="procurement" {% if pf == 'procurement' %}selected{% endif %}>procurement</option>
+                <option value="technical" {% if pf == 'technical' %}selected{% endif %}>technical</option>
+                <option value="research" {% if pf == 'research' %}selected{% endif %}>research</option>
+                <option value="power" {% if pf == 'power' %}selected{% endif %}>power</option>
+                <option value="imagery" {% if pf == 'imagery' %}selected{% endif %}>imagery</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Rights class</label>
+              {% set rights = profile.get('rights_class', 'public') %}
+              <select name="rights_class">
+                <option value="public" {% if rights == 'public' %}selected{% endif %}>public</option>
+                <option value="public_restricted" {% if rights == 'public_restricted' %}selected{% endif %}>public_restricted</option>
+                <option value="paid" {% if rights == 'paid' %}selected{% endif %}>paid</option>
+                <option value="internal" {% if rights == 'internal' %}selected{% endif %}>internal</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Acquisition mode</label>
+              {% set acq = profile.get('acquisition_mode', 'connector') %}
+              <select name="acquisition_mode">
+                <option value="connector" {% if acq == 'connector' %}selected{% endif %}>connector</option>
+                <option value="authenticated_browser" {% if acq == 'authenticated_browser' %}selected{% endif %}>authenticated_browser</option>
+                <option value="manual_template" {% if acq == 'manual_template' %}selected{% endif %}>manual_template</option>
+                <option value="manual_review" {% if acq == 'manual_review' %}selected{% endif %}>manual_review</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:12px;">
+            <div class="field">
+              <label>Cadence label</label>
+              <input type="text" name="cadence_label" value="{{ profile.get('cadence_label','') }}" placeholder="daily, monthly, event_driven" />
+            </div>
+            <div class="field">
+              <label>Review required</label>
+              {% set rr = profile.get('review_required', False) %}
+              <select name="review_required">
+                <option value="false" {% if not rr %}selected{% endif %}>false</option>
+                <option value="true" {% if rr %}selected{% endif %}>true</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Vendor tier</label>
+              <input type="text" name="vendor_tier" value="{{ profile.get('vendor_tier','') }}" placeholder="public, vendor_ready, premium" />
+            </div>
+          </div>
+
+          <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:12px;">
+            <div class="field">
+              <label>Subject binding</label>
+              <input type="text" name="subject_binding_kind" value="{{ profile.get('subject_binding_kind','') }}" placeholder="subject, issuer, company" />
+            </div>
+            <div class="field">
+              <label>Site binding</label>
+              <input type="text" name="site_binding_kind" value="{{ profile.get('site_binding_kind','') }}" placeholder="site" />
+            </div>
+            <div class="field">
+              <label>Jurisdiction template</label>
+              <input type="text" name="jurisdiction_template_kind" value="{{ profile.get('jurisdiction_template_kind','') or (source.config.get('jurisdiction_template_kind','') if source else '') }}" placeholder="county_permit_portal" />
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Profile notes</label>
+            <textarea name="profile_notes" rows="3" placeholder="Rights, entitlement, review, or local-record handling notes.">{{ profile.get('notes','') }}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>Active window start (HH:MM)</label>
+          <input type="text" name="active_window_start" value="{{ source.config.get('active_window_start','') if source else '' }}" placeholder="07:00" />
+        </div>
+        <div class="field">
+          <label>Active window end (HH:MM)</label>
+          <input type="text" name="active_window_end" value="{{ source.config.get('active_window_end','') if source else '' }}" placeholder="01:00" />
+        </div>
+        <div class="field">
+          <label>Active window timezone</label>
+          <input type="text" name="active_window_tz" value="{{ source.config.get('active_window_tz','') if source else '' }}" placeholder="America/New_York" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Connector</label>
+        <select name="connector">
+          {% set c = (source.config.get('connector') if source else (preset_connector or 'web_list')) %}
+          <option value="web_list" {% if c == 'web_list' %}selected{% endif %}>web_list</option>
+          <option value="web_list_browser" {% if c == 'web_list_browser' %}selected{% endif %}>web_list_browser (Playwright)</option>
+          <option value="rss" {% if c == 'rss' %}selected{% endif %}>rss</option>
+          <option value="skhynix_blog_api" {% if c == 'skhynix_blog_api' %}selected{% endif %}>skhynix_blog_api</option>
+          <option value="future_electronics" {% if c == 'future_electronics' %}selected{% endif %}>future_electronics</option>
+          <option value="x_list" {% if c == 'x_list' %}selected{% endif %}>x_list (Playwright)</option>
+          <option value="gmail_substack" {% if c == 'gmail_substack' %}selected{% endif %}>gmail_substack</option>
+          <option value="substack_inbox_browser" {% if c == 'substack_inbox_browser' %}selected{% endif %}>substack_inbox_browser (paid reader)</option>
+          <option value="note_creator_browser" {% if c == 'note_creator_browser' %}selected{% endif %}>note_creator_browser (paid reader)</option>
+          <option value="google_drive_folder" {% if c == 'google_drive_folder' %}selected{% endif %}>google_drive_folder</option>
+          <option value="local_research_library" {% if c == 'local_research_library' %}selected{% endif %}>local_research_library</option>
+          <option value="tsmc_calendar" {% if c == 'tsmc_calendar' %}selected{% endif %}>tsmc_calendar</option>
+          <option value="trade_us_census" {% if c == 'trade_us_census' %}selected{% endif %}>trade_us_census</option>
+          <option value="trade_taiwan_customs" {% if c == 'trade_taiwan_customs' %}selected{% endif %}>trade_taiwan_customs</option>
+          <option value="trade_korea_customs" {% if c == 'trade_korea_customs' %}selected{% endif %}>trade_korea_customs</option>
+          <option value="trade_japan_trade_stats" {% if c == 'trade_japan_trade_stats' %}selected{% endif %}>trade_japan_trade_stats</option>
+          <option value="trade_eurostat_comext" {% if c == 'trade_eurostat_comext' %}selected{% endif %}>trade_eurostat_comext</option>
+          <option value="trade_usitc_dataweb" {% if c == 'trade_usitc_dataweb' %}selected{% endif %}>trade_usitc_dataweb</option>
+          <option value="trade_un_comtrade" {% if c == 'trade_un_comtrade' %}selected{% endif %}>trade_un_comtrade</option>
+          <option value="taiwan_mops_monthly_revenue" {% if c == 'taiwan_mops_monthly_revenue' %}selected{% endif %}>taiwan_mops_monthly_revenue</option>
+          <option value="taiwan_mops_investor_conferences" {% if c == 'taiwan_mops_investor_conferences' %}selected{% endif %}>taiwan_mops_investor_conferences</option>
+          <option value="tpex_infohub_company" {% if c == 'tpex_infohub_company' %}selected{% endif %}>tpex_infohub_company</option>
+          <option value="twse_openapi" {% if c == 'twse_openapi' %}selected{% endif %}>twse_openapi</option>
+          <option value="krx_kind_disclosure" {% if c == 'krx_kind_disclosure' %}selected{% endif %}>krx_kind_disclosure</option>
+          <option value="hkexnews_title_search" {% if c == 'hkexnews_title_search' %}selected{% endif %}>hkexnews_title_search</option>
+          <option value="cninfo_announcements" {% if c == 'cninfo_announcements' %}selected{% endif %}>cninfo_announcements</option>
+          <option value="tdnet_company_announcements" {% if c == 'tdnet_company_announcements' %}selected{% endif %}>tdnet_company_announcements</option>
+          <option value="edinet_disclosures" {% if c == 'edinet_disclosures' %}selected{% endif %}>edinet_disclosures</option>
+          <option value="edinetdb_financials" {% if c == 'edinetdb_financials' %}selected{% endif %}>edinetdb_financials</option>
+          <option value="opendart_disclosures" {% if c == 'opendart_disclosures' %}selected{% endif %}>opendart_disclosures</option>
+          <option value="opendart_financials" {% if c == 'opendart_financials' %}selected{% endif %}>opendart_financials</option>
+          <option value="sec_edgar_rss" {% if c == 'sec_edgar_rss' %}selected{% endif %}>sec_edgar_rss</option>
+          <option value="sec_companyfacts" {% if c == 'sec_companyfacts' %}selected{% endif %}>sec_companyfacts</option>
+          <option value="eu_ted_search" {% if c == 'eu_ted_search' %}selected{% endif %}>eu_ted_search</option>
+          <option value="sam_gov_contracts" {% if c == 'sam_gov_contracts' %}selected{% endif %}>sam_gov_contracts</option>
+          <option value="gsa_calc_ceiling_rates" {% if c == 'gsa_calc_ceiling_rates' %}selected{% endif %}>gsa_calc_ceiling_rates</option>
+          <option value="patentsview_search" {% if c == 'patentsview_search' %}selected{% endif %}>patentsview_search</option>
+          <option value="eia_860m" {% if c == 'eia_860m' %}selected{% endif %}>eia_860m</option>
+          <option value="pjm_planning_center" {% if c == 'pjm_planning_center' %}selected{% endif %}>pjm_planning_center</option>
+          <option value="caiso_interconnection_queue" {% if c == 'caiso_interconnection_queue' %}selected{% endif %}>caiso_interconnection_queue</option>
+          <option value="ercot_large_load" {% if c == 'ercot_large_load' %}selected{% endif %}>ercot_large_load</option>
+          <option value="ercot_llwg" {% if c == 'ercot_llwg' %}selected{% endif %}>ercot_llwg</option>
+          <option value="copernicus_browser" {% if c == 'copernicus_browser' %}selected{% endif %}>copernicus_browser</option>
+          <option value="usgs_earthexplorer" {% if c == 'usgs_earthexplorer' %}selected{% endif %}>usgs_earthexplorer</option>
+          <option value="usgs_naip" {% if c == 'usgs_naip' %}selected{% endif %}>usgs_naip</option>
+          <option value="cbp_cross" {% if c == 'cbp_cross' %}selected{% endif %}>cbp_cross</option>
+          <option value="usitc_hts" {% if c == 'usitc_hts' %}selected{% endif %}>usitc_hts</option>
+          <option value="eu_taric" {% if c == 'eu_taric' %}selected{% endif %}>eu_taric</option>
+          <option value="fcc_oet_kdb" {% if c == 'fcc_oet_kdb' %}selected{% endif %}>fcc_oet_kdb</option>
+          <option value="chips_funding" {% if c == 'chips_funding' %}selected{% endif %}>chips_funding</option>
+          <option value="cloudflare_crawl_discovery" {% if c == 'cloudflare_crawl_discovery' %}selected{% endif %}>cloudflare_crawl_discovery</option>
+        </select>
+      </div>
+
+      <div class="field">
+        {% set connector_val = (source.config.get('connector') if source else (preset_connector or 'web_list')) %}
+        <label>
+          {% if connector_val == 'rss' %}
+            Feed URL
+          {% elif connector_val == 'skhynix_blog_api' %}
+            API URL
+          {% elif connector_val == 'future_electronics' %}
+            Future Electronics report URL
+          {% elif connector_val == 'gmail_substack' %}
+            URL (unused for Gmail connector)
+          {% elif connector_val == 'google_drive_folder' %}
+            URL (unused for Drive connector)
+          {% elif connector_val == 'substack_inbox_browser' %}
+            Substack inbox URL
+          {% elif connector_val == 'note_creator_browser' %}
+            note.com creator URL
+          {% elif connector_val.startswith('trade_') or connector_val in ['taiwan_mops_monthly_revenue','taiwan_mops_investor_conferences','tpex_infohub_company','twse_openapi','krx_kind_disclosure','hkexnews_title_search','cninfo_announcements','tdnet_company_announcements','edinet_disclosures','edinetdb_financials','opendart_disclosures','opendart_financials','sec_edgar_rss','sec_companyfacts','eu_ted_search','sam_gov_contracts','gsa_calc_ceiling_rates','patentsview_search','local_research_library','eia_860m','pjm_planning_center','caiso_interconnection_queue','ercot_large_load','ercot_llwg','copernicus_browser','usgs_earthexplorer','usgs_naip','cbp_cross','usitc_hts','eu_taric','fcc_oet_kdb','chips_funding'] %}
+            Data/API URL
+          {% elif connector_val == 'cloudflare_crawl_discovery' %}
+            Start URL
+          {% else %}
+            List URL
+          {% endif %}
+        </label>
+        {% if source and connector_val == 'rss' %}
+          <input type="text" name="url" value="{{ source.config.get('feed_url','') }}" />
+        {% elif source and connector_val == 'skhynix_blog_api' %}
+          <input type="text" name="url" value="{{ source.config.get('api_url','') }}" />
+        {% elif source and connector_val == 'future_electronics' %}
+          <input type="text" name="url" value="{{ source.config.get('report_url','') or source.config.get('product_list_url','') or source.config.get('list_url','') }}" />
+        {% elif source and connector_val in ['substack_inbox_browser','note_creator_browser'] %}
+          <input type="text" name="url" value="{{ source.config.get('list_url','') }}" />
+        {% elif source and (connector_val.startswith('trade_') or connector_val in ['taiwan_mops_monthly_revenue','taiwan_mops_investor_conferences','tpex_infohub_company','twse_openapi','krx_kind_disclosure','hkexnews_title_search','cninfo_announcements','tdnet_company_announcements','edinet_disclosures','edinetdb_financials','opendart_disclosures','opendart_financials','sec_edgar_rss','sec_companyfacts','eu_ted_search','sam_gov_contracts','gsa_calc_ceiling_rates','patentsview_search','local_research_library','eia_860m','pjm_planning_center','caiso_interconnection_queue','ercot_large_load','ercot_llwg','copernicus_browser','usgs_earthexplorer','usgs_naip','cbp_cross','usitc_hts','eu_taric','fcc_oet_kdb','chips_funding']) %}
+          <input type="text" name="url" value="{{ source.config.get('data_url','') or source.config.get('csv_url','') or source.config.get('api_url','') }}" />
+        {% elif source and connector_val == 'cloudflare_crawl_discovery' %}
+          <input type="text" name="url" value="{{ source.config.get('start_url','') or source.config.get('list_url','') }}" />
+        {% else %}
+          <input type="text" name="url" value="{{ source.config.get('list_url','') if source else (preset_url or '') }}" />
+        {% endif %}
+      </div>
+
+      <div class="field">
+        <label>Extra Config JSON</label>
+        <textarea name="extra_config_json" rows="8" placeholder='{"themes":["memory"],"metrics":["value_usd"],"lookback_periods":12}'></textarea>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">
+          Trade and crawl sources use this for fields such as <code>themes</code>, <code>hs_codes</code>, <code>dataset_id</code>, <code>query_params</code>, <code>json_items_path</code>, <code>include_patterns</code>, and <code>page_limit</code>. Values here are merged onto the normal form config.
+        </div>
+        {% if source %}
+          <details style="margin-top:8px;">
+            <summary style="cursor:pointer;color:var(--muted);">Current source config</summary>
+            <pre style="margin-top:8px;white-space:pre-wrap;">{{ source.config | tojson(indent=2) }}</pre>
+          </details>
+        {% endif %}
+      </div>
+
+      <div class="panel" style="margin-bottom:14px;">
+        <div class="hd"><h2>Google Connector Settings</h2></div>
+        <div class="bd">
+          <div style="color:var(--muted);font-size:11px;margin-bottom:10px;">
+            Used by <code>gmail_substack</code> and <code>google_drive_folder</code>. Configure Google OAuth in <a href="/settings">Settings</a> first.
+          </div>
+          <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="field">
+              <label>Gmail label name (gmail_substack)</label>
+              <input type="text" name="gmail_label_name" value="{{ source.config.get('gmail_label_name','Thoth/Substack') if source else 'Thoth/Substack' }}" placeholder="Thoth/Substack" />
+            </div>
+            <div class="field">
+              <label>Gmail query (optional)</label>
+              <input type="text" name="gmail_query" value="{{ source.config.get('gmail_query','') if source else '' }}" placeholder="newer_than:14d" />
+            </div>
+          </div>
+          <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:12px;">
+            <div class="field">
+              <label>Require label (gmail_substack)</label>
+              {% set grl = (source.config.get('require_label', True) if source else True) %}
+              <select name="gmail_require_label">
+                <option value="true" {% if grl %}selected{% endif %}>true</option>
+                <option value="false" {% if not grl %}selected{% endif %}>false</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Max messages / run</label>
+              <input type="number" name="gmail_max_messages_per_run" value="{{ source.config.get('max_messages_per_run','') if source else '' }}" min="1" max="200" />
+            </div>
+            <div class="field">
+              <label>Allow publications (csv)</label>
+              <input type="text" name="gmail_allow_publications" value="{{ ((source.config.get('allow_publications') or [])|join(',') if source else '') }}" placeholder="Stratechery, SemiAnalysis" />
+            </div>
+          </div>
+          <div class="field">
+            <label>Deny publications (csv)</label>
+            <input type="text" name="gmail_deny_publications" value="{{ ((source.config.get('deny_publications') or [])|join(',') if source else '') }}" placeholder="Example Newsletter" />
+          </div>
+
+          <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="field">
+              <label>Drive folder id (google_drive_folder)</label>
+              <input type="text" name="drive_folder_id" value="{{ source.config.get('folder_id','') if source else '' }}" placeholder="1AbC..." />
+            </div>
+            <div class="field">
+              <label>Drive MIME allowlist (csv, optional)</label>
+              <input type="text" name="drive_mime_allowlist" value="{{ ((source.config.get('mime_allowlist') or [])|join(',') if source else '') }}" placeholder="application/pdf,text/markdown" />
+            </div>
+          </div>
+          <div class="grid" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;">
+            <div class="field">
+              <label>Recursive</label>
+              {% set drv_rec = (source.config.get('recursive', True) if source else True) %}
+              <select name="drive_recursive">
+                <option value="true" {% if drv_rec %}selected{% endif %}>true</option>
+                <option value="false" {% if not drv_rec %}selected{% endif %}>false</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Shared drives</label>
+              {% set drv_sd = (source.config.get('include_shared_drives', True) if source else True) %}
+              <select name="drive_include_shared_drives">
+                <option value="true" {% if drv_sd %}selected{% endif %}>true</option>
+                <option value="false" {% if not drv_sd %}selected{% endif %}>false</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Max files / run</label>
+              <input type="number" name="drive_max_files_per_run" value="{{ source.config.get('max_files_per_run','') if source else '' }}" min="1" max="500" />
+            </div>
+            <div class="field">
+              <label>Max file bytes</label>
+              <input type="number" name="drive_max_file_bytes" value="{{ source.config.get('max_file_bytes','') if source else '' }}" min="0" step="1" placeholder="25000000" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Browser storage state path (Playwright)</label>
+        <input type="text" name="browser_storage_state_path" value="{{ source.config.get('storage_state_path','') if source else '' }}" placeholder="data/tsmc_storage_state.json" />
+      </div>
+
+      <div class="field">
+        <label>Browser channel (Playwright)</label>
+        <input type="text" name="browser_channel" value="{{ source.config.get('browser_channel','') if source else '' }}" placeholder="msedge or chrome" />
+      </div>
+
+      <div class="field">
+        <label>User data dir (Playwright)</label>
+        <input type="text" name="browser_user_data_dir" value="{{ source.config.get('user_data_dir','') if source else '' }}" placeholder="C:\\Users\\You\\AppData\\Local\\Google\\Chrome\\User Data" />
+      </div>
+
+      <div class="field">
+        <label>Profile directory (Playwright)</label>
+        <input type="text" name="browser_profile_directory" value="{{ source.config.get('profile_directory','') if source else '' }}" placeholder="Default or Profile 1 or Personal" />
+      </div>
+
+      <div class="field">
+        <label>Slow mo (ms, Playwright)</label>
+        <input type="number" name="browser_slow_mo_ms" value="{{ source.config.get('slow_mo_ms','') if source else '' }}" placeholder="0" />
+      </div>
+
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>Browser wait (ms)</label>
+          <input type="number" name="browser_wait_ms" value="{{ source.config.get('browser_wait_ms','') if source else '' }}" placeholder="2500" />
+        </div>
+        <div class="field">
+          <label>Browser scrolls</label>
+          <input type="number" name="browser_scrolls" value="{{ source.config.get('browser_scrolls','') if source else '' }}" min="0" max="20" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Cookie accept selector (Playwright)</label>
+        <input type="text" name="accept_cookies_selector" value="{{ source.config.get('accept_cookies_selector','') if source else '' }}" placeholder="button#accept" />
+      </div>
+
+      <div class="field">
+        <label>Browser fetch articles (Playwright)</label>
+        {% set bfa = (source.config.get('browser_fetch_articles', False) if source else False) %}
+        <select name="browser_fetch_articles">
+          <option value="true" {% if bfa %}selected{% endif %}>true</option>
+          <option value="false" {% if not bfa %}selected{% endif %}>false</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Allowed hosts (comma-separated)</label>
+        <input type="text" name="allowed_hosts" value="{{ ((source.config.get('allowed_hosts') or [])|join(',') if source else '') }}" placeholder="www.example.com" />
+      </div>
+
+      <div class="field">
+        <label>Include URL regex</label>
+        <input type="text" name="include_url_regex" value="{{ source.config.get('include_url_regex','') if source else '' }}" />
+      </div>
+
+      <div class="field">
+        <label>Exclude URL regex</label>
+        <input type="text" name="exclude_url_regex" value="{{ source.config.get('exclude_url_regex','') if source else '' }}" />
+      </div>
+
+      <div class="field">
+        <label>Include keywords (comma-separated)</label>
+        <input type="text" name="include_keywords" value="{{ ((source.config.get('include_keywords') or [])|join(',') if source else '') }}" placeholder="HBM, MCL, CoWoS" />
+      </div>
+
+      <div class="field">
+        <label>Exclude keywords (comma-separated)</label>
+        <input type="text" name="exclude_keywords" value="{{ ((source.config.get('exclude_keywords') or [])|join(',') if source else '') }}" placeholder="gaming, smartphone" />
+      </div>
+
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>Max items / run</label>
+          <input type="number" name="max_items_per_run" value="{{ source.config.get('max_items_per_run',25) if source else 25 }}" min="1" max="200" />
+        </div>
+        <div class="field">
+          <label>Fetch article</label>
+          {% set fa = (source.config.get('fetch_article', True) if source else True) %}
+          <select name="fetch_article">
+            <option value="true" {% if fa %}selected{% endif %}>true</option>
+            <option value="false" {% if not fa %}selected{% endif %}>false</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>Scrolls (x_list)</label>
+          <input type="number" name="scrolls" value="{{ source.config.get('scrolls',4) if source else 4 }}" min="1" max="25" />
+        </div>
+        <div class="field">
+          <label>Include thread (x_list)</label>
+          {% set it = (source.config.get('include_thread', True) if source else True) %}
+          <select name="include_thread">
+            <option value="true" {% if it %}selected{% endif %}>true</option>
+            <option value="false" {% if not it %}selected{% endif %}>false</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>Max thread replies (x_list)</label>
+          <input type="number" name="max_thread_replies" value="{{ source.config.get('max_thread_replies',6) if source else 6 }}" min="0" max="50" />
+        </div>
+        <div class="field">
+          <label>Headless (x_list)</label>
+          {% set hl = (source.config.get('headless', True) if source else True) %}
+          <select name="headless">
+            <option value="true" {% if hl %}selected{% endif %}>true</option>
+            <option value="false" {% if not hl %}selected{% endif %}>false</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Include quoted tweet details (x_list)</label>
+        {% set iq = (source.config.get('include_quoted', True) if source else True) %}
+        <select name="include_quoted">
+          <option value="true" {% if iq %}selected{% endif %}>true</option>
+          <option value="false" {% if not iq %}selected{% endif %}>false</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Include X article details (x_list)</label>
+        {% set ia = (source.config.get('include_articles', True) if source else True) %}
+        <select name="include_articles">
+          <option value="true" {% if ia %}selected{% endif %}>true</option>
+          <option value="false" {% if not ia %}selected{% endif %}>false</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Retry headed if headless fails</label>
+        {% set rh = (source.config.get('retry_headed_on_fail', True) if source else True) %}
+        <select name="retry_headed_on_fail">
+          <option value="true" {% if rh %}selected{% endif %}>true</option>
+          <option value="false" {% if not rh %}selected{% endif %}>false</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Retry headed if headless returns 0</label>
+        {% set re = (source.config.get('retry_headed_on_empty', True) if source else True) %}
+        <select name="retry_headed_on_empty">
+          <option value="true" {% if re %}selected{% endif %}>true</option>
+          <option value="false" {% if not re %}selected{% endif %}>false</option>
+        </select>
+      </div>
+
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>Download article images</label>
+          {% set dai = (source.config.get('download_article_images', False) if source else False) %}
+          <select name="download_article_images">
+            <option value="true" {% if dai %}selected{% endif %}>true</option>
+            <option value="false" {% if not dai %}selected{% endif %}>false</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>OCR images</label>
+          {% set ocr_on = (source.config.get('ocr_enabled', False) if source else False) %}
+          <select name="ocr_enabled">
+            <option value="true" {% if ocr_on %}selected{% endif %}>true</option>
+            <option value="false" {% if not ocr_on %}selected{% endif %}>false</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>OCR backend</label>
+          <input type="text" name="ocr_backend" value="{{ source.config.get('ocr_backend','') if source else '' }}" placeholder="tesseract" />
+        </div>
+        <div class="field">
+          <label>OCR languages</label>
+          <input type="text" name="ocr_languages" value="{{ source.config.get('ocr_languages','eng') if source else 'eng' }}" placeholder="eng" />
+        </div>
+      </div>
+
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>Refresh existing docs</label>
+          {% set re = (source.config.get('refresh_existing', False) if source else False) %}
+          <select name="refresh_existing">
+            <option value="true" {% if re %}selected{% endif %}>true</option>
+            <option value="false" {% if not re %}selected{% endif %}>false</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Store raw HTML on failure</label>
+        {% set sh = (source.config.get('store_raw_html_on_failure', True) if source else True) %}
+        <select name="store_raw_html_on_failure">
+          <option value="true" {% if sh %}selected{% endif %}>true</option>
+          <option value="false" {% if not sh %}selected{% endif %}>false</option>
+        </select>
+      </div>
+
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>Enabled</label>
+          {% set en = source.config.get('enabled') if source else None %}
+          {% set dis = source.config.get('disabled_reason') if source else None %}
+          {% set is_disabled = (en is sameas false) or (en is none and dis) %}
+          <select name="enabled">
+            <option value="true" {% if not is_disabled %}selected{% endif %}>true</option>
+            <option value="false" {% if is_disabled %}selected{% endif %}>false</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Disabled reason</label>
+          <input type="text" name="disabled_reason" value="{{ dis or '' }}" placeholder="blocked (HTTP 403)" />
+        </div>
+      </div>
+
+      <div class="btnrow">
+        <button class="btn primary" type="submit">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if source and source.config.get('connector') in ['x_list','web_list_browser','substack_inbox_browser','note_creator_browser'] %}
+<div class="panel" style="margin-top:14px;">
+  <div class="hd"><h2>Playwright Debug</h2></div>
+  <div class="bd">
+    <div class="btnrow">
+      <button class="btn" type="button" id="pw-test-btn">Test Source</button>
+    </div>
+    <pre id="pw-output" style="white-space:pre-wrap;background:rgba(7,10,13,.55);border:1px solid var(--border);border-radius:14px;padding:10px;font-size:12px;line-height:1.4;margin-top:10px;"></pre>
+    <div style="margin-top:8px;color:var(--muted);font-size:12px;">
+      Uses the current source settings and runs a headless diagnostic probe.
+    </div>
+  </div>
+</div>
+<script>
+  (function () {
+    const testBtn = document.getElementById("pw-test-btn");
+    const out = document.getElementById("pw-output");
+    if (!testBtn || !out) return;
+    const base = "{{ request.base_url }}".replace(/\/$/, "");
+    const srcId = "{{ source.id }}";
+    const testUrl = `${base}/sources/${srcId}/playwright/test`;
+
+    function setOut(val) {
+      out.textContent = val || "";
+    }
+
+    testBtn.addEventListener("click", async () => {
+      setOut("Running Playwright test...");
+      try {
+        const res = await fetch(testUrl, { method: "POST" });
+        const data = await res.json();
+        setOut(JSON.stringify(data, null, 2));
+      } catch (err) {
+        setOut(String(err));
+      }
+    });
+  })();
+</script>
+{% endif %}
+{% endblock %}

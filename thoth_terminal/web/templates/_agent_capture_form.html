@@ -1,0 +1,160 @@
+<section class="panel agent-capture-panel" id="capture">
+  <div class="hd">
+    <div class="hd-left">
+      <h2>Agent Intake</h2>
+      <span class="pill">capture -> queue</span>
+    </div>
+  </div>
+  <div class="bd">
+    <form method="post" action="/capture" enctype="multipart/form-data" id="capture-form" class="agent-capture-form">
+      <div class="grid agent-capture-grid">
+        <div class="field">
+          <label>Title</label>
+          <input type="text" name="title" placeholder="UBS ASML estimate revision" />
+        </div>
+        <div class="field">
+          <label>Priority</label>
+          <select name="agent_priority">
+            <option value="">Back of queue</option>
+            <option value="next">Next agent pass</option>
+            <option value="front">Front of queue</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid agent-capture-grid">
+        <div class="field">
+          <label>URL (optional)</label>
+          <input type="text" name="url" placeholder="paste link from X, web, notes, or source inbox" />
+          <div class="capture-url-line">
+            <span class="pill" id="capture-url-status"></span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Author / Publication (optional)</label>
+          <input type="text" name="author" placeholder="Goldman Sachs / TrendForce / PhotonCap" />
+        </div>
+      </div>
+      <div class="grid agent-capture-grid three">
+        <div class="field">
+          <label>Rights Class</label>
+          <select name="rights_class">
+            <option value="public">public</option>
+            <option value="private">private</option>
+            <option value="paid_private">paid_private</option>
+            <option value="licensed_private">licensed_private</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Acquisition Mode</label>
+          <select name="acquisition_mode">
+            <option value="manual_review">manual_review</option>
+            <option value="authenticated_browser">authenticated_browser</option>
+            <option value="gmail_entitled">gmail_entitled</option>
+            <option value="connector">connector</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Language Hint</label>
+          <input type="text" name="language_hint" placeholder="ja, en, zh" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Text</label>
+        <textarea name="text" rows="7" placeholder="Paste the excerpt or write the instruction for what the local agent should model."></textarea>
+      </div>
+      <div class="grid agent-capture-grid">
+        <div class="field">
+          <label>Attachment (optional)</label>
+          <input type="file" name="file" />
+        </div>
+        <div class="agent-capture-actions">
+          <button class="btn primary" type="submit">Send to Agent Queue</button>
+        </div>
+      </div>
+    </form>
+
+    <details class="agent-bookmarklet">
+      <summary>X / Twitter bookmarklet</summary>
+      <div class="agent-bookmarklet-body">
+        <div class="btnrow">
+          <a class="btn" id="x-bookmarklet" href="#">Send X tweets to Thoth</a>
+        </div>
+        <pre id="x-bookmarklet-code"></pre>
+      </div>
+    </details>
+  </div>
+</section>
+
+<script>
+  (function () {
+    const base = "{{ request.base_url }}".replace(/\/$/, "");
+    const endpoint = base + "/api/capture/tweets";
+    const code = `(() => {
+  const endpoint = "${endpoint}";
+  const articles = Array.from(document.querySelectorAll('article[data-testid="tweet"]'));
+  function pickStatusUrl(article) {
+    const links = Array.from(article.querySelectorAll('a[href*="/status/"]'));
+    for (const link of links) {
+      const href = link.getAttribute("href") || "";
+      if (/\\/status\\/\\d+/.test(href)) {
+        return link.href;
+      }
+    }
+    return null;
+  }
+  function parse(article) {
+    const url = pickStatusUrl(article);
+    if (!url) return null;
+    const idMatch = url.match(/status\\/(\\d+)/);
+    const tweetId = idMatch ? idMatch[1] : null;
+    const textEls = article.querySelectorAll('[data-testid="tweetText"]');
+    const text = textEls[0] ? textEls[0].innerText : "";
+    const quotedText = textEls.length > 1 ? textEls[1].innerText : "";
+    const timeEl = article.querySelector("time");
+    const createdAt = timeEl ? timeEl.getAttribute("datetime") : null;
+    let handle = "";
+    try {
+      const parts = new URL(url).pathname.split("/");
+      handle = parts[1] || "";
+    } catch (_e) {}
+    let author = "";
+    const nameEl = article.querySelector('div[data-testid="User-Name"] span');
+    if (nameEl) author = nameEl.textContent || "";
+    const media = Array.from(article.querySelectorAll('img[src*="pbs.twimg.com/media/"]')).map((img) => img.src);
+    const links = Array.from(article.querySelectorAll("a[href]"))
+      .map((a) => a.href)
+      .filter((href) => href && href.startsWith("http") && !href.includes("/status/") && !href.includes("x.com/") && !href.includes("twitter.com/"));
+    const quotedUrlEl = article.querySelector('div[aria-label="Quoted Tweet"] a[href*="/status/"]');
+    const quotedUrl = quotedUrlEl ? quotedUrlEl.href : null;
+    return {
+      url,
+      tweet_id: tweetId,
+      text,
+      quoted_text: quotedText || null,
+      quoted_url: quotedUrl,
+      author,
+      handle,
+      created_at: createdAt,
+      media,
+      links
+    };
+  }
+  const items = articles.map(parse).filter(Boolean);
+  if (!items.length) {
+    alert("No tweets found on this page.");
+    return;
+  }
+  const payload = JSON.stringify({ items });
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon(endpoint, new Blob([payload], { type: "application/json" }));
+  } else {
+    fetch(endpoint, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: payload });
+  }
+  alert(\`Sent \${items.length} tweet(s) to Thoth\`);
+})();`;
+    const link = document.getElementById("x-bookmarklet");
+    if (link) link.setAttribute("href", "javascript:" + encodeURIComponent(code));
+    const pre = document.getElementById("x-bookmarklet-code");
+    if (pre) pre.textContent = code;
+  })();
+</script>

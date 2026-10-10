@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+{% set entry = history.entry %}
+<section class="page-section roadmap-surface">
+  <header class="surface-heading"><div><p class="eyebrow">Forecast history</p><h1>{{ entry.title }}</h1><p>{{ entry.statement }}</p><p class="muted">{{ entry.owner or 'Owner unresolved' }}</p></div><a class="btn" href="/roadmaps">Roadmaps</a></header>
+  {% if entry.resolution_criteria %}<p><strong>Resolution criteria:</strong> {{ entry.resolution_criteria }}</p>{% endif %}
+  {% if history.truncation.forecast_versions or history.truncation.outcome_reviews %}<details><summary>History coverage</summary><p>Showing the original forecast and the latest {{ history.limit }} versions and assessments. {{ history.counts.forecast_versions }} forecast versions and {{ history.counts.outcome_reviews }} assessments are recorded.</p></details>{% endif %}
+  <div class="roadmap-timeline">
+    {% for version in history.forecast_versions %}
+    {% set forecast = version.forecast_snapshot %}
+    <article class="roadmap-entry">
+      <div class="roadmap-when"><b>{{ forecast.expected_window or forecast.target_date or forecast.target_year or 'TBD' }}</b>{% if forecast.target_quarter %}<span>Q{{ forecast.target_quarter }}</span>{% endif %}<small>{{ version.window_basis or '' }}</small></div>
+      <div class="roadmap-core"><h3>{{ forecast.title or version.title }}</h3><p>{{ forecast.statement }}</p><div class="roadmap-tags"><span>{{ forecast.revision_kind or 'recorded forecast' }}</span><span>{{ version.latest_outcome | replace('_', ' ') }}</span>{% if history.current_forecast and version.forecast_mention_id == history.current_forecast.forecast_mention_id %}<span>Current forecast</span>{% endif %}{% if history.original_forecast and version.forecast_mention_id == history.original_forecast.forecast_mention_id %}<span>Original forecast</span>{% endif %}</div>{% if forecast.change_rationale %}<p>{{ forecast.change_rationale }}</p>{% endif %}<details><summary>Evidence and assessments</summary>{% if forecast.resolution_criteria %}<p><strong>Resolution criteria:</strong> {{ forecast.resolution_criteria }}</p>{% endif %}{% if forecast.source_document_id %}<p><a href="/docs/{{ forecast.source_document_id }}">Forecast source</a></p>{% endif %}{% for review in history.outcome_history if review.forecast_mention_id == version.forecast_mention_id %}<p><strong>{{ review.outcome | replace('_', ' ') }}</strong> · {{ review.created_at }}<br>{{ review.rationale }}{% if review.actual_date %}<br>Actual: {{ review.actual_date }}{% elif review.observed_window %}<br>Observed: {{ review.observed_window }}{% endif %}{% if review.uncertainty %}<br>{{ review.uncertainty }}{% endif %}</p><p>{% for source_id in review.source_document_ids %}<a href="/docs/{{ source_id }}">Evidence {{ source_id }}</a> {% endfor %}</p>{% else %}<p>{{ "No assessment in this history window." if history.truncation.outcome_reviews else "No outcome assessment recorded for this forecast." }}</p>{% endfor %}</details></div>
+      <div class="roadmap-source"><b>{{ forecast.owner or entry.owner or 'Owner unresolved' }}</b><span>{{ forecast.confidence_label or (forecast.confidence if forecast.confidence is not none else 'unrated') }}</span></div>
+    </article>
+    {% else %}<div class="empty-state">No source forecast history recorded.</div>{% endfor %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,612 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="consensus-page" data-consensus-page>
+  <div class="consensus-header">
+    <div>
+      <div class="workspace-kicker">Consensus OS</div>
+      <h1>Consensus</h1>
+      <p>Autocomplete-first institutional model surface for estimates, source firms, analysts, product/category views, directional news, and cleanup review.</p>
+    </div>
+    <div class="btnrow">
+      <a class="btn" href="/visualizations/datasets?family=analyst_evidence">Data Workbench</a>
+      <a class="btn" href="/agent-review">Review Queue</a>
+    </div>
+  </div>
+
+  <section class="panel consensus-command-panel" data-consensus-command data-suggest-url="/api/consensus/suggest">
+    <div class="bd">
+      <form method="get" action="/consensus" class="consensus-command-form" id="consensus-command-form">
+        <input type="hidden" name="subject" value="{{ subject_filter }}" data-consensus-hidden="subject" />
+        <input type="hidden" name="product_category" value="{{ product_category_filter }}" data-consensus-hidden="product_category" />
+        <input type="hidden" name="source_firm" value="{{ source_firm_filter }}" data-consensus-hidden="source_firm" />
+        <input type="hidden" name="analyst" value="{{ analyst_filter }}" data-consensus-hidden="analyst" />
+        <input type="hidden" name="metric" value="{{ metric_filter }}" data-consensus-hidden="metric" />
+        <input type="hidden" name="period" value="{{ period_filter }}" data-consensus-hidden="period" />
+        <input type="hidden" name="limit" value="{{ limit }}" />
+
+        <div class="consensus-command-row">
+          <div class="consensus-command-input-wrap">
+            <label for="consensus-command-input">Command Search</label>
+            <input id="consensus-command-input" class="consensus-command-input" type="text" name="q" value="{{ query }}" autocomplete="off" placeholder="Search MLCC, HBM, ASML, TrendForce, Morgan Stanley, price target..." />
+            <div class="consensus-suggest" id="consensus-suggest" hidden></div>
+          </div>
+          <div class="consensus-command-actions">
+            <button class="btn primary" type="submit">Open</button>
+            <a class="btn" href="/consensus">Reset</a>
+          </div>
+        </div>
+
+        <div class="consensus-active-facets" aria-label="Active consensus filters">
+          {% if query %}<span class="facet-chip">Search: {{ query }}</span>{% endif %}
+          {% if subject_filter %}<span class="facet-chip">Subject: {{ subject_filter }}</span>{% endif %}
+          {% if product_category_filter %}<span class="facet-chip">Product: {{ product_category_filter }}</span>{% endif %}
+          {% if source_firm_filter %}<span class="facet-chip">Firm: {{ source_firm_filter }}</span>{% endif %}
+          {% if analyst_filter %}<span class="facet-chip">Person: {{ analyst_filter }}</span>{% endif %}
+          {% if metric_filter %}<span class="facet-chip">Metric: {{ metric_filter }}</span>{% endif %}
+          {% if period_filter %}<span class="facet-chip">Period: {{ period_filter }}</span>{% endif %}
+          {% if not query and not subject_filter and not product_category_filter and not source_firm_filter and not analyst_filter and not metric_filter and not period_filter %}
+            <span class="facet-chip muted">Type to resolve an existing subject, product, firm, analyst, metric, or period.</span>
+          {% endif %}
+        </div>
+
+        <details class="consensus-advanced-filters">
+          <summary>Facets</summary>
+          <div class="consensus-filters">
+            <div class="field">
+              <label>Subject</label>
+              <input type="text" value="{{ subject_filter }}" placeholder="ASML, AT&S, Samsung" data-consensus-facet="subject" />
+            </div>
+            <div class="field">
+              <label>Product / Category</label>
+              <input type="text" value="{{ product_category_filter }}" placeholder="HBM, AI substrates, EUV, MLCC" data-consensus-facet="product_category" />
+            </div>
+            <div class="field">
+              <label>Source Firm</label>
+              <input type="text" value="{{ source_firm_filter }}" placeholder="Morgan Stanley, TrendForce" data-consensus-facet="source_firm" />
+            </div>
+            <div class="field">
+              <label>Analyst / Person</label>
+              <input type="text" value="{{ analyst_filter }}" placeholder="named analyst, account, author" data-consensus-facet="analyst" />
+            </div>
+            <div class="field">
+              <label>Metric</label>
+              <select data-consensus-facet="metric">
+                <option value="">All metrics</option>
+                {% for value in metric_options %}
+                  <option value="{{ value }}" {% if metric_filter == value %}selected{% endif %}>{{ value }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="field">
+              <label>Period</label>
+              <select data-consensus-facet="period">
+                <option value="">All periods</option>
+                {% for value in period_options %}
+                  <option value="{{ value }}" {% if period_filter == value %}selected{% endif %}>{{ value }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="field">
+              <label>Rows</label>
+              <select name="limit">
+                {% for value in [75, 150, 300, 500] %}
+                  <option value="{{ value }}" {% if limit == value %}selected{% endif %}>{{ value }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </details>
+      </form>
+    </div>
+  </section>
+
+  <section class="consensus-stat-strip" aria-label="Consensus coverage">
+    <div><span>Subjects</span><strong>{{ metrics.subjects }}</strong></div>
+    <div><span>Consensus Groups</span><strong>{{ metrics.consensus_groups }}</strong></div>
+    <div><span>Evidence Rows</span><strong>{{ metrics.evidence_rows }}</strong></div>
+    <div><span>Source Cohorts</span><strong>{{ metrics.source_cohorts }}</strong></div>
+    <div><span>Directional News</span><strong>{{ metrics.directional_events }}</strong></div>
+    <div class="{{ 'is-alert' if metrics.non_modelable else '' }}"><span>Needs Routing</span><strong>{{ metrics.non_modelable }}</strong></div>
+  </section>
+
+  <div class="consensus-workspace-tabs" role="tablist" aria-label="Consensus workspace">
+    <button type="button" class="active" data-consensus-tab="matrix">Matrix</button>
+    <button type="button" data-consensus-tab="estimates">Estimates</button>
+    <button type="button" data-consensus-tab="directional">Directional News</button>
+    <button type="button" data-consensus-tab="cleanup">Cleanup</button>
+    <button type="button" data-consensus-tab="evidence">Evidence Rows</button>
+  </div>
+
+  <div class="consensus-layout">
+    <main class="consensus-main">
+      <section class="panel consensus-tab-panel" data-consensus-panel="matrix">
+        <div class="hd">
+          <div class="hd-left">
+            <h2>Model Matrix</h2>
+            <span class="pill">{{ matrix_rows|length }} rows</span>
+          </div>
+        </div>
+        <div class="bd">
+          <table class="consensus-table matrix">
+            <thead>
+              <tr>
+                <th>Subject / Metric</th>
+                {% for period in matrix_columns %}
+                  <th>{{ period }}</th>
+                {% endfor %}
+                <th>Sources</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in matrix_rows %}
+                <tr>
+                  <td data-label="Subject / Metric">
+                    <strong>{{ row.subject }}</strong>
+                    <span class="subtle-line">{{ row.metric }}</span>
+                  </td>
+                  {% for cell in row.cells %}
+                    <td data-label="{{ cell.period }}" class="mono matrix-cell {{ 'empty' if not cell.consensus }}">
+                      {% if cell.consensus %}
+                        <strong>{{ cell.consensus }}</strong>
+                        <span>{{ cell.range }}</span>
+                        <span class="subtle-line">{{ cell.sources }} sources / {{ cell.rows }} rows</span>
+                      {% else %}
+                        <span class="subtle-line">no model</span>
+                      {% endif %}
+                    </td>
+                  {% endfor %}
+                  <td data-label="Sources">{{ row.source_count }}</td>
+                  <td data-label="Updated" class="mono">{{ row.latest_at[:16].replace('T',' ') if row.latest_at else 'n/a' }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="{{ matrix_columns|length + 3 }}">No modelable matrix rows match this filter.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel consensus-tab-panel" data-consensus-panel="estimates" hidden>
+        <div class="hd">
+          <div class="hd-left">
+            <h2>Consensus Table</h2>
+            <span class="pill">{{ consensus_rows|length }} groups</span>
+          </div>
+        </div>
+        <div class="bd">
+          <table class="consensus-table">
+            <thead>
+              <tr>
+                <th>Subject</th>
+                <th>Metric</th>
+                <th>Period</th>
+                <th>Sources</th>
+                <th>Rows</th>
+                <th>Consensus</th>
+                <th>Range</th>
+                <th>Updated</th>
+                <th>Dataset</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in consensus_rows %}
+                <tr>
+                  <td data-label="Subject">{{ row.subject }}</td>
+                  <td data-label="Metric" class="wrap-cell">{{ row.metric }}</td>
+                  <td data-label="Period" class="mono">{{ row.period }}</td>
+                  <td data-label="Sources">{{ row.source_count }}</td>
+                  <td data-label="Rows">{{ row.evidence_count }}</td>
+                  <td data-label="Consensus" class="mono">{{ row.consensus }}{% if 'derived_range_midpoint' in row.warnings %}<span class="subtle-line">includes derived midpoint</span>{% endif %}</td>
+                  <td data-label="Range" class="mono wrap-cell">{{ row.range }}</td>
+                  <td data-label="Updated" class="mono">{{ row.latest_at[:16].replace('T',' ') if row.latest_at else 'n/a' }}</td>
+                  <td data-label="Dataset"><a href="{{ row.dataset_href }}">Open</a></td>
+                </tr>
+              {% else %}
+                <tr><td colspan="9">No modelable consensus groups match this filter.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel consensus-tab-panel" data-consensus-panel="directional" hidden>
+        <div class="hd">
+          <div class="hd-left">
+            <h2>Directional News</h2>
+            <span class="pill">{{ directional_events|length }} events</span>
+          </div>
+        </div>
+        <div class="bd">
+          <table class="consensus-table directional">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Bias</th>
+                <th>Event / Report</th>
+                <th>Target</th>
+                <th>Expires</th>
+                <th>Analyst Refresh</th>
+                <th>Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in directional_events %}
+                <tr>
+                  <td data-label="Date" class="mono">{{ row.event_date or 'n/a' }}</td>
+                  <td data-label="Bias"><span class="direction-pill {{ row.direction }}">{{ row.direction }}</span></td>
+                  <td data-label="Event / Report" class="wrap-cell">{{ row.title }}{% if row.summary %}<span class="subtle-line">{{ row.summary }}</span>{% endif %}</td>
+                  <td data-label="Target" class="wrap-cell">
+                    {{ row.impact_target or row.kind }}
+                    {% if row.impact_marker %}<span class="subtle-line">{{ row.impact_marker }}</span>{% endif %}
+                    {% if row.reference_label %}<span class="subtle-line">ref: {{ row.reference_label }}</span>{% endif %}
+                  </td>
+                  <td data-label="Expires" class="mono">{{ row.expires_at or 'n/a' }}{% if row.expiry_status %}<span class="subtle-line">{{ row.expiry_status }}</span>{% endif %}</td>
+                  <td data-label="Analyst Refresh" class="wrap-cell">{{ row.updated_sources }} / {{ row.total_sources }} updated{% if row.pending_sources %}<span class="subtle-line">waiting: {{ row.pending_sources_label }}</span>{% endif %}</td>
+                  <td data-label="Source">
+                    {% if row.source_document_href %}<a href="{{ row.source_document_href }}">Doc</a>{% elif row.source_url %}<a href="{{ row.source_url }}" target="_blank" rel="noreferrer">Link</a>{% else %}n/a{% endif %}
+                  </td>
+                </tr>
+              {% else %}
+                <tr><td colspan="7">No dated upside/downside events match this filter.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel consensus-tab-panel" data-consensus-panel="cleanup" hidden>
+        <div class="hd">
+          <div class="hd-left">
+            <h2>Needs Routing</h2>
+            <span class="pill">{{ cleanup_rows|length }} rows</span>
+          </div>
+        </div>
+        <div class="bd">
+          <table class="consensus-table evidence">
+            <thead>
+              <tr>
+                <th>Published</th>
+                <th>Subject</th>
+                <th>Source Firm</th>
+                <th>Product / Category</th>
+                <th>Metric</th>
+                <th>Reason</th>
+                <th>Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in cleanup_rows %}
+                <tr class="needs-routing" data-detail-index="{{ row.detail_index }}" tabindex="0">
+                  <td data-label="Published" class="mono">{{ row.published_at[:16].replace('T',' ') if row.published_at else 'n/a' }}</td>
+                  <td data-label="Subject">{{ row.subject.label }}</td>
+                  <td data-label="Source Firm" class="wrap-cell">{{ row.source }}</td>
+                  <td data-label="Product / Category" class="wrap-cell">{{ row.product_category or 'n/a' }}</td>
+                  <td data-label="Metric" class="wrap-cell">{{ row.metric }}</td>
+                  <td data-label="Reason" class="summary-cell">No modelable value, rating, target, or dated status vector. Route as event/fact/request before cleanup.</td>
+                  <td data-label="Source">
+                    {% if row.source_document_href %}<a href="{{ row.source_document_href }}">Doc</a>{% elif row.source_url %}<a href="{{ row.source_url }}" target="_blank" rel="noreferrer">Link</a>{% else %}n/a{% endif %}
+                  </td>
+                </tr>
+              {% else %}
+                <tr><td colspan="7">No malformed legacy rows match this filter.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel consensus-tab-panel" data-consensus-panel="evidence" hidden>
+        <div class="hd">
+          <div class="hd-left">
+            <h2>Evidence Rows</h2>
+            <span class="pill">{{ evidence_rows|length }} rows</span>
+          </div>
+        </div>
+        <div class="bd">
+          <table class="consensus-table evidence">
+            <thead>
+              <tr>
+                <th>Published</th>
+                <th>Subject</th>
+                <th>Source Firm</th>
+                <th>Analyst / Person</th>
+                <th>Product / Category</th>
+                <th>Metric</th>
+                <th>Period</th>
+                <th>Value</th>
+                <th>Rating / Target</th>
+                <th>Confidence</th>
+                <th>Summary</th>
+                <th>Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in evidence_rows %}
+                <tr class="{{ '' if row.modelable else 'needs-routing' }}" data-detail-index="{{ row.detail_index }}" tabindex="0">
+                  <td data-label="Published" class="mono">{{ row.published_at[:16].replace('T',' ') if row.published_at else 'n/a' }}</td>
+                  <td data-label="Subject">{{ row.subject.label }}</td>
+                  <td data-label="Source Firm" class="wrap-cell">{{ row.source }}</td>
+                  <td data-label="Analyst / Person" class="wrap-cell">{{ row.person or 'n/a' }}</td>
+                  <td data-label="Product / Category" class="wrap-cell">{{ row.product_category or 'n/a' }}</td>
+                  <td data-label="Metric" class="wrap-cell">{{ row.metric }}</td>
+                  <td data-label="Period" class="mono">{{ row.period }}</td>
+                  <td data-label="Value" class="mono">{{ row.reported_range or row.value }}{% if row.value_basis == 'range_midpoint' %}<span class="subtle-line">midpoint {{ row.value }} used for consensus</span>{% endif %}</td>
+                  <td data-label="Rating / Target">{{ row.rating or row.target or 'n/a' }}</td>
+                  <td data-label="Confidence" class="mono">{{ row.confidence or 'n/a' }}</td>
+                  <td data-label="Summary" class="summary-cell">{{ row.summary }}</td>
+                  <td data-label="Source">
+                    {% if row.source_document_href %}<a href="{{ row.source_document_href }}">Doc</a>{% elif row.source_url %}<a href="{{ row.source_url }}" target="_blank" rel="noreferrer">Link</a>{% else %}n/a{% endif %}
+                  </td>
+                </tr>
+              {% else %}
+                <tr><td colspan="12">No evidence rows match this filter.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel consensus-support-panel">
+        <div class="hd">
+          <div class="hd-left">
+            <h2>Coverage</h2>
+            <span class="pill">{{ subject_rows|length }} subjects</span>
+          </div>
+        </div>
+        <div class="bd">
+          <table class="consensus-table">
+            <thead>
+              <tr>
+                <th>Subject</th>
+                <th>Ticker</th>
+                <th>Sources</th>
+                <th>Estimates</th>
+                <th>Latest Rating</th>
+                <th>Latest Target</th>
+                <th>Metrics</th>
+                <th>Updated</th>
+                <th>Dataset</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in subject_rows %}
+                <tr>
+                  <td data-label="Subject">{% if row.href %}<a href="{{ row.href }}">{{ row.label }}</a>{% else %}{{ row.label }}{% endif %}</td>
+                  <td data-label="Ticker" class="mono">{{ row.ticker or 'n/a' }}</td>
+                  <td data-label="Sources">{{ row.source_count }}</td>
+                  <td data-label="Estimates">{{ row.estimate_count }} / {{ row.evidence_count }}</td>
+                  <td data-label="Latest Rating">{{ row.latest_rating or 'n/a' }}</td>
+                  <td data-label="Latest Target">{{ row.latest_target or 'n/a' }}</td>
+                  <td data-label="Metrics" class="wrap-cell">{{ row.metrics_label }}</td>
+                  <td data-label="Updated" class="mono">{{ row.latest_at[:16].replace('T',' ') if row.latest_at else 'n/a' }}</td>
+                  <td data-label="Dataset"><a href="{{ row.dataset_href }}">Open</a></td>
+                </tr>
+              {% else %}
+                <tr><td colspan="9">No consensus subjects match this filter.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <aside class="consensus-rail">
+      <section class="panel consensus-inspector" data-consensus-inspector>
+        <div class="hd"><h2>Inspector</h2></div>
+        <div class="bd">
+          <div class="inspector-empty">
+            <strong>Select an evidence row</strong>
+            <span>Provenance, source refresh, routing status, and internal comparison context will appear here.</span>
+          </div>
+          <div class="inspector-body" hidden>
+            <div class="inspector-title" data-inspector-title></div>
+            <div class="inspector-meta" data-inspector-meta></div>
+            <div class="inspector-grid">
+              <div><span>Metric</span><strong data-inspector-metric></strong></div>
+              <div><span>Period</span><strong data-inspector-period></strong></div>
+              <div><span>Value</span><strong data-inspector-value></strong></div>
+              <div><span>Confidence</span><strong data-inspector-confidence></strong></div>
+            </div>
+            <p data-inspector-summary></p>
+            <div class="inspector-actions" data-inspector-actions></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="hd"><h2>Source Cohorts</h2></div>
+        <div class="bd">
+          <table class="consensus-table compact">
+            <thead><tr><th>Source Firm</th><th>Role</th><th>Rows</th><th>Updated</th></tr></thead>
+            <tbody>
+              {% for row in cohort_rows %}
+                <tr>
+                  <td class="wrap-cell">{{ row.source }}</td>
+                  <td>{{ row.role }}</td>
+                  <td>{{ row.evidence_count }}</td>
+                  <td class="mono">{{ row.latest_at[:10] if row.latest_at else 'n/a' }}</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="4">No cohorts.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="hd"><h2>Model Rules</h2></div>
+        <div class="bd consensus-rule-list">
+          <div><strong>Analysts</strong><span>Use as a Consensus lens by subject, firm, or person.</span></div>
+          <div><strong>Internal</strong><span>Show as comparison, not part of sell-side consensus math.</span></div>
+          <div><strong>Company Sources</strong><span>Route official claims to company/product facts, not price targets.</span></div>
+          <div><strong>Directional News</strong><span>Store dated upside/downside events with expiry and analyst-refresh status.</span></div>
+          <div><strong>Qualitative Guidance</strong><span>Use prior value plus directional marker until an official number exists.</span></div>
+          <div><strong>Undersupply</strong><span>Use catalyst/event context unless shortage size, utilization, or price impact is quantified.</span></div>
+          <div><strong>Contract price</strong><span>Keep separate from spot price.</span></div>
+          <div><strong>Market share</strong><span>Chart by default when shares close; keep the table beside it.</span></div>
+          <div><strong>TAM / SAM / SOM</strong><span>Track period, unit, source, and scope before aggregation.</span></div>
+          <div><strong>Bad writes</strong><span>Local agent cannot delete; steward cleanup needs review.</span></div>
+          <div><strong>Aliases</strong><span>Resolve existing vocabulary before adding a new metric or material name.</span></div>
+        </div>
+      </section>
+    </aside>
+  </div>
+</section>
+<script type="application/json" id="consensus-evidence-json">{{ evidence_rows|tojson }}</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  const root = document.querySelector("[data-consensus-page]");
+  if (!root) return;
+
+  const form = document.getElementById("consensus-command-form");
+  const command = root.querySelector("[data-consensus-command]");
+  const input = document.getElementById("consensus-command-input");
+  const suggest = document.getElementById("consensus-suggest");
+  const suggestUrl = command?.dataset.suggestUrl || "/api/consensus/suggest";
+  const hiddenByParam = {};
+  root.querySelectorAll("[data-consensus-hidden]").forEach((node) => {
+    hiddenByParam[node.dataset.consensusHidden] = node;
+  });
+  root.querySelectorAll("[data-consensus-facet]").forEach((node) => {
+    node.addEventListener("change", () => {
+      const hidden = hiddenByParam[node.dataset.consensusFacet];
+      if (hidden) hidden.value = node.value || "";
+    });
+    node.addEventListener("input", () => {
+      const hidden = hiddenByParam[node.dataset.consensusFacet];
+      if (hidden) hidden.value = node.value || "";
+    });
+  });
+
+  let timer = null;
+  const renderSuggestions = (groups) => {
+    const activeGroups = (groups || []).filter((group) => (group.items || []).length);
+    if (!activeGroups.length) {
+      suggest.hidden = true;
+      suggest.innerHTML = "";
+      return;
+    }
+    suggest.innerHTML = activeGroups.map((group) => `
+      <div class="suggest-group">
+        <div class="suggest-group-title">${escapeHtml(group.label || "")}</div>
+        ${(group.items || []).map((item) => `
+          <button type="button" class="suggest-item" data-param="${escapeAttr(item.param || "q")}" data-value="${escapeAttr(item.value || item.label || "")}">
+            <span>${escapeHtml(item.label || "")}</span>
+            <small>${escapeHtml(item.meta || "")}${item.count ? ` / ${item.count} rows` : ""}</small>
+          </button>
+        `).join("")}
+      </div>
+    `).join("");
+    suggest.hidden = false;
+  };
+
+  const fetchSuggestions = () => {
+    const q = input.value.trim();
+    if (!q) {
+      suggest.hidden = true;
+      suggest.innerHTML = "";
+      return;
+    }
+    fetch(`${suggestUrl}?q=${encodeURIComponent(q)}&limit=6`, { headers: { "Accept": "application/json" } })
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload) => renderSuggestions(payload?.groups || []))
+      .catch(() => {
+        suggest.hidden = true;
+      });
+  };
+
+  input?.addEventListener("input", () => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(fetchSuggestions, 120);
+  });
+  input?.addEventListener("focus", fetchSuggestions);
+  input?.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      suggest.hidden = true;
+    }
+  });
+  document.addEventListener("click", (event) => {
+    if (!command?.contains(event.target)) suggest.hidden = true;
+  });
+  suggest?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-param]");
+    if (!button) return;
+    const param = button.dataset.param || "q";
+    const value = button.dataset.value || "";
+    if (param === "q") {
+      input.value = value;
+    } else if (hiddenByParam[param]) {
+      hiddenByParam[param].value = value;
+      input.value = "";
+    }
+    form.submit();
+  });
+
+  root.querySelectorAll("[data-consensus-tab]").forEach((button) => {
+    button.addEventListener("click", () => {
+      suggest.hidden = true;
+      const tab = button.dataset.consensusTab;
+      root.querySelectorAll("[data-consensus-tab]").forEach((node) => node.classList.toggle("active", node === button));
+      root.querySelectorAll("[data-consensus-panel]").forEach((panel) => {
+        panel.hidden = panel.dataset.consensusPanel !== tab;
+      });
+    });
+  });
+
+  let evidenceRows = [];
+  try {
+    evidenceRows = JSON.parse(document.getElementById("consensus-evidence-json")?.textContent || "[]");
+  } catch {}
+  const inspector = root.querySelector("[data-consensus-inspector]");
+  const empty = inspector?.querySelector(".inspector-empty");
+  const body = inspector?.querySelector(".inspector-body");
+  const setText = (selector, text) => {
+    const node = inspector?.querySelector(selector);
+    if (node) node.textContent = text || "n/a";
+  };
+  const showInspector = (row) => {
+    if (!row || !inspector || !body || !empty) return;
+    empty.hidden = true;
+    body.hidden = false;
+    setText("[data-inspector-title]", `${row.subject?.label || "Unscoped"} / ${row.source || "Unknown source"}`);
+    setText("[data-inspector-meta]", [row.person, row.product_category, row.kind].filter(Boolean).join(" / "));
+    setText("[data-inspector-metric]", row.metric || "n/a");
+    setText("[data-inspector-period]", row.period || "n/a");
+    setText("[data-inspector-value]", row.value || row.rating || row.target || "n/a");
+    setText("[data-inspector-confidence]", row.confidence || "n/a");
+    setText("[data-inspector-summary]", row.summary || "No summary.");
+    const actions = inspector.querySelector("[data-inspector-actions]");
+    if (actions) {
+      actions.innerHTML = "";
+      const links = [];
+      if (row.source_document_href) links.push(`<a class="btn" href="${escapeAttr(row.source_document_href)}">Open Doc</a>`);
+      if (row.source_url) links.push(`<a class="btn" href="${escapeAttr(row.source_url)}" target="_blank" rel="noreferrer">Source</a>`);
+      if (!row.modelable) links.push(`<span class="route-note">Route before cleanup</span>`);
+      actions.innerHTML = links.join("");
+    }
+  };
+  root.querySelectorAll("[data-detail-index]").forEach((rowNode) => {
+    const activate = () => showInspector(evidenceRows[Number(rowNode.dataset.detailIndex)]);
+    rowNode.addEventListener("click", activate);
+    rowNode.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        activate();
+      }
+    });
+  });
+
+  function escapeHtml(value) {
+    return String(value || "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
+  }
+  function escapeAttr(value) {
+    return escapeHtml(value).replace(/`/g, "&#096;");
+  }
+})();
+</script>
+{% endblock %}

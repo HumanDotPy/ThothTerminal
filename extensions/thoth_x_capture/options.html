@@ -1,0 +1,167 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Thoth X Capture Options</title>
+    <style>
+      body { font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 16px; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .field { margin-bottom: 12px; }
+      label { display: block; font-weight: 600; margin-bottom: 4px; }
+      input[type="text"], input[type="number"] { width: 100%; padding: 6px 8px; }
+      .row { display: flex; gap: 10px; align-items: center; }
+      .actions { margin-top: 12px; display: flex; gap: 10px; }
+      .status { margin-top: 8px; color: #176; }
+      .hint { color: #666; font-size: 12px; }
+      details { margin-top: 10px; }
+      summary { cursor: pointer; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <h2>Thoth X Capture</h2>
+
+    <div class="field row">
+      <input type="checkbox" id="enabled" />
+      <label for="enabled" style="margin:0">Enabled</label>
+    </div>
+    <div class="field">
+      <div class="hint">Last run: <span id="lastRunAt">—</span> · <span id="lastRunTrigger">—</span></div>
+      <div class="hint">Next scheduled: <span id="nextRunAt">—</span></div>
+    </div>
+
+    <div class="field">
+      <label for="thothUrl">Thoth base URL</label>
+      <input id="thothUrl" type="text" placeholder="http://127.0.0.1:8750" />
+    </div>
+    <div class="field row">
+      <button id="grantBtn" type="button">Grant access to Thoth URL</button>
+      <span class="hint">Required if you change the Thoth URL/domain.</span>
+    </div>
+
+    <div class="field">
+      <label for="listUrl">X list URL</label>
+      <input id="listUrl" type="text" placeholder="https://x.com/i/lists/..." />
+    </div>
+
+    <div class="grid">
+      <div class="field">
+        <label for="pollMinMinutes">Poll min (minutes)</label>
+        <input id="pollMinMinutes" type="number" min="1" />
+      </div>
+      <div class="field">
+        <label for="pollMaxMinutes">Poll max (minutes)</label>
+        <input id="pollMaxMinutes" type="number" min="1" />
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="field">
+        <label for="activeWindowStart">Active window start (HH:MM)</label>
+        <input id="activeWindowStart" type="text" placeholder="07:00" />
+      </div>
+      <div class="field">
+        <label for="activeWindowEnd">Active window end (HH:MM)</label>
+        <input id="activeWindowEnd" type="text" placeholder="01:00" />
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="activeWindowTz">Active window timezone</label>
+      <input id="activeWindowTz" type="text" placeholder="America/New_York" />
+    </div>
+
+    <div class="grid">
+      <div class="field">
+        <label for="seenStreakStop">Stop after seen-streak</label>
+        <input id="seenStreakStop" type="number" min="1" />
+        <div class="hint">Stops after N consecutive already-seen tweets.</div>
+      </div>
+      <div class="field">
+        <label for="initialBackfillCount">Initial backfill count</label>
+        <input id="initialBackfillCount" type="number" min="0" />
+        <div class="hint">First run only. 0 = just mark the top.</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="field row">
+        <input type="checkbox" id="includeThread" />
+        <label for="includeThread" style="margin:0">Include self-thread replies</label>
+      </div>
+      <div class="field">
+        <label for="maxThreadReplies">Max self-replies</label>
+        <input id="maxThreadReplies" type="number" min="0" />
+      </div>
+    </div>
+
+    <details>
+      <summary>Advanced pacing</summary>
+      <div class="grid" style="margin-top:8px;">
+        <div class="field">
+          <label for="batchSize">Batch size (send to Thoth)</label>
+          <input id="batchSize" type="number" min="1" />
+        </div>
+        <div class="field">
+          <label for="tweetDwellBaseMs">Base dwell per tweet (ms)</label>
+          <input id="tweetDwellBaseMs" type="number" min="0" />
+        </div>
+        <div class="field">
+          <label for="tweetDwellPerCharMs">Extra dwell per char (ms)</label>
+          <input id="tweetDwellPerCharMs" type="number" min="0" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="tweetDwellMaxMs">Max dwell per tweet (ms)</label>
+        <input id="tweetDwellMaxMs" type="number" min="0" />
+      </div>
+      <div class="field">
+        <label for="readingWpm">Reading speed (words per minute)</label>
+        <input id="readingWpm" type="number" min="50" />
+        <div class="hint">Used to compute human-like dwell time per tweet.</div>
+      </div>
+      <div class="field row">
+        <input type="checkbox" id="keepTabOnError" />
+        <label for="keepTabOnError" style="margin:0">Keep list tab open on error</label>
+      </div>
+      <div class="field row">
+        <input type="checkbox" id="foregroundCapture" />
+        <label for="foregroundCapture" style="margin:0">Capture in foreground (recommended if X blocks background tabs)</label>
+      </div>
+      <div class="field">
+        <label for="captureWindowMode">Capture window</label>
+        <select id="captureWindowMode">
+          <option value="tab">Same window tab</option>
+          <option value="window">Separate window (background)</option>
+          <option value="stealth">Stealth window (offscreen)</option>
+        </select>
+        <div class="hint">Stealth mode hides the X window offscreen. If X fails to render, switch back to background window.</div>
+      </div>
+      <div class="field row">
+        <input type="checkbox" id="captureWindowMinimized" />
+        <label for="captureWindowMinimized" style="margin:0">Minimize capture window</label>
+      </div>
+      <div class="field">
+        <label for="autoActivateMs">Auto-activate list tab (ms)</label>
+        <input id="autoActivateMs" type="number" min="0" />
+        <div class="hint">Briefly focuses the list tab to trigger X rendering. 0 disables.</div>
+      </div>
+      <div class="field row">
+        <input type="checkbox" id="allowFocusSteal" />
+        <label for="allowFocusSteal" style="margin:0">Allow focus steal (activate tab)</label>
+      </div>
+      <div class="field row">
+        <input type="checkbox" id="autoPoke" />
+        <label for="autoPoke" style="margin:0">Simulate a click on the list page</label>
+      </div>
+    </details>
+
+    <div class="actions">
+      <button id="saveBtn">Save</button>
+      <button id="runNowBtn">Run Now</button>
+      <button id="backfillBtn">Backfill Now</button>
+    </div>
+    <div class="status" id="status"></div>
+
+    <script src="options.js"></script>
+  </body>
+</html>

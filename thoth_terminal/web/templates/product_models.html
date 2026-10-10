@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-section informal-surface worldview-surface">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">Causal models</p>
+      <h1>{% if detail %}{{ detail.configuration.name }}{% else %}Product models{% endif %}</h1>
+      <p class="muted">Versioned configurations, calculations, missing inputs, and their sources.</p>
+    </div>
+    {% if detail %}<a class="btn" href="/product-models">&larr; All product models</a>{% endif %}
+  </div>
+
+  {% if detail %}
+    <article class="informal-row"><div class="informal-main">
+      <p><span class="chip">{{ detail.configuration.product_key }}</span>
+      <span class="chip">{{ detail.model.boundary|replace('_', ' ') }}</span>
+      <span class="chip">Configuration v{{ detail.configuration.version }}</span>
+      <span class="chip">Model v{{ detail.model.version }}</span></p>
+      <p>{{ detail.model.name }}{% if detail.configuration.period %} · {{ detail.configuration.period }}{% endif %}{% if detail.configuration.period_months %} · {{ detail.configuration.period_months }} months{% endif %}{% if detail.configuration.world_key %} · World: {{ detail.configuration.world_key }}{% endif %}</p>
+      <p>{{ detail.configuration.change_summary }}</p>
+      {% for value in detail.variables.values() %}{% if value.basis == 'conditional_house_assumption' and value.rationale %}
+      <p><strong>Conditional premise:</strong> {{ value.rationale }}</p>
+      {% endif %}{% endfor %}
+      <div class="informal-meta">{% for doc_id in detail.configuration.source_document_ids %}<a href="/docs/{{ doc_id }}">Source #{{ doc_id }}</a>{% endfor %}</div>
+    </div></article>
+    <h2>Calculated outputs</h2>
+    <div class="informal-list">{% for key, value in detail.outputs.items() %}
+      <article class="informal-row"><div class="informal-main">
+        <h3>{{ key|replace('_', ' ')|title|replace('Hbm', 'HBM')|replace('Gb', 'GB') }}</h3>
+        {% if value.low is not none %}<p>{% if value.value is not none %}{{ value.value }}{% else %}Range {{ value.low }}–{{ value.high }}{% endif %} {{ value.unit }}</p>{% else %}<p class="muted">Missing: {{ value.missing_inputs|join(', ') }}</p>{% endif %}
+        <p class="muted">{{ value.basis|replace('_', ' ') }}{% if value.depends_on %} · Depends on {{ value.depends_on|join(', ') }}{% endif %}</p>
+      </div></article>
+    {% endfor %}</div>
+    {% if detail.impact and detail.impact.previous_revision_id %}
+    <h2>Change from previous version</h2>
+    <div class="informal-list">{% for key, change in detail.impact.output_changes.items() %}
+      <article class="informal-row"><div class="informal-main">
+        <h3>{{ key|replace('_', ' ')|title|replace('Hbm', 'HBM')|replace('Gb', 'GB') }}</h3>
+        <p>{{ change.status|replace('_', ' ') }} ·
+          {% if change.before and change.before.low is not none %}{% if change.before.value is not none %}{{ change.before.value }}{% else %}{{ change.before.low }}–{{ change.before.high }}{% endif %}{% else %}unresolved{% endif %}
+          → {% if change.after and change.after.low is not none %}{% if change.after.value is not none %}{{ change.after.value }}{% else %}{{ change.after.low }}–{{ change.after.high }}{% endif %} {{ change.after.unit }}{% else %}unresolved{% endif %}
+        </p>
+      </div></article>
+    {% else %}<p class="muted">No output value or lineage changed in this revision.</p>{% endfor %}</div>
+    {% endif %}
+    {% if detail.impact and detail.impact.dependent_configurations %}
+    <h2>Configurations pinned to the previous version</h2>
+    <p class="muted">These configurations retain their recorded inputs. Rebinding requires a separate revision and a check that the premises still apply.</p>
+    <div class="informal-list">{% for dependent in detail.impact.dependent_configurations %}
+      <article class="informal-row"><div class="informal-main">
+        <h3><a href="/product-configurations/{{ dependent.configuration_key }}">{{ dependent.configuration_key }}</a></h3>
+        <p>Inputs: {{ dependent.binding_keys|join(', ') }} · Projected output changes: {{ dependent.projected_output_changes.keys()|join(', ') if dependent.projected_output_changes else 'none yet' }}</p>
+      </div></article>
+    {% endfor %}</div>
+    {% endif %}
+    {% if detail.memory_bridges %}<h2>Memory demand connection</h2><div class="informal-list">
+      {% for bridge in detail.memory_bridges %}<article class="informal-row"><div class="informal-main">
+        <h3>{{ bridge.memory_product }}</h3>
+        {% if bridge.demand_gb_range %}<p>{{ bridge.demand_gb_range.low }}–{{ bridge.demand_gb_range.high }} GB across the configured shipment period.</p>{% else %}<p class="muted">Missing: {{ bridge.missing_inputs|join(', ') }}</p>{% endif %}
+        <p class="muted">The demand row can be combined with sourced capacity and allocation inputs in the Memory System.</p>
+      </div></article>{% endfor %}
+    </div>{% endif %}
+    <details><summary>Inputs and dependency graph</summary><div class="informal-list">
+      {% for key, value in detail.variables.items() %}<article class="informal-row"><div class="informal-main">
+        <strong>{{ key|replace('_', ' ')|title|replace('Hbm', 'HBM')|replace('Gb', 'GB') }}</strong>
+        {% if value.low is not none %}<p>{% if value.value is not none %}{{ value.value }}{% else %}{{ value.low }}–{{ value.high }}{% endif %} {{ value.unit }}</p>{% else %}<p class="muted">Missing: {{ value.missing_inputs|join(', ') }}</p>{% endif %}
+        {% if value.rationale %}<p>{{ value.rationale }}</p>{% endif %}
+        <div class="informal-meta"><span>{{ value.basis|replace('_', ' ') }}</span>{% if value.depends_on %}<span>From {{ value.depends_on|join(', ') }}</span>{% endif %}{% if value.child_configuration_revision_id %}<span>Child configuration #{{ value.child_configuration_revision_id }}</span>{% endif %}{% for doc_id in value.source_document_ids %}<a href="/docs/{{ doc_id }}">Source #{{ doc_id }}</a>{% endfor %}</div>
+      </div></article>{% endfor %}
+    </div></details>
+    {% if detail.history %}<h2>Revision history</h2><div class="informal-list">
+      {% for revision in detail.history %}<article class="informal-row"><div class="informal-main">
+        <strong>Version {{ revision.version }}</strong><p>{{ revision.change_summary }}</p>
+        <div class="informal-meta"><span>Configuration #{{ revision.id }}</span><span>Model revision #{{ revision.model_revision_id }}</span>{% for doc_id in revision.source_document_ids %}<a href="/docs/{{ doc_id }}">Source #{{ doc_id }}</a>{% endfor %}</div>
+      </div></article>{% endfor %}
+    </div>{% endif %}
+  {% else %}
+    <form class="filter-bar" method="get" action="/product-models"><input type="search" name="q" placeholder="Search model or boundary" value="{{ query }}" /><button type="submit">Search</button></form>
+    <div class="informal-list">{% for model in models %}<article class="informal-row"><div class="informal-main">
+      <h2>{{ model.name }}</h2><p>{{ model.model_key }} · {{ model.boundary|replace('_', ' ') }} · Version {{ model.version }}</p>
+      <p class="muted">Outputs: {{ model.outputs|join(', ') }}</p><p>{{ model.change_summary }}</p>
+      <div class="informal-meta">{% for doc_id in model.source_document_ids %}<a href="/docs/{{ doc_id }}">Source #{{ doc_id }}</a>{% endfor %}</div>
+      {% if model.configurations %}<div class="informal-list">{% for config in model.configurations %}<p><a href="/product-configurations/{{ config.configuration_key }}">{{ config.name }}</a> · {{ config.product_key }} · v{{ config.version }}{% if config.period %} · {{ config.period }}{% endif %}{% if config.period_months %} ({{ config.period_months }} months){% endif %}{% if config.world_key %} · {{ config.world_key }}{% endif %}</p>{% endfor %}</div>{% endif %}
+    </div></article>{% else %}<div class="empty-state">No product models yet. The research agent can create one when a causal question cannot be represented by an existing model.</div>{% endfor %}</div>
+  {% endif %}
+</section>
+{% endblock %}

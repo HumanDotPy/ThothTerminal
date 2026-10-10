@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="hd">
+    <h2>New Thesis</h2>
+    <div class="btnrow">
+      <span class="pill" id="thesis-draft-status" style="opacity:.8;">draft idle</span>
+      <a class="btn" href="/theses">Back</a>
+    </div>
+  </div>
+  <div class="bd">
+    {% if error %}
+      <div class="panel" style="margin-bottom:14px;border-color:rgba(239,68,68,.5);">
+        <div class="bd" style="color:var(--bad);font-family:var(--mono);font-size:12px;">
+          {{ error }}
+        </div>
+      </div>
+    {% endif %}
+    {% if dupe_warning and dupe_hits|length > 0 %}
+      <div class="panel" style="margin-bottom:14px;border-color:rgba(255,176,32,.6);">
+        <div class="hd"><h2>Possible duplicates</h2></div>
+        <div class="bd">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">
+            These look similar based on your title/statement/entities. Review before creating a new thesis.
+          </div>
+          <div class="search-results">
+            {% for hit in dupe_hits %}
+              <div class="search-item">
+                <div style="display:flex;justify-content:space-between;gap:12px;">
+                  <a href="/theses/{{ hit.id }}" target="_blank" rel="noopener noreferrer">{{ hit.title }}</a>
+                  <span class="pill">{{ hit.status }}</span>
+                </div>
+                {% if hit.entities and hit.entities|length > 0 %}
+                  <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;">
+                    {% for e in hit.entities[:6] %}<span class="pill">{{ e }}</span>{% endfor %}
+                    {% if hit.entities|length > 6 %}<span class="pill">+{{ hit.entities|length - 6 }}</span>{% endif %}
+                  </div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="panel" id="thesis-similar-panel" style="display:none;margin-bottom:14px;border-color:rgba(255,176,32,.45);">
+      <div class="hd"><h2>Possible duplicates</h2></div>
+      <div class="bd">
+        <div class="search-results" id="thesis-similar-results"></div>
+      </div>
+    </div>
+
+    <div class="panel" id="thesis-draft-restore" style="display:none;margin-bottom:12px;">
+      <div class="bd" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+        <div style="color:var(--muted);font-family:var(--mono);font-size:12px;">
+          Draft available · <span id="thesis-draft-timestamp"></span>
+        </div>
+        <div class="btnrow" style="gap:8px;">
+          <button class="btn" type="button" id="thesis-draft-restore-btn">Restore</button>
+          <button class="btn" type="button" id="thesis-draft-discard-btn">Discard</button>
+        </div>
+      </div>
+    </div>
+
+    <form method="post" action="/theses/new" id="thesis-new-form">
+      {% if from_doc %}<input type="hidden" name="from_doc" value="{{ from_doc }}" />{% endif %}
+      <div class="field">
+        <label>Title</label>
+        <input type="text" name="title" value="{{ prefill.title if prefill.title is defined else '' }}" placeholder="Short label" required />
+      </div>
+
+      <div class="field">
+        <label>Statement</label>
+        <textarea name="statement" placeholder="1–5 sentences. What exactly are you tracking?" required>{{ prefill.statement if prefill.statement is defined else '' }}</textarea>
+      </div>
+
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>Status</label>
+          {% set s = (prefill.status if prefill.status is defined else 'watching') %}
+          <select name="status">
+            {% for opt in ['watching','active','confirmed','disproven','paused'] %}
+              <option value="{{ opt }}" {% if s == opt %}selected{% endif %}>{{ opt }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>Importance (1–5)</label>
+          <input type="number" name="importance" min="1" max="5" value="{{ prefill.importance if prefill.importance is defined else 3 }}" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Stale-after (days)</label>
+        <input type="number" name="stale_after_days" min="1" value="{{ prefill.stale_after_days if prefill.stale_after_days is defined else 90 }}" />
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">
+          Default is 90d (quarter). Set blank later if you want “never stale”.
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Entities (required; comma-separated)</label>
+        <input type="text" name="entities" value="{{ prefill.entities if prefill.entities is defined else '' }}" placeholder="MCL, VR200, SK hynix" required />
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">
+          Entities are the core subjects of the thesis. They drive linking, filtering, and notifications.
+        </div>
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">
+          {% for e in entities[:16] %}
+            <span class="pill">{{ e.canonical_name }}</span>
+          {% endfor %}
+          {% if entities|length > 16 %}<span class="pill">+{{ entities|length - 16 }}</span>{% endif %}
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Domains (0–2)</label>
+        <div class="chip-grid" id="domain-chips">
+          {% set selected = (prefill.domains.split(',') if prefill.domains is defined and prefill.domains else []) %}
+          {% set seen_domains = namespace(slugs=[]) %}
+          {% for d in domains %}
+            {% if d.slug in seen_domains.slugs %}
+            {% else %}
+              {% set _ = seen_domains.slugs.append(d.slug) %}
+              <button type="button" class="chip {% if d.slug in selected %}selected{% endif %}" data-slug="{{ d.slug }}">{{ d.name }}</button>
+            {% endif %}
+          {% endfor %}
+        </div>
+        <input type="hidden" name="domains" id="domains-input" value="{{ prefill.domains if prefill.domains is defined else '' }}" />
+      </div>
+
+      <div class="field">
+        <label>Tags</label>
+        <div class="chip-grid" id="tag-chips">
+          {% set selected_tags = (prefill.tags.split(',') if prefill.tags is defined and prefill.tags else []) %}
+          {% set seen_tags = namespace(slugs=[]) %}
+          {% for t in tags %}
+            {% if t.slug in seen_tags.slugs %}
+            {% else %}
+              {% set _ = seen_tags.slugs.append(t.slug) %}
+              <button type="button" class="chip {% if t.slug in selected_tags %}selected{% endif %}" data-slug="{{ t.slug }}">{{ t.name }}</button>
+            {% endif %}
+          {% endfor %}
+        </div>
+        <input type="hidden" name="tags" id="tags-input" value="{{ prefill.tags if prefill.tags is defined else '' }}" />
+      </div>
+
+      <div class="field">
+        <label>Event Types</label>
+        <div class="chip-grid" id="event-chips">
+          {% set selected_events = (prefill.event_types.split(',') if prefill.event_types is defined and prefill.event_types else []) %}
+          {% set seen_events = namespace(slugs=[]) %}
+          {% for e in event_types %}
+            {% if e.slug in seen_events.slugs %}
+            {% else %}
+              {% set _ = seen_events.slugs.append(e.slug) %}
+              <button type="button" class="chip {% if e.slug in selected_events %}selected{% endif %}" data-slug="{{ e.slug }}">{{ e.name }}</button>
+            {% endif %}
+          {% endfor %}
+        </div>
+        <input type="hidden" name="event_types" id="events-input" value="{{ prefill.event_types if prefill.event_types is defined else '' }}" />
+      </div>
+
+      <div class="panel" style="margin:14px 0;border-radius:12px;">
+        <div class="hd"><h2>Primary Metric (optional)</h2></div>
+        <div class="bd">
+          <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="field">
+              <label>Subject</label>
+              <input type="text" name="metric_subject" value="{{ prefill.metric_subject if prefill.metric_subject is defined else '' }}" placeholder="TSMC" />
+            </div>
+            <div class="field">
+              <label>Topic / Object</label>
+              <input type="text" name="metric_topic" value="{{ prefill.metric_topic if prefill.metric_topic is defined else '' }}" placeholder="CoWoS" />
+            </div>
+          </div>
+          <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="field">
+              <label>Metric</label>
+              <input type="text" name="metric_name" value="{{ prefill.metric_name if prefill.metric_name is defined else '' }}" placeholder="Exit WPM" />
+            </div>
+            <div class="field">
+              <label>Unit</label>
+              <input type="text" name="metric_unit" value="{{ prefill.metric_unit if prefill.metric_unit is defined else '' }}" placeholder="WPM / % / GB" />
+            </div>
+          </div>
+          <details style="margin-top:10px;">
+            <summary style="cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--muted);">Advanced key (optional)</summary>
+            <div class="field" style="margin-top:10px;">
+              <label>Raw key</label>
+              <input type="text" name="metric_key_raw" value="{{ prefill.metric_key_raw if prefill.metric_key_raw is defined else '' }}" placeholder="tsmc:cowos:exit_wpm" />
+              <div style="font-size:11px;color:var(--muted);margin-top:6px;">
+                Leave blank to let Thoth generate the key from the fields above.
+              </div>
+            </div>
+            <div class="field">
+              <label><input type="checkbox" name="metric_use_raw" value="1" /> Use raw key</label>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div class="btnrow" style="justify-content:flex-end;">
+        {% if dupe_warning %}
+          <button class="btn" type="submit" name="force_create" value="1">Create anyway</button>
+        {% endif %}
+        <button class="btn primary" type="submit">Create Thesis</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function(){
+  function bindChips(containerId, inputId, opts) {
+    const container = document.getElementById(containerId);
+    const input = document.getElementById(inputId);
+    if (!container || !input) return;
+
+    const max = opts && opts.max ? opts.max : 0;
+    const selected = new Set((input.value || '').split(',').map(s => s.trim()).filter(Boolean));
+
+    function sync() {
+      input.value = Array.from(selected).join(',');
+    }
+
+    container.querySelectorAll('.chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const slug = btn.dataset.slug;
+        if (!slug) return;
+
+        if (selected.has(slug)) {
+          selected.delete(slug);
+          btn.classList.remove('selected');
+          sync();
+          return;
+        }
+
+        if (max && selected.size >= max) {
+          // keep selection tight for domains (0–2)
+          return;
+        }
+
+        selected.add(slug);
+        btn.classList.add('selected');
+        sync();
+      });
+    });
+    sync();
+  }
+
+  bindChips('domain-chips', 'domains-input', { max: 2 });
+  bindChips('tag-chips', 'tags-input');
+  bindChips('event-chips', 'events-input');
+
+  const titleInput = document.querySelector('input[name="title"]');
+  const statementInput = document.querySelector('textarea[name="statement"]');
+  const panel = document.getElementById('thesis-similar-panel');
+  const results = document.getElementById('thesis-similar-results');
+  let timer = null;
+  let lastQ = "";
+
+  function renderSimilar(items) {
+    if (!results) return;
+    results.innerHTML = "";
+    if (!items || items.length === 0) {
+      if (panel) panel.style.display = "none";
+      return;
+    }
+    items.forEach((it) => {
+      const row = document.createElement("div");
+      row.className = "search-item";
+      row.innerHTML = `
+        <div style="display:flex;justify-content:space-between;gap:12px;">
+          <a href="/theses/${it.id}" target="_blank" rel="noopener noreferrer">${it.label || it.title || ("thesis " + it.id)}</a>
+          ${it.status ? `<span class="pill">${it.status}</span>` : ""}
+        </div>
+      `;
+      results.appendChild(row);
+    });
+    if (panel) panel.style.display = "block";
+  }
+
+  async function fetchSimilar(q) {
+    if (!q || q.length < 4) {
+      renderSimilar([]);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/search?kind=thesis&q=${encodeURIComponent(q)}&limit=6`);
+      if (!res.ok) return;
+      const json = await res.json();
+      const items = Array.isArray(json.items) ? json.items : [];
+      renderSimilar(items);
+    } catch (_e) {}
+  }
+
+  function scheduleSimilar() {
+    const q = (titleInput?.value || statementInput?.value || "").trim();
+    if (q === lastQ) return;
+    lastQ = q;
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => fetchSimilar(q), 350);
+  }
+
+  if (titleInput) titleInput.addEventListener("input", scheduleSimilar);
+  if (statementInput) statementInput.addEventListener("input", scheduleSimilar);
+})();
+</script>
+{% endblock %}
+
+{% block scripts %}
+  <script src="/static/form_draft_autosave.js?v={{ settings.static_assets_version }}"></script>
+{% endblock %}

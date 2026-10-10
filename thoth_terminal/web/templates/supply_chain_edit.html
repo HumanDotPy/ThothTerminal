@@ -1,0 +1,2623 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="supply-builder">
+  <div class="supply-builder-header">
+    <div class="supply-title-block">
+      <div class="kicker">Supply Chain Studio</div>
+      <input type="text" id="chain-title" class="supply-title-input" placeholder="Supply chain title" />
+      <div class="supply-title-sub">Layered graph for constraints, dependencies, and leverage points.</div>
+    </div>
+    <div class="btnrow">
+      <a href="/visualizations/supply-chains" class="btn">← Supply Chains</a>
+      {% if chain %}<a href="/visualizations/supply-chains/{{ chain.id }}/command-center" class="btn">Command Center</a>{% endif %}
+      <button class="btn primary" type="button" id="chain-save-btn">Save</button>
+      <button class="btn" type="button" id="chain-publish-btn">Publish snapshot</button>
+      <button class="btn" type="button" id="chain-export-btn">Export JSON</button>
+      <label class="btn" for="chain-import-input">Import JSON</label>
+      <button class="btn danger" type="button" id="chain-delete-btn">Delete</button>
+      <input type="file" id="chain-import-input" accept="application/json" style="display:none;" />
+    </div>
+  </div>
+
+  <div class="supply-toolbar">
+    <div class="supply-toolbar-group">
+      <label>View</label>
+      <select id="supply-view-mode">
+        <option value="layer">Layered</option>
+        <option value="bottleneck">Bottleneck heat</option>
+        <option value="capacity">Capacity</option>
+        <option value="confidence">Confidence</option>
+      </select>
+    </div>
+    <div class="supply-toolbar-group">
+      <label>Search</label>
+      <input type="text" id="supply-search" placeholder="Search nodes, suppliers, layers..." />
+    </div>
+    <div class="supply-toolbar-group">
+      <label>Layer focus</label>
+      <select id="supply-layer-filter"></select>
+    </div>
+    <div class="supply-toolbar-group">
+      <label>Status</label>
+      <select id="chain-status">
+        <option value="active">Active</option>
+        <option value="draft">Draft</option>
+        <option value="archived">Archived</option>
+      </select>
+    </div>
+    <div class="supply-toolbar-group">
+      <label>Draft</label>
+      <div class="supply-version-meta" id="draft-version-meta">—</div>
+    </div>
+    <div class="supply-toolbar-group">
+      <label>Published</label>
+      <div class="supply-version-meta" id="published-version-meta">—</div>
+    </div>
+    <div class="pill supply-status-pill" id="chain-save-status">unsaved</div>
+  </div>
+
+  <div class="supply-layout">
+	    <aside class="supply-sidebar">
+	      <div class="panel" id="panel-chain-meta">
+	        <div class="hd"><h2>Chain Metadata</h2></div>
+	        <div class="bd">
+	          <div class="field">
+	            <label>Category</label>
+	            <input type="text" id="chain-category" placeholder="semiconductors" />
+          </div>
+          <div class="field">
+            <label>Product / System</label>
+            <input type="text" id="chain-product" placeholder="Vera Rubin chiplet" />
+          </div>
+          <div class="field">
+            <label>Component of</label>
+            <div class="supply-parent-block">
+              <div id="chain-parent-list" class="supply-parent-list"></div>
+              <input type="text" id="chain-parent-search" placeholder="Search systems to link..." />
+              <div id="chain-parent-results" class="supply-parent-results"></div>
+              <div class="muted" id="chain-parent-empty" style="font-size:11px;margin-top:6px;">Save the chain to link it into parent systems.</div>
+            </div>
+          </div>
+          <div class="field">
+            <label>Description</label>
+            <textarea id="chain-description" rows="3" placeholder="Key constraints, scope, and update cadence."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-chain-about">
+        <div class="hd"><h2>Command Center Primer</h2></div>
+        <div class="bd">
+          <div class="field">
+            <label>About summary</label>
+            <textarea id="chain-about-summary" rows="3" placeholder="What this chain is and how to read it."></textarea>
+          </div>
+          <div class="field">
+            <label>Scope</label>
+            <textarea id="chain-about-scope" rows="2" placeholder="Scope, boundaries, exclusions."></textarea>
+          </div>
+          <div class="field">
+            <label>Why it matters</label>
+            <textarea id="chain-about-why" rows="3" placeholder="What matters institutionally about this chain."></textarea>
+          </div>
+          <div class="field">
+            <label>Key players</label>
+            <textarea id="chain-about-players" rows="3" placeholder="One per line."></textarea>
+          </div>
+          <div class="field">
+            <label>Watchpoints</label>
+            <textarea id="chain-about-watchpoints" rows="3" placeholder="One per line."></textarea>
+          </div>
+        </div>
+      </div>
+
+	      <div class="panel" id="panel-layers">
+	        <div class="hd">
+	          <h2>Layers</h2>
+	          <span class="pill" id="supply-layer-count">0</span>
+	        </div>
+	        <div class="bd">
+	          <div class="supply-panel-search">
+	            <input type="search" id="supply-layer-search" placeholder="Search layers..." />
+	          </div>
+	          <div class="supply-layer-list" id="supply-layer-list"></div>
+	          <form id="add-layer-form" style="margin-top:12px;">
+	            <div class="field">
+	              <label>New layer</label>
+	              <input type="text" name="layer_name" placeholder="Packaging & Test" required />
+            </div>
+            <div class="field">
+              <label>Color</label>
+              <input type="color" name="layer_color" value="#f59e0b" />
+            </div>
+            <div class="field">
+              <label>Stage family</label>
+              <select name="layer_family">
+                <option value="input">Inputs & Materials</option>
+                <option value="capability">Capability</option>
+                <option value="production">Production</option>
+                <option value="component" selected>Component</option>
+                <option value="system">System</option>
+                <option value="market">Market</option>
+              </select>
+            </div>
+            <div class="btnrow">
+              <button class="btn" type="submit">Add layer</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+	      <div class="panel" id="panel-nodes">
+	        <div class="hd">
+	          <h2>Nodes</h2>
+	          <span class="pill" id="supply-node-count">0</span>
+	        </div>
+	        <div class="bd">
+	          <div class="supply-panel-search">
+	            <input type="search" id="supply-node-search" placeholder="Search nodes..." />
+	          </div>
+	          <div id="supply-node-list"></div>
+	        </div>
+	      </div>
+
+	      <div class="panel" id="panel-add-node">
+	        <div class="hd"><h2>Add Node</h2></div>
+	        <div class="bd">
+	          <form id="add-node-form">
+	            <div class="field">
+	              <label>Name</label>
+              <input type="text" name="node_name" placeholder="HBM3E stacks" required />
+            </div>
+            <div class="field">
+              <label>Layer</label>
+              <select name="node_layer" id="node-layer-select"></select>
+            </div>
+            <div class="field">
+              <label>Type</label>
+              <input type="text" name="node_type" id="node-type-input" list="node-type-options" placeholder="equipment, actuator, optics..." />
+            </div>
+            <div class="field">
+              <label>Manufacturer (optional)</label>
+              <input type="text" name="node_manufacturer" placeholder="SK hynix / Samsung" />
+            </div>
+            <div class="field">
+              <label>Location (optional)</label>
+              <input type="text" name="node_location" placeholder="KR/US" />
+            </div>
+            <div class="btnrow">
+              <button class="btn primary" type="submit">Add node</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+	      <div class="panel" id="panel-add-edge">
+	        <div class="hd"><h2>Add Edge</h2></div>
+	        <div class="bd">
+	          <form id="add-edge-form">
+	            <div class="field">
+	              <label>From</label>
+              <select name="edge_source" id="edge-source-select"></select>
+            </div>
+            <div class="field">
+              <label>To</label>
+              <select name="edge_target" id="edge-target-select"></select>
+            </div>
+            <div class="field">
+              <label>Type</label>
+              <input type="text" name="edge_type" list="edge-type-options" placeholder="materials, equipment, tooling..." />
+            </div>
+            <div class="field">
+              <label>Criticality (0-100)</label>
+              <input type="number" name="edge_criticality" min="0" max="100" step="1" value="60" />
+            </div>
+            <div class="btnrow">
+              <button class="btn" type="submit">Add edge</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+	      <div class="panel" id="panel-modules">
+	        <div class="hd">
+	          <h2>Modules</h2>
+	          <button class="btn" type="button" id="supply-modules-expand">Expand</button>
+	        </div>
+	        <div class="bd">
+	          <div class="supply-panel-search">
+	            <input type="search" id="supply-module-search" placeholder="Search modules..." />
+	          </div>
+	          <div class="supply-module-list" id="supply-module-list"></div>
+	          <div class="muted" style="font-size:11px;margin-top:8px;">Drop in reusable building blocks like HBM stacks or packaging flows.</div>
+	        </div>
+	      </div>
+	    </aside>
+
+    <main class="supply-canvas">
+      <div class="supply-canvas-header">
+        <div>
+          <h2>Graph View</h2>
+          <div class="supply-canvas-sub">Click nodes to inspect. Drag to reposition. Scroll to zoom. Edges appear on selection.</div>
+        </div>
+        <div class="supply-canvas-right">
+          <div class="supply-canvas-meta">
+            <span class="pill">layers <span id="count-layers">0</span></span>
+            <span class="pill">nodes <span id="count-nodes">0</span></span>
+            <span class="pill">edges <span id="count-edges">0</span></span>
+          </div>
+          <div class="btnrow supply-graph-controls">
+            <span class="pill mono" id="graph-zoom-label">100%</span>
+            <button class="btn" type="button" id="graph-zoom-out" title="Zoom out">−</button>
+            <button class="btn" type="button" id="graph-zoom-in" title="Zoom in">+</button>
+            <button class="btn" type="button" id="graph-reset" title="Reset view">Reset</button>
+            <button class="btn" type="button" id="graph-fullscreen" title="Toggle full screen">Expand</button>
+          </div>
+        </div>
+      </div>
+      <div id="supply-graph"></div>
+      <div id="supply-graph-empty" class="supply-graph-empty"></div>
+      <datalist id="node-type-options">
+        <option value="materials"></option>
+        <option value="substrate"></option>
+        <option value="equipment"></option>
+        <option value="tooling"></option>
+        <option value="ip"></option>
+        <option value="process"></option>
+        <option value="fab"></option>
+        <option value="memory"></option>
+        <option value="packaging"></option>
+        <option value="chiplet"></option>
+        <option value="system"></option>
+        <option value="customer"></option>
+        <option value="optics"></option>
+        <option value="actuator"></option>
+        <option value="sensor"></option>
+        <option value="interconnect"></option>
+      </datalist>
+      <datalist id="edge-type-options">
+        <option value="materials"></option>
+        <option value="equipment"></option>
+        <option value="tooling"></option>
+        <option value="ip"></option>
+        <option value="capacity"></option>
+        <option value="process"></option>
+        <option value="packaging"></option>
+        <option value="assembly"></option>
+        <option value="delivery"></option>
+        <option value="logistics"></option>
+      </datalist>
+      <div class="supply-preview" id="supply-preview"></div>
+      <div class="supply-legend" id="supply-legend"></div>
+    </main>
+
+    <aside class="supply-inspector">
+      <div class="panel">
+        <div class="hd">
+          <h2>Inspector</h2>
+          <span class="pill" id="node-selected-id">none</span>
+        </div>
+        <div class="bd">
+          <div class="muted" id="node-empty">Select a node to edit details and constraints.</div>
+          <form id="node-form" style="display:none;">
+            <div class="field">
+              <label>Name</label>
+              <input type="text" id="node-name" />
+            </div>
+            <div class="field">
+              <label>Layer</label>
+              <select id="node-layer"></select>
+            </div>
+            <div class="field">
+              <label>Type</label>
+              <input type="text" id="node-type" list="node-type-options" placeholder="equipment, actuator, optics..." />
+            </div>
+            <div class="field">
+              <label>Manufacturer</label>
+              <input type="text" id="node-manufacturer" />
+            </div>
+            <div class="field">
+              <label>Location</label>
+              <input type="text" id="node-location" />
+            </div>
+            <div class="field">
+              <label>Linked supply chain</label>
+              <div class="supply-node-link">
+                <div class="muted" id="node-chain-meta" style="font-size:11px;">No linked chain.</div>
+                <input type="text" id="node-chain-search" placeholder="Search supply chains..." />
+                <div id="node-chain-results" class="supply-parent-results"></div>
+                <div class="btnrow">
+                  <button class="btn" type="button" id="node-chain-open">Open</button>
+                  <button class="btn" type="button" id="node-chain-clear">Clear</button>
+                </div>
+              </div>
+            </div>
+            <div class="field">
+              <label>Display family override</label>
+              <select id="node-display-family">
+                <option value="">Inherit from layer</option>
+                <option value="input">Inputs & Materials</option>
+                <option value="capability">Capability</option>
+                <option value="production">Production</option>
+                <option value="component">Component</option>
+                <option value="system">System</option>
+                <option value="market">Market</option>
+              </select>
+            </div>
+            <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px;">
+              <div class="field">
+                <label>Bottleneck (0-100)</label>
+                <input type="number" id="node-bottleneck" min="0" max="100" step="1" />
+              </div>
+              <div class="field">
+                <label>Capacity (0-100)</label>
+                <input type="number" id="node-capacity" min="0" max="100" step="1" />
+              </div>
+              <div class="field">
+                <label>Pricing power (0-100)</label>
+                <input type="number" id="node-pricing" min="0" max="100" step="1" />
+              </div>
+              <div class="field">
+                <label>Confidence (0-100)</label>
+                <input type="number" id="node-confidence" min="0" max="100" step="1" />
+              </div>
+            </div>
+            <div class="field">
+              <label>Lead time (months)</label>
+              <input type="number" id="node-leadtime" min="0" max="120" step="1" />
+            </div>
+            <div class="field">
+              <label>Image URL (optional)</label>
+              <input type="text" id="node-image" placeholder="https://..." />
+            </div>
+            <div class="field">
+              <label>Notes</label>
+              <textarea id="node-notes" rows="3"></textarea>
+            </div>
+            <div class="field">
+              <label>Definition</label>
+              <textarea id="node-definition" rows="2" placeholder="Plain-language definition for readers."></textarea>
+            </div>
+            <div class="field">
+              <label>Why it matters</label>
+              <textarea id="node-why" rows="2" placeholder="Institutional takeaway for this node."></textarea>
+            </div>
+            <div class="field">
+              <label>Who matters</label>
+              <textarea id="node-who-matters" rows="2" placeholder="One per line."></textarea>
+            </div>
+            <div class="field">
+              <label>Watchpoints</label>
+              <textarea id="node-watchpoints" rows="2" placeholder="One per line."></textarea>
+            </div>
+            <div class="field">
+              <label>Glossary</label>
+              <textarea id="node-glossary" rows="2" placeholder="Optional short glossary entry."></textarea>
+            </div>
+            <div class="field">
+              <label>Supplier options</label>
+              <div id="node-options-list" class="supply-option-list"></div>
+              <form id="node-option-form" class="supply-option-form">
+                <input type="text" name="option_name" placeholder="Supplier name" />
+                <input type="text" name="option_company" placeholder="Company" />
+                <input type="number" name="option_mix" min="0" max="100" step="1" placeholder="Mix %" />
+                <button class="btn" type="submit">Add supplier</button>
+              </form>
+              <div class="supply-option-link" id="node-option-link" style="display:none;">
+                <div class="muted" id="node-option-link-target" style="font-size:11px;">Link supplier chain</div>
+                <input type="text" id="node-option-chain-search" placeholder="Search supply chains..." />
+                <div id="node-option-chain-results" class="supply-parent-results"></div>
+                <div class="btnrow">
+                  <button class="btn" type="button" id="node-option-link-cancel">Cancel</button>
+                </div>
+              </div>
+            </div>
+            <div class="btnrow">
+              <button class="btn" type="button" id="node-duplicate">Duplicate</button>
+              <button class="btn danger" type="button" id="node-delete">Delete</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hd"><h2>Connected Edges</h2></div>
+        <div class="bd">
+          <div id="edge-list" class="supply-edge-list"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hd"><h2>Lint Warnings</h2></div>
+        <div class="bd">
+          <div id="supply-lint-list" class="supply-edge-list"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hd"><h2>Inference Playbook</h2></div>
+        <div class="bd">
+          <ol class="supply-playbook">
+            <li>Start from constraints: lead time, marginal cost, scaling bottlenecks.</li>
+            <li>Use negative information: omissions signal single-sourcing.</li>
+            <li>Scan transcripts for complaints, not claims.</li>
+            <li>Triangulate: customer calls + supplier calls + capex.</li>
+          </ol>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/vendor/echarts.min.js?v={{ settings.static_assets_version }}"></script>
+<script>
+(function() {
+  const CHAIN_ID = {{ chain.id if chain else 'null' }};
+  const CHAIN_META = {{ chain_meta_json|safe }};
+  const CHAIN_DATA = {{ chain_data_json|safe }};
+  const CHAIN_VERSION = {{ chain_version_json|safe }};
+  const CHAIN_PARENTS = {{ chain_parents_json|safe }};
+
+  const state = {
+    meta: Object.assign({ title: "", description: "", category: "general", product: "", status: "active" }, CHAIN_META || {}),
+    about: Object.assign({ summary: "", scope: "", why_it_matters: "", key_players: [], watchpoints: [] }, CHAIN_DATA.about || {}),
+    layers: Array.isArray(CHAIN_DATA.layers) ? CHAIN_DATA.layers : [],
+    nodes: Array.isArray(CHAIN_DATA.nodes) ? CHAIN_DATA.nodes : [],
+    edges: Array.isArray(CHAIN_DATA.edges) ? CHAIN_DATA.edges : [],
+    bindings: Array.isArray(CHAIN_DATA.bindings) ? CHAIN_DATA.bindings : [],
+    alerts: Array.isArray(CHAIN_DATA.alerts) ? CHAIN_DATA.alerts : [],
+    version: CHAIN_VERSION || { draft: null, published: null },
+    parents: Array.isArray(CHAIN_PARENTS) ? CHAIN_PARENTS : []
+  };
+
+	  let chainId = CHAIN_ID;
+	  let activeNodeId = null;
+	  let viewMode = "layer";
+	  let searchTerm = "";
+	  let layerFilter = "";
+	  let layerSearchTerm = "";
+	  let moduleSearchTerm = "";
+	  let modulesExpanded = false;
+	  let dirty = false;
+	  let activeOptionLinkIndex = null;
+	  let editingLayerId = null;
+
+    const graphEl = document.getElementById("supply-graph");
+    const chart = graphEl ? echarts.init(graphEl, null, { renderer: "canvas" }) : null;
+    const zoomLabel = document.getElementById("graph-zoom-label");
+    const zoomInBtn = document.getElementById("graph-zoom-in");
+    const zoomOutBtn = document.getElementById("graph-zoom-out");
+    const resetBtn = document.getElementById("graph-reset");
+    const fullscreenBtn = document.getElementById("graph-fullscreen");
+
+  const els = {
+    title: document.getElementById("chain-title"),
+    description: document.getElementById("chain-description"),
+    aboutSummary: document.getElementById("chain-about-summary"),
+    aboutScope: document.getElementById("chain-about-scope"),
+    aboutWhy: document.getElementById("chain-about-why"),
+    aboutPlayers: document.getElementById("chain-about-players"),
+    aboutWatchpoints: document.getElementById("chain-about-watchpoints"),
+    category: document.getElementById("chain-category"),
+    product: document.getElementById("chain-product"),
+    status: document.getElementById("chain-status"),
+	    saveStatus: document.getElementById("chain-save-status"),
+	    layerList: document.getElementById("supply-layer-list"),
+	    layerSearch: document.getElementById("supply-layer-search"),
+	    layerCount: document.getElementById("supply-layer-count"),
+	    nodeCount: document.getElementById("supply-node-count"),
+	    layerFilter: document.getElementById("supply-layer-filter"),
+	    nodeList: document.getElementById("supply-node-list"),
+	    nodeSearch: document.getElementById("supply-node-search"),
+	    nodeLayerSelect: document.getElementById("node-layer-select"),
+	    edgeSource: document.getElementById("edge-source-select"),
+	    edgeTarget: document.getElementById("edge-target-select"),
+	    viewMode: document.getElementById("supply-view-mode"),
+	    search: document.getElementById("supply-search"),
+	    moduleList: document.getElementById("supply-module-list"),
+	    moduleSearch: document.getElementById("supply-module-search"),
+	    modulesExpand: document.getElementById("supply-modules-expand"),
+	    modulesPanel: document.getElementById("panel-modules"),
+	    legend: document.getElementById("supply-legend"),
+	    countLayers: document.getElementById("count-layers"),
+	    countNodes: document.getElementById("count-nodes"),
+	    countEdges: document.getElementById("count-edges"),
+    selectedId: document.getElementById("node-selected-id"),
+    nodeEmpty: document.getElementById("node-empty"),
+    nodeForm: document.getElementById("node-form"),
+    nodeName: document.getElementById("node-name"),
+    nodeLayer: document.getElementById("node-layer"),
+    nodeType: document.getElementById("node-type"),
+    nodeManufacturer: document.getElementById("node-manufacturer"),
+    nodeLocation: document.getElementById("node-location"),
+    nodeBottleneck: document.getElementById("node-bottleneck"),
+    nodeCapacity: document.getElementById("node-capacity"),
+    nodePricing: document.getElementById("node-pricing"),
+    nodeConfidence: document.getElementById("node-confidence"),
+    nodeLeadtime: document.getElementById("node-leadtime"),
+    nodeImage: document.getElementById("node-image"),
+    nodeNotes: document.getElementById("node-notes"),
+    nodeDefinition: document.getElementById("node-definition"),
+    nodeWhy: document.getElementById("node-why"),
+    nodeWhoMatters: document.getElementById("node-who-matters"),
+    nodeWatchpoints: document.getElementById("node-watchpoints"),
+    nodeGlossary: document.getElementById("node-glossary"),
+    nodeDisplayFamily: document.getElementById("node-display-family"),
+    nodeDuplicate: document.getElementById("node-duplicate"),
+    nodeDelete: document.getElementById("node-delete"),
+    edgeList: document.getElementById("edge-list"),
+    draftMeta: document.getElementById("draft-version-meta"),
+    publishedMeta: document.getElementById("published-version-meta"),
+    parentList: document.getElementById("chain-parent-list"),
+    parentSearch: document.getElementById("chain-parent-search"),
+    parentResults: document.getElementById("chain-parent-results"),
+    parentEmpty: document.getElementById("chain-parent-empty"),
+    nodeChainMeta: document.getElementById("node-chain-meta"),
+    nodeChainSearch: document.getElementById("node-chain-search"),
+    nodeChainResults: document.getElementById("node-chain-results"),
+    nodeChainOpen: document.getElementById("node-chain-open"),
+    nodeChainClear: document.getElementById("node-chain-clear"),
+    nodeOptionsList: document.getElementById("node-options-list"),
+    nodeOptionForm: document.getElementById("node-option-form"),
+    nodeOptionLink: document.getElementById("node-option-link"),
+    nodeOptionLinkTarget: document.getElementById("node-option-link-target"),
+    nodeOptionSearch: document.getElementById("node-option-chain-search"),
+    nodeOptionResults: document.getElementById("node-option-chain-results"),
+    nodeOptionCancel: document.getElementById("node-option-link-cancel"),
+    preview: document.getElementById("supply-preview"),
+    graphEmpty: document.getElementById("supply-graph-empty"),
+    lintList: document.getElementById("supply-lint-list")
+  };
+
+  const STAGE_FAMILIES = {
+    input: { label: "Inputs & Materials", shapeKey: "diamond_plaque" },
+    capability: { label: "Capability", shapeKey: "hex_plate" },
+    production: { label: "Production", shapeKey: "block_rect" },
+    component: { label: "Component", shapeKey: "capsule" },
+    system: { label: "System", shapeKey: "chevron_card" },
+    market: { label: "Market", shapeKey: "tag_badge" }
+  };
+  const STAGE_FAMILY_ORDER = { input: 0, capability: 1, production: 2, component: 3, system: 4, market: 5 };
+  const LAYER_HINTS = [
+    ["market", ["customer", "customers", "market", "markets", "demand", "oem"]],
+    ["system", ["system", "systems", "integration", "rack", "tray", "platform"]],
+    ["component", ["memory", "component", "components", "subsystem", "module"]],
+    ["production", ["fab", "capacity", "manufacturing", "packaging", "assembly", "test", "osat"]],
+    ["capability", ["equipment", "process", "ip", "tool", "tooling", "recipe"]],
+    ["input", ["input", "inputs", "material", "materials", "substrate", "substrates", "gas", "chemical", "wafer"]]
+  ];
+  const NODE_TYPE_FAMILY = {
+    materials: "input",
+    material: "input",
+    substrate: "input",
+    chemical: "input",
+    gas: "input",
+    equipment: "capability",
+    tooling: "capability",
+    tool: "capability",
+    process: "capability",
+    ip: "capability",
+    fab: "production",
+    foundry: "production",
+    packaging: "production",
+    assembly: "production",
+    osat: "production",
+    test: "production",
+    memory: "component",
+    component: "component",
+    system: "system",
+    customer: "market"
+  };
+
+  const MODULES = [
+    {
+      id: "hbm-stack",
+      name: "HBM stack",
+      description: "Add HBM suppliers + TSV packaging node.",
+      apply: () => {
+        const layerMemory = pickLayer("memory") || state.layers[0];
+        const layerPackaging = pickLayer("packaging") || state.layers[0];
+        const hbmId = addNode({ name: "HBM supplier", layer: layerMemory?.id, type: "memory", manufacturer: "SK hynix / Samsung / Micron" });
+        const tsvId = addNode({ name: "TSV stacking", layer: layerPackaging?.id, type: "packaging", manufacturer: "ASE / Amkor" });
+        if (hbmId && tsvId) addEdge({ source: hbmId, target: tsvId, type: "packaging", criticality: 70 });
+      }
+    },
+    {
+      id: "advanced-packaging",
+      name: "Advanced packaging",
+      description: "TCB bonding + 2.5D integration flow.",
+      apply: () => {
+        const layerPkg = pickLayer("packaging") || state.layers[0];
+        const layerFab = pickLayer("fabs") || state.layers[0];
+        const bondingId = addNode({ name: "Thermo-compression bonding (TCB)", layer: layerPkg?.id, type: "process", manufacturer: "TSMC / OSATs" });
+        const cowosId = addNode({ name: "CoWoS capacity", layer: layerPkg?.id, type: "packaging", manufacturer: "TSMC" });
+        const fabNode = state.nodes.find((n) => n.layer === layerFab?.id);
+        if (fabNode && cowosId) addEdge({ source: fabNode.id, target: cowosId, type: "capacity", criticality: 75 });
+        if (bondingId && cowosId) addEdge({ source: bondingId, target: cowosId, type: "packaging", criticality: 60 });
+      }
+    }
+  ];
+
+  function setDirty(flag) {
+    dirty = flag;
+    if (els.saveStatus) els.saveStatus.textContent = dirty ? "unsaved" : "saved";
+  }
+
+  function formatDate(value) {
+    if (!value) return "—";
+    try {
+      return new Date(value).toISOString().slice(0, 10);
+    } catch (_e) {
+      return String(value).slice(0, 10);
+    }
+  }
+
+  function renderVersionMeta() {
+    const draft = state.version?.draft;
+    const published = state.version?.published;
+    if (els.draftMeta) {
+      els.draftMeta.textContent = draft ? `v${draft.version} · ${formatDate(draft.updated_at)}` : "—";
+    }
+    if (els.publishedMeta) {
+      if (!published) {
+        els.publishedMeta.textContent = "unpublished";
+      } else {
+        const label = published.label ? ` · ${published.label}` : "";
+        els.publishedMeta.textContent = `v${published.version}${label} · ${formatDate(published.updated_at)}`;
+      }
+    }
+  }
+
+  function debounce(fn, delay) {
+    let timer = null;
+    return (...args) => {
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(() => fn(...args), delay);
+    };
+  }
+
+  async function fetchChainSearch(query) {
+    if (!query || query.length < 2) return [];
+    const url = `/api/supply-chains/search?q=${encodeURIComponent(query)}${chainId ? `&exclude_id=${chainId}` : ""}`;
+    try {
+      const resp = await fetch(url);
+      const data = await resp.json();
+      return data.results || [];
+    } catch (_e) {
+      return [];
+    }
+  }
+
+  function slugify(value) {
+    return String(value || "")
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)+/g, "");
+  }
+
+  function uniqueId(base, list) {
+    let id = slugify(base) || "node";
+    let counter = 2;
+    const existing = new Set((list || []).map((n) => n.id));
+    while (existing.has(id)) {
+      id = `${id}-${counter++}`;
+    }
+    return id;
+  }
+
+  function splitLines(value) {
+    return String(value || "")
+      .split(/\n+/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+  }
+
+  function joinLines(value) {
+    if (!Array.isArray(value)) return "";
+    return value.map((part) => String(part || "").trim()).filter(Boolean).join("\n");
+  }
+
+  function normalizeLayerFamily(layer) {
+    const explicit = String(layer?.family || "").trim().toLowerCase();
+    if (STAGE_FAMILIES[explicit]) return explicit;
+    const blob = [layer?.id, layer?.name, layer?.description].filter(Boolean).join(" ").toLowerCase();
+    for (const [family, hints] of LAYER_HINTS) {
+      if (hints.some((hint) => blob.includes(hint))) return family;
+    }
+    return "component";
+  }
+
+  function resolveNodeFamily(node) {
+    const override = String(node?.display_family_override || "").trim().toLowerCase();
+    if (STAGE_FAMILIES[override]) return override;
+    const typeFamily = NODE_TYPE_FAMILY[String(node?.type || "").trim().toLowerCase()];
+    if (typeFamily) return typeFamily;
+    const layer = state.layers.find((row) => row.id === node?.layer);
+    return normalizeLayerFamily(layer);
+  }
+
+  function familyLabel(family) {
+    return STAGE_FAMILIES[family]?.label || STAGE_FAMILIES.component.label;
+  }
+
+  function shapePathForFamily(family) {
+    const shapeKey = STAGE_FAMILIES[family]?.shapeKey || STAGE_FAMILIES.component.shapeKey;
+    const SHAPES = {
+      diamond_plaque: "path://M14,20 L30,4 L86,4 L102,20 L86,36 L30,36 Z",
+      hex_plate: "path://M18,4 L84,4 L98,20 L84,36 L18,36 L4,20 Z",
+      block_rect: "path://M8,4 L96,4 L96,36 L8,36 Z",
+      capsule: "path://M24,4 L76,4 Q96,4 96,20 Q96,36 76,36 L24,36 Q4,36 4,20 Q4,4 24,4 Z",
+      chevron_card: "path://M8,4 L82,4 L100,20 L82,36 L8,36 Z",
+      tag_badge: "path://M8,4 L88,4 L100,20 L88,36 L8,36 Z"
+    };
+    return SHAPES[shapeKey] || SHAPES.capsule;
+  }
+
+  function computeLints() {
+    const nodeMap = new Map(state.nodes.map((node) => [node.id, node]));
+    const inbound = new Map();
+    const outbound = new Map();
+    const lints = [];
+    state.edges.forEach((edge) => {
+      const source = nodeMap.get(edge.source);
+      const target = nodeMap.get(edge.target);
+      if (source) {
+        if (!outbound.has(source.id)) outbound.set(source.id, []);
+        outbound.get(source.id).push(edge);
+      }
+      if (target) {
+        if (!inbound.has(target.id)) inbound.set(target.id, []);
+        inbound.get(target.id).push(edge);
+      }
+      if (!source || !target) return;
+      const sourceFamily = resolveNodeFamily(source);
+      const targetFamily = resolveNodeFamily(target);
+      if ((STAGE_FAMILY_ORDER[sourceFamily] ?? 0) > (STAGE_FAMILY_ORDER[targetFamily] ?? 0)) {
+        lints.push({
+          code: "edge_direction_backward",
+          severity: "warning",
+          node_id: source.id,
+          message: `${source.name} feeds backward into ${target.name} relative to the stage-family flow.`
+        });
+      }
+    });
+    state.nodes.forEach((node) => {
+      const family = resolveNodeFamily(node);
+      const expected = NODE_TYPE_FAMILY[String(node.type || "").trim().toLowerCase()];
+      if (expected && expected !== family) {
+        lints.push({
+          code: "layer_family_mismatch",
+          severity: "warning",
+          node_id: node.id,
+          message: `${node.name} reads like ${expected} but is currently rendered as ${family}.`
+        });
+      }
+      const nodeType = String(node.type || "").trim().toLowerCase();
+      if (["system", "module", "rack", "tray", "platform", "chiplet"].includes(nodeType) && !node.chain_ref_id) {
+        lints.push({
+          code: "linked_chain_gap",
+          severity: "info",
+          node_id: node.id,
+          message: `${node.name} would benefit from a linked child chain for drilldown.`
+        });
+      }
+      const hasCopy = Boolean(String(node.definition || node.why_it_matters || node.notes || "").trim());
+      const traffic = (inbound.get(node.id) || []).length + (outbound.get(node.id) || []).length;
+      if ((family === "system" || family === "market") && traffic > 0 && !hasCopy) {
+        lints.push({
+          code: "downstream_readability",
+          severity: "info",
+          node_id: node.id,
+          message: `${node.name} needs a clearer definition or linked drilldown for downstream readers.`
+        });
+      }
+    });
+    return lints;
+  }
+
+  state.about.key_players = splitLines(state.about.key_players);
+  state.about.watchpoints = splitLines(state.about.watchpoints);
+  state.layers = state.layers.map((layer) => Object.assign({ family: normalizeLayerFamily(layer) }, layer));
+  state.nodes = state.nodes.map((node) => Object.assign({ who_matters: splitLines(node.who_matters), watchpoints: splitLines(node.watchpoints) }, node));
+
+  function pickLayer(slug) {
+    return state.layers.find((l) => l.id === slug || slugify(l.name) === slug);
+  }
+
+  function toRatio(val) {
+    const num = Number(val);
+    if (Number.isNaN(num)) return 0;
+    if (num > 1) return Math.min(num / 100, 1);
+    return Math.min(Math.max(num, 0), 1);
+  }
+
+  function securityLabel(security) {
+    if (!security || !security.ticker) return "";
+    return security.exchange ? `${security.ticker} · ${security.exchange}` : `${security.ticker}`;
+  }
+
+  function exposurePreview(node) {
+    return Array.isArray(node?.exposure_preview) ? node.exposure_preview.slice(0, 3) : [];
+  }
+
+  function lerp(a, b, t) {
+    return a + (b - a) * t;
+  }
+
+  function lerpColor(a, b, t) {
+    const ca = a.replace("#", "");
+    const cb = b.replace("#", "");
+    const ar = parseInt(ca.slice(0, 2), 16);
+    const ag = parseInt(ca.slice(2, 4), 16);
+    const ab = parseInt(ca.slice(4, 6), 16);
+    const br = parseInt(cb.slice(0, 2), 16);
+    const bg = parseInt(cb.slice(2, 4), 16);
+    const bb = parseInt(cb.slice(4, 6), 16);
+    const rr = Math.round(lerp(ar, br, t));
+    const rg = Math.round(lerp(ag, bg, t));
+    const rb = Math.round(lerp(ab, bb, t));
+    return `rgb(${rr}, ${rg}, ${rb})`;
+  }
+
+	  function nodeMatches(node) {
+	    if (!searchTerm) return true;
+	    const layer = state.layers.find((l) => l.id === node.layer);
+	    const blob = [
+	      node.name,
+      node.type,
+      node.manufacturer,
+      node.location,
+      layer?.name,
+      node.chain_ref_title,
+      Array.isArray(node.options) ? node.options.map((o) => o.name).join(" ") : ""
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+	    return blob.includes(searchTerm.toLowerCase());
+	  }
+
+	  function setNodeSearch(nextValue) {
+	    searchTerm = String(nextValue || "").trim();
+	    if (els.search && els.search.value !== searchTerm) els.search.value = searchTerm;
+	    if (els.nodeSearch && els.nodeSearch.value !== searchTerm) els.nodeSearch.value = searchTerm;
+	    renderNodeList();
+	    renderGraph();
+	  }
+
+  function resolveNodeColor(node, layer) {
+    if (viewMode === "bottleneck") {
+      return lerpColor("#10b981", "#ef4444", toRatio(node.bottleneck));
+    }
+    if (viewMode === "capacity") {
+      return lerpColor("#ef4444", "#10b981", toRatio(node.capacity));
+    }
+    if (viewMode === "confidence") {
+      return lerpColor("#f59e0b", "#3b82f6", toRatio(node.confidence));
+    }
+    return layer?.color || "#64748b";
+  }
+
+  function buildGraphData() {
+    const layers = [...state.layers].sort((a, b) => (a.order || 0) - (b.order || 0));
+    const width = graphEl ? graphEl.clientWidth : 900;
+    const height = graphEl ? graphEl.clientHeight : 640;
+    const paddingX = 96;
+    const paddingY = 80;
+    const usableWidth = Math.max(width - paddingX * 2, 320);
+    const columnWidth = Math.max(220, usableWidth / Math.max(layers.length, 1));
+
+    const byLayer = new Map();
+    layers.forEach((l) => byLayer.set(l.id, []));
+    state.nodes.forEach((node) => {
+      if (layerFilter && node.layer !== layerFilter) return;
+      if (!byLayer.has(node.layer)) byLayer.set(node.layer, []);
+      byLayer.get(node.layer).push(node);
+    });
+
+    const graphNodes = [];
+    const gap = 88;
+    const lintMap = new Map();
+    computeLints().forEach((lint) => {
+      const key = String(lint.node_id || "").trim();
+      if (!key) return;
+      if (!lintMap.has(key)) lintMap.set(key, []);
+      lintMap.get(key).push(lint);
+    });
+    layers.forEach((layer, idx) => {
+      const nodes = byLayer.get(layer.id) || [];
+      const stackHeight = Math.max(0, (nodes.length - 1) * gap);
+      const startY = Math.max(paddingY, (height - stackHeight) / 2);
+      nodes.forEach((node, i) => {
+        const matched = nodeMatches(node);
+        const active = node.id === activeNodeId;
+        const color = resolveNodeColor(node, layer);
+        const optionCount = Array.isArray(node.options) ? node.options.length : 0;
+        const family = resolveNodeFamily(node);
+        const lintCount = (lintMap.get(node.id) || []).length;
+        const title = node.name || "Node";
+        const metaParts = [];
+        if (node.type) metaParts.push(node.type);
+        if (optionCount) metaParts.push(`${optionCount} suppliers`);
+        metaParts.push(familyLabel(family));
+        const meta = metaParts.join(" · ");
+        const maxLen = Math.max(title.length, meta.length);
+        const nodeWidth = Math.max(120, Math.min(240, 56 + maxLen * 7));
+        const nodeHeight = meta ? 50 : 38;
+        const hasChildChain = Boolean(node.chain_ref_id);
+        let borderColor = "rgba(15,23,42,0.9)";
+        if (hasChildChain) borderColor = "#38bdf8";
+        if (lintCount) borderColor = "#f59e0b";
+        if (active) borderColor = "#f5a623";
+        graphNodes.push({
+          id: node.id,
+          name: node.name,
+          title,
+          meta,
+          x: paddingX + (idx * columnWidth) + (columnWidth / 2),
+          y: startY + i * gap,
+          symbol: shapePathForFamily(family),
+          symbolSize: [nodeWidth, nodeHeight],
+          draggable: true,
+          value: node.name,
+          stageFamily: family,
+          lintCount,
+          hasChildChain,
+          itemStyle: {
+            color,
+            opacity: matched ? 1 : 0.18,
+            borderColor,
+            borderWidth: active ? 3 : hasChildChain || lintCount ? 2 : 1,
+            shadowBlur: active ? 18 : hasChildChain ? 12 : 8,
+            shadowColor: active ? "rgba(245,166,35,0.35)" : hasChildChain ? "rgba(56,189,248,0.22)" : "rgba(0,0,0,0.35)"
+          },
+          label: {
+            show: labelsVisible,
+            position: "inside",
+            color: "rgba(240,246,255,0.9)",
+            fontSize: 11,
+            width: nodeWidth - 16,
+            overflow: "truncate",
+            lineHeight: 14,
+            formatter: () => {
+              if (!meta) {
+                return `{title|${title}}`;
+              }
+              return `{title|${title}}\n{meta|${meta}}`;
+            },
+            rich: {
+              title: { fontSize: 11, fontWeight: 600, color: "rgba(240,246,255,0.9)" },
+              meta: { fontSize: 10, color: "rgba(148,163,184,0.9)" }
+            }
+          }
+        });
+      });
+    });
+
+    const visibleNodeIds = new Set(graphNodes.map((node) => node.id));
+    const edges = state.edges
+      .filter((edge) => {
+        if (activeNodeId) {
+          return edge.source === activeNodeId || edge.target === activeNodeId;
+        }
+        return visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target);
+      })
+      .map((edge) => ({
+        source: edge.source,
+        target: edge.target,
+        value: edge.type,
+        lineStyle: {
+          width: 1 + toRatio(edge.criticality) * 2,
+          opacity: 0.35 + toRatio(edge.criticality) * 0.45,
+          color: "rgba(148,163,184,0.45)"
+        },
+        label: {
+          show: false
+        }
+      }));
+
+    return { graphNodes, edges, layers };
+  }
+
+  function computeFitZoom(graphNodes, width, height) {
+    if (!Array.isArray(graphNodes) || !graphNodes.length) {
+      return 1;
+    }
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    graphNodes.forEach((node) => {
+      const size = Array.isArray(node.symbolSize) ? node.symbolSize : [120, 40];
+      const halfWidth = Number(size[0] || 120) / 2;
+      const halfHeight = Number(size[1] || 40) / 2;
+      minX = Math.min(minX, Number(node.x || 0) - halfWidth);
+      maxX = Math.max(maxX, Number(node.x || 0) + halfWidth);
+      minY = Math.min(minY, Number(node.y || 0) - halfHeight);
+      maxY = Math.max(maxY, Number(node.y || 0) + halfHeight);
+    });
+    const contentWidth = Math.max(1, maxX - minX);
+    const contentHeight = Math.max(1, maxY - minY);
+    const zoomX = Math.max(0.3, (width - 140) / contentWidth);
+    const zoomY = Math.max(0.3, (height - 140) / contentHeight);
+    return Math.max(0.65, Math.min(1.45, Math.min(zoomX, zoomY)));
+  }
+
+  function updateLegend() {
+    if (!els.legend) return;
+    if (!activeNodeId) {
+      els.legend.innerHTML = `
+        <div class="muted" style="margin-bottom:10px;">Layer color shows chain position. Shape shows stage family.</div>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;">
+          ${Object.entries(STAGE_FAMILIES).map(([family, meta]) => `<div class="pill">${meta.label}</div>`).join("")}
+        </div>
+      `;
+      return;
+    }
+    if (viewMode === "layer") {
+      const node = state.nodes.find((row) => row.id === activeNodeId);
+      const family = resolveNodeFamily(node || {});
+      els.legend.innerHTML = `<div class='muted'>Selected node uses <strong>${familyLabel(family)}</strong> shape semantics on top of layer colors.</div>`;
+      return;
+    }
+    const labels = {
+      bottleneck: "Bottleneck pressure",
+      capacity: "Capacity availability",
+      confidence: "Confidence level"
+    };
+    els.legend.innerHTML = `
+      <div class="supply-legend-row">
+        <span>${labels[viewMode] || "Signal"}</span>
+        <div class="supply-legend-bar"></div>
+        <span class="muted">low → high</span>
+      </div>
+    `;
+  }
+
+  function renderGraph() {
+    if (!chart) return;
+    const { graphNodes, edges } = buildGraphData();
+    const fitZoom = computeFitZoom(graphNodes, chart.getWidth(), chart.getHeight());
+    DEFAULT_ZOOM = fitZoom;
+    const option = {
+      backgroundColor: "transparent",
+      tooltip: {
+        trigger: "item",
+        backgroundColor: "rgba(7,10,13,0.95)",
+        borderColor: "rgba(255,255,255,0.08)",
+        textStyle: { color: "rgba(235,244,255,0.85)", fontSize: 12 },
+        formatter: (params) => {
+          if (params.dataType !== "node") return "";
+          const node = state.nodes.find((n) => n.id === params.data.id);
+          if (!node) return params.name;
+          const layer = state.layers.find((l) => l.id === node.layer);
+          const optionCount = Array.isArray(node.options) ? node.options.length : 0;
+          const linked = node.chain_ref_title || (node.chain_ref_id ? `Chain ${node.chain_ref_id}` : "");
+          const family = familyLabel(resolveNodeFamily(node));
+          const lintCount = computeLints().filter((lint) => lint.node_id === node.id).length;
+          const preview = exposurePreview(node);
+          return `
+            <div style="font-weight:600;margin-bottom:4px;">${node.name}</div>
+            <div style="font-size:11px;opacity:.7;">${layer?.name || ""} · ${node.type || ""} · ${family}</div>
+            <div style="margin-top:6px;font-size:11px;">Lead time: ${node.lead_time_months || "—"} mo</div>
+            <div style="font-size:11px;">Bottleneck: ${Math.round(toRatio(node.bottleneck) * 100)}%</div>
+            <div style="font-size:11px;">Capacity: ${Math.round(toRatio(node.capacity) * 100)}%</div>
+            <div style="font-size:11px;">Suppliers: ${optionCount || "—"}</div>
+            ${linked ? `<div style="font-size:11px;">Linked: ${linked}</div>` : ""}
+            ${lintCount ? `<div style="font-size:11px;">Lint: ${lintCount}</div>` : ""}
+            ${preview.length ? `
+              <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);">
+                ${preview.map((entry) => `
+                  <div style="font-size:11px;">
+                    ${entry.display_name || ""}
+                    ${securityLabel(entry.primary_security) ? `<strong style="margin-left:6px;">${securityLabel(entry.primary_security)}</strong>` : ""}
+                  </div>
+                `).join("")}
+              </div>
+            ` : ""}
+          `;
+        }
+      },
+      animationDuration: 600,
+      series: [
+        {
+          type: "graph",
+          layout: "none",
+          data: graphNodes,
+          links: edges,
+          roam: true,
+          scaleLimit: { min: 0.3, max: 3 },
+          edgeSymbol: ["circle", "arrow"],
+          edgeSymbolSize: [4, 8],
+          lineStyle: { curveness: 0.12 },
+          emphasis: {
+            focus: "adjacency",
+            lineStyle: { width: 3 }
+          }
+        }
+      ]
+    };
+    chart.setOption(option);
+    if (!initialZoomApplied) {
+      initialZoomApplied = true;
+      currentZoom = fitZoom;
+      labelsVisible = currentZoom >= LABEL_ZOOM_THRESHOLD;
+      suppressZoomEvent = true;
+      chart.dispatchAction({ type: "graphRoam", seriesIndex: 0, zoom: fitZoom });
+      updateZoomLabel();
+      chart.setOption({ series: [{ label: { show: labelsVisible } }] });
+    }
+  }
+
+  let DEFAULT_ZOOM = 1;
+  const LABEL_ZOOM_THRESHOLD = 0.9;
+  let currentZoom = 1;
+  let labelsVisible = currentZoom >= LABEL_ZOOM_THRESHOLD;
+  let initialZoomApplied = false;
+  let suppressZoomEvent = false;
+  function updateZoomLabel() {
+    if (!zoomLabel) return;
+    zoomLabel.textContent = `${Math.round(currentZoom * 100)}%`;
+  }
+  updateZoomLabel();
+
+  if (chart) {
+    chart.on("graphRoam", (evt) => {
+      if (evt && typeof evt.zoom === "number") {
+        if (suppressZoomEvent) {
+          suppressZoomEvent = false;
+          return;
+        }
+        currentZoom *= evt.zoom;
+        currentZoom = Math.max(0.1, Math.min(6, currentZoom));
+        updateZoomLabel();
+        const nextVisible = currentZoom >= LABEL_ZOOM_THRESHOLD;
+        if (nextVisible !== labelsVisible) {
+          labelsVisible = nextVisible;
+          chart.setOption({ series: [{ label: { show: labelsVisible } }] });
+        }
+      }
+    });
+  }
+
+  if (zoomInBtn && chart) {
+    zoomInBtn.addEventListener("click", () => {
+      chart.dispatchAction({ type: "graphRoam", seriesIndex: 0, zoom: 1.2 });
+    });
+  }
+  if (zoomOutBtn && chart) {
+    zoomOutBtn.addEventListener("click", () => {
+      chart.dispatchAction({ type: "graphRoam", seriesIndex: 0, zoom: 1 / 1.2 });
+    });
+  }
+  if (resetBtn && chart) {
+    resetBtn.addEventListener("click", () => {
+      chart.dispatchAction({ type: "restore" });
+      initialZoomApplied = false;
+      currentZoom = DEFAULT_ZOOM;
+      renderGraph();
+    });
+  }
+
+	  function renderLayerList() {
+	    if (!els.layerList) return;
+	    const layersAll = [...state.layers].sort((a, b) => (a.order || 0) - (b.order || 0));
+	    const layers = layerSearchTerm
+	      ? layersAll.filter((layer) => String(layer.name || "").toLowerCase().includes(layerSearchTerm.toLowerCase()))
+	      : layersAll;
+	    els.layerList.innerHTML = "";
+	    layers.forEach((layer) => {
+	      const item = document.createElement("div");
+	      item.className = `supply-layer-item ${layer.id === layerFilter ? "active" : ""}`;
+	      item.dataset.layerId = layer.id;
+
+      if (editingLayerId === layer.id) {
+        item.classList.add("editing");
+        item.innerHTML = `
+          <div class="supply-layer-edit-row">
+            <input type="text" value="${(layer.name || "").replaceAll('"', "&quot;")}" />
+            <input type="color" value="${layer.color || "#64748b"}" />
+            <input type="number" min="0" step="1" value="${layer.order ?? 0}" />
+            <select>
+              ${Object.entries(STAGE_FAMILIES).map(([family, meta]) => `<option value="${family}" ${normalizeLayerFamily(layer) === family ? "selected" : ""}>${meta.label}</option>`).join("")}
+            </select>
+          </div>
+          <div class="btnrow">
+            <button class="btn primary" type="button" data-save>Save</button>
+            <button class="btn" type="button" data-cancel>Cancel</button>
+          </div>
+        `;
+        item.querySelector("[data-cancel]").addEventListener("click", (e) => {
+          e.stopPropagation();
+          editingLayerId = null;
+          renderLayerList();
+        });
+        item.querySelector("[data-save]").addEventListener("click", (e) => {
+          e.stopPropagation();
+          const inputs = item.querySelectorAll("input");
+          const familySelect = item.querySelector("select");
+          const name = String(inputs[0].value || "").trim();
+          const color = String(inputs[1].value || "").trim() || "#64748b";
+          const order = parseInt(String(inputs[2].value || "0"), 10);
+          if (name) layer.name = name;
+          layer.color = color;
+          if (!Number.isNaN(order)) layer.order = order;
+          if (familySelect) layer.family = familySelect.value || "component";
+          editingLayerId = null;
+          setDirty(true);
+          renderAll();
+        });
+      } else {
+        item.innerHTML = `
+          <span class="supply-layer-dot" style="background:${layer.color || "#64748b"};"></span>
+          <span class="supply-layer-name">${layer.name}</span>
+          <span class="pill">${familyLabel(normalizeLayerFamily(layer))}</span>
+          <span class="pill">order ${layer.order ?? 0}</span>
+          <div class="btnrow supply-layer-actions">
+            <button class="btn" type="button" data-edit>Edit</button>
+            <button class="btn danger" type="button" data-delete>Delete</button>
+          </div>
+        `;
+        item.addEventListener("click", () => {
+          layerFilter = layer.id;
+          if (els.layerFilter) els.layerFilter.value = layer.id;
+          renderAll();
+        });
+        item.querySelector("[data-edit]").addEventListener("click", (e) => {
+          e.stopPropagation();
+          editingLayerId = layer.id;
+          renderLayerList();
+        });
+        item.querySelector("[data-delete]").addEventListener("click", (e) => {
+          e.stopPropagation();
+          deleteLayer(layer.id);
+        });
+      }
+
+	      els.layerList.appendChild(item);
+	    });
+	    if (els.layerCount) {
+	      els.layerCount.textContent = layerSearchTerm ? `${layers.length}/${layersAll.length}` : String(layersAll.length);
+	    }
+	  }
+
+  function ensureUnassignedLayer() {
+    let layer = state.layers.find((l) => l.id === "unassigned");
+    if (layer) return layer;
+    const maxOrder = Math.max(...state.layers.map((l) => l.order || 0), 0);
+    layer = { id: "unassigned", name: "Unassigned", order: maxOrder + 1, color: "#64748b" };
+    state.layers.push(layer);
+    return layer;
+  }
+
+  function deleteLayer(layerId) {
+    const layer = state.layers.find((l) => l.id === layerId);
+    if (!layer) return;
+    const nodesInLayer = state.nodes.filter((n) => n.layer === layerId);
+    if (nodesInLayer.length) {
+      const ok = window.confirm(
+        `Delete layer \"${layer.name}\"? It contains ${nodesInLayer.length} node(s).\\n\\nOK will move nodes to \"Unassigned\".`
+      );
+      if (!ok) return;
+      const target = ensureUnassignedLayer();
+      nodesInLayer.forEach((n) => (n.layer = target.id));
+    } else {
+      const ok = window.confirm(`Delete layer \"${layer.name}\"?`);
+      if (!ok) return;
+    }
+    state.layers = state.layers.filter((l) => l.id !== layerId);
+    if (layerFilter === layerId) {
+      layerFilter = "";
+      if (els.layerFilter) els.layerFilter.value = "";
+    }
+    editingLayerId = null;
+    setDirty(true);
+    renderAll();
+  }
+
+  function renderLayerFilter() {
+    if (!els.layerFilter) return;
+    els.layerFilter.innerHTML = "";
+    const allOpt = document.createElement("option");
+    allOpt.value = "";
+    allOpt.textContent = "All layers";
+    els.layerFilter.appendChild(allOpt);
+    state.layers
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+      .forEach((layer) => {
+        const opt = document.createElement("option");
+        opt.value = layer.id;
+        opt.textContent = layer.name;
+        els.layerFilter.appendChild(opt);
+      });
+    els.layerFilter.value = layerFilter;
+  }
+
+  function renderNodeSelects() {
+    const selects = [els.nodeLayerSelect, els.nodeLayer, els.edgeSource, els.edgeTarget];
+    selects.forEach((sel) => {
+      if (!sel) return;
+      sel.innerHTML = "";
+    });
+    state.layers
+      .sort((a, b) => (a.order || 0) - (b.order || 0))
+      .forEach((layer) => {
+        [els.nodeLayerSelect, els.nodeLayer].forEach((sel) => {
+          if (!sel) return;
+          const opt = document.createElement("option");
+          opt.value = layer.id;
+          opt.textContent = layer.name;
+          sel.appendChild(opt);
+        });
+      });
+    state.nodes.forEach((node) => {
+      [els.edgeSource, els.edgeTarget].forEach((sel) => {
+        if (!sel) return;
+        const opt = document.createElement("option");
+        opt.value = node.id;
+        opt.textContent = node.name;
+        sel.appendChild(opt);
+      });
+    });
+  }
+
+  function renderNodeList() {
+    if (!els.nodeList) return;
+    const list = document.createElement("div");
+    list.className = "supply-node-list";
+    state.nodes
+      .filter((node) => (!layerFilter || node.layer === layerFilter))
+      .filter(nodeMatches)
+      .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+      .forEach((node) => {
+        const layer = state.layers.find((l) => l.id === node.layer);
+        const optionCount = Array.isArray(node.options) ? node.options.length : 0;
+        const linked = node.chain_ref_id ? true : false;
+        const family = resolveNodeFamily(node);
+        const lintCount = computeLints().filter((lint) => lint.node_id === node.id).length;
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = `supply-node-item ${node.id === activeNodeId ? "active" : ""}`;
+        item.innerHTML = `
+          <span class="supply-node-dot" style="background:${layer?.color || "#64748b"};"></span>
+          <span class="supply-node-name">${node.name}</span>
+          <span class="pill">${node.type || "node"}</span>
+          <span class="pill">${familyLabel(family)}</span>
+          ${optionCount ? `<span class="pill">${optionCount} suppliers</span>` : ""}
+          ${linked ? `<span class="pill">linked</span>` : ""}
+          ${lintCount ? `<span class="pill">lint ${lintCount}</span>` : ""}
+        `;
+        item.addEventListener("click", () => selectNode(node.id));
+        item.addEventListener("dblclick", (e) => {
+          e.preventDefault();
+          selectNode(node.id);
+          setTimeout(() => {
+            if (els.nodeName) els.nodeName.focus();
+          }, 0);
+        });
+        list.appendChild(item);
+      });
+    els.nodeList.innerHTML = "";
+    els.nodeList.appendChild(list);
+  }
+
+	  function updateCounts() {
+	    if (els.countLayers) els.countLayers.textContent = String(state.layers.length);
+	    if (els.countNodes) els.countNodes.textContent = String(state.nodes.length);
+	    if (els.countEdges) els.countEdges.textContent = String(state.edges.length);
+	    if (els.nodeCount) {
+	      const nodesInView = state.nodes.filter((n) => (!layerFilter || n.layer === layerFilter));
+	      if (searchTerm) {
+	        els.nodeCount.textContent = `${nodesInView.filter(nodeMatches).length}/${nodesInView.length}`;
+	      } else {
+	        els.nodeCount.textContent = String(nodesInView.length);
+	      }
+	    }
+	  }
+
+  function selectNode(id) {
+    activeNodeId = id;
+    renderInspector();
+    updateLegend();
+    renderGraph();
+  }
+
+  function renderInspector() {
+    const node = state.nodes.find((n) => n.id === activeNodeId);
+    if (!node) {
+      if (els.selectedId) els.selectedId.textContent = "none";
+      if (els.nodeEmpty) els.nodeEmpty.style.display = "block";
+      if (els.nodeForm) els.nodeForm.style.display = "none";
+      renderEdgeList(null);
+      renderNodeChain(null);
+      renderNodeOptions(null);
+      renderPreview();
+      return;
+    }
+    if (els.selectedId) els.selectedId.textContent = node.id;
+    if (els.nodeEmpty) els.nodeEmpty.style.display = "none";
+    if (els.nodeForm) els.nodeForm.style.display = "block";
+    if (els.nodeName) els.nodeName.value = node.name || "";
+    if (els.nodeLayer) els.nodeLayer.value = node.layer || "";
+    if (els.nodeType) els.nodeType.value = node.type || "materials";
+    if (els.nodeManufacturer) els.nodeManufacturer.value = node.manufacturer || "";
+    if (els.nodeLocation) els.nodeLocation.value = node.location || "";
+    if (els.nodeBottleneck) els.nodeBottleneck.value = Math.round(toRatio(node.bottleneck) * 100);
+    if (els.nodeCapacity) els.nodeCapacity.value = Math.round(toRatio(node.capacity) * 100);
+    if (els.nodePricing) els.nodePricing.value = Math.round(toRatio(node.pricing_power) * 100);
+    if (els.nodeConfidence) els.nodeConfidence.value = Math.round(toRatio(node.confidence) * 100);
+    if (els.nodeLeadtime) els.nodeLeadtime.value = node.lead_time_months || 0;
+    if (els.nodeImage) els.nodeImage.value = node.image_url || "";
+    if (els.nodeNotes) els.nodeNotes.value = node.notes || "";
+    if (els.nodeDefinition) els.nodeDefinition.value = node.definition || "";
+    if (els.nodeWhy) els.nodeWhy.value = node.why_it_matters || "";
+    if (els.nodeWhoMatters) els.nodeWhoMatters.value = joinLines(node.who_matters);
+    if (els.nodeWatchpoints) els.nodeWatchpoints.value = joinLines(node.watchpoints);
+    if (els.nodeGlossary) els.nodeGlossary.value = node.glossary || "";
+    if (els.nodeDisplayFamily) els.nodeDisplayFamily.value = node.display_family_override || "";
+    renderEdgeList(node.id);
+    renderNodeChain(node);
+    renderNodeOptions(node);
+    hideOptionLinker();
+    renderPreview();
+  }
+
+  function renderLintList() {
+    if (!els.lintList) return;
+    const allLints = computeLints();
+    const rows = activeNodeId ? allLints.filter((lint) => lint.node_id === activeNodeId) : allLints;
+    els.lintList.innerHTML = "";
+    if (!rows.length) {
+      const empty = document.createElement("div");
+      empty.className = "muted";
+      empty.style.fontSize = "11px";
+      empty.textContent = activeNodeId ? "No lint warnings for the selected node." : "No lint warnings right now.";
+      els.lintList.appendChild(empty);
+      return;
+    }
+    rows.slice(0, 8).forEach((lint) => {
+      const row = document.createElement("div");
+      row.className = "supply-edge-item";
+      row.innerHTML = `
+        <div>
+          <div style="font-size:12px;font-weight:600;">${lint.code || "lint"}</div>
+          <div class="muted" style="font-size:11px;">${lint.message || ""}</div>
+        </div>
+        <span class="pill">${lint.severity || "info"}</span>
+      `;
+      els.lintList.appendChild(row);
+    });
+  }
+
+  function renderEdgeList(nodeId) {
+    if (!els.edgeList) return;
+    els.edgeList.innerHTML = "";
+    if (!nodeId) {
+      const empty = document.createElement("div");
+      empty.className = "muted";
+      empty.style.fontSize = "11px";
+      empty.textContent = "No node selected.";
+      els.edgeList.appendChild(empty);
+      return;
+    }
+    const edges = state.edges.filter((e) => e.source === nodeId || e.target === nodeId);
+    if (!edges.length) {
+      const empty = document.createElement("div");
+      empty.className = "muted";
+      empty.style.fontSize = "11px";
+      empty.textContent = "No edges connected.";
+      els.edgeList.appendChild(empty);
+      return;
+    }
+    edges.forEach((edge, idx) => {
+      const row = document.createElement("div");
+      row.className = "supply-edge-item";
+      const source = state.nodes.find((n) => n.id === edge.source)?.name || edge.source;
+      const target = state.nodes.find((n) => n.id === edge.target)?.name || edge.target;
+      row.innerHTML = `
+        <div>
+          <div style="font-size:12px;">${source} → ${target}</div>
+          <div class="muted" style="font-size:11px;">${edge.type || "edge"} · crit ${Math.round(toRatio(edge.criticality) * 100)}%</div>
+        </div>
+        <button class="btn" type="button">Remove</button>
+      `;
+      row.querySelector("button").addEventListener("click", () => {
+        const edgeIndex = state.edges.indexOf(edge);
+        if (edgeIndex >= 0) state.edges.splice(edgeIndex, 1);
+        setDirty(true);
+        renderAll();
+      });
+      els.edgeList.appendChild(row);
+    });
+  }
+
+  function renderPreview() {
+    if (!els.preview) return;
+    const node = state.nodes.find((n) => n.id === activeNodeId);
+    if (!node) {
+      els.preview.innerHTML = "<div class='muted'>Select a node to preview constraints and context.</div>";
+      return;
+    }
+    const layer = state.layers.find((l) => l.id === node.layer);
+    const optionCount = Array.isArray(node.options) ? node.options.length : 0;
+    const preview = exposurePreview(node);
+    els.preview.innerHTML = `
+      <div class="supply-preview-title">${node.name}</div>
+      <div class="supply-preview-meta">${layer?.name || "Layer"} · ${node.type || "node"}${node.manufacturer ? ` · ${node.manufacturer}` : ""}</div>
+      <div class="supply-preview-grid">
+        <span>Bottleneck ${Math.round(toRatio(node.bottleneck) * 100)}%</span>
+        <span>Capacity ${Math.round(toRatio(node.capacity) * 100)}%</span>
+        <span>Pricing ${Math.round(toRatio(node.pricing_power) * 100)}%</span>
+        <span>Confidence ${Math.round(toRatio(node.confidence) * 100)}%</span>
+        <span>Lead ${node.lead_time_months || 0} mo</span>
+        <span>${optionCount ? `${optionCount} suppliers` : "No suppliers"}</span>
+      </div>
+      ${preview.length ? `
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;">
+          ${preview.map((entry) => `
+            <span class="pill">${entry.display_name || ""}${securityLabel(entry.primary_security) ? ` · ${securityLabel(entry.primary_security)}` : ""}</span>
+          `).join("")}
+        </div>
+      ` : ""}
+    `;
+  }
+
+  function renderGraphEmpty() {
+    if (!els.graphEmpty) return;
+    if (state.nodes.length === 0) {
+      els.graphEmpty.textContent = "Add a node to start your supply chain.";
+      els.graphEmpty.style.display = "flex";
+      return;
+    }
+    if (state.nodes.length === 1) {
+      els.graphEmpty.textContent = "Add another node and connect with an edge.";
+      els.graphEmpty.style.display = "flex";
+      return;
+    }
+    els.graphEmpty.style.display = "none";
+  }
+
+  function renderNodeChain(node) {
+    if (!els.nodeChainMeta) return;
+    if (!node || !node.chain_ref_id) {
+      els.nodeChainMeta.textContent = "No linked chain.";
+      if (els.nodeChainOpen) els.nodeChainOpen.disabled = true;
+      if (els.nodeChainClear) els.nodeChainClear.disabled = true;
+      return;
+    }
+    const title = node.chain_ref_title || `Chain ${node.chain_ref_id}`;
+    let meta = title;
+    if (node.chain_ref_snapshot && node.chain_ref_snapshot.version !== undefined) {
+      meta += ` · pinned v${node.chain_ref_snapshot.version}`;
+    }
+    els.nodeChainMeta.textContent = meta;
+    if (els.nodeChainOpen) els.nodeChainOpen.disabled = false;
+    if (els.nodeChainClear) els.nodeChainClear.disabled = false;
+  }
+
+  function renderNodeOptions(node) {
+    if (!els.nodeOptionsList) return;
+    els.nodeOptionsList.innerHTML = "";
+    const options = node && Array.isArray(node.options) ? node.options : [];
+    if (!options.length) {
+      const empty = document.createElement("div");
+      empty.className = "muted";
+      empty.style.fontSize = "11px";
+      empty.textContent = "No supplier options yet.";
+      els.nodeOptionsList.appendChild(empty);
+      return;
+    }
+    options.forEach((opt, idx) => {
+      const row = document.createElement("div");
+      row.className = "supply-option-item";
+      const mix = opt.mix_pct === 0 || opt.mix_pct ? `${opt.mix_pct}%` : "—";
+      const linked = opt.chain_ref_id ? true : false;
+      const linkedTitle = opt.chain_ref_title ? ` · ${opt.chain_ref_title}` : "";
+      row.innerHTML = `
+        <div>
+          <div style="font-size:12px;font-weight:600;">${opt.name || "Supplier"}</div>
+          <div class="muted" style="font-size:11px;">
+            ${opt.company || ""}${opt.company && opt.mix_pct ? " · " : ""}${mix}
+            ${linked ? " · linked" : ""}${linkedTitle}
+          </div>
+        </div>
+        <div class="btnrow">
+          ${linked ? "<button class='btn' type='button' data-opt-open>Open</button>" : "<button class='btn' type='button' data-opt-link>Link</button>"}
+          ${linked ? "<button class='btn' type='button' data-opt-unlink>Unlink</button>" : "<button class='btn' type='button' data-opt-create>Create + Link</button>"}
+          <button class="btn" type="button" data-opt-remove>Remove</button>
+        </div>
+      `;
+      row.querySelector("[data-opt-remove]").addEventListener("click", () => {
+        options.splice(idx, 1);
+        node.options = options;
+        setDirty(true);
+        renderNodeOptions(node);
+        renderNodeList();
+        renderGraph();
+      });
+      const linkBtn = row.querySelector("[data-opt-link]");
+      if (linkBtn) {
+        linkBtn.addEventListener("click", () => {
+          showOptionLinker(idx, opt);
+        });
+      }
+      const createBtn = row.querySelector("[data-opt-create]");
+      if (createBtn) {
+        createBtn.addEventListener("click", () => {
+          createAndLinkSupplierChain(idx, opt);
+        });
+      }
+      const openBtn = row.querySelector("[data-opt-open]");
+      if (openBtn) {
+        openBtn.addEventListener("click", () => {
+          if (opt.chain_ref_id) {
+            window.open(`/visualizations/supply-chains/${opt.chain_ref_id}`, "_blank");
+          }
+        });
+      }
+      const unlinkBtn = row.querySelector("[data-opt-unlink]");
+      if (unlinkBtn) {
+        unlinkBtn.addEventListener("click", () => {
+          opt.chain_ref_id = null;
+          opt.chain_ref_title = null;
+          setDirty(true);
+          renderNodeOptions(node);
+        });
+      }
+      els.nodeOptionsList.appendChild(row);
+    });
+  }
+
+  function showOptionLinker(index, opt) {
+    activeOptionLinkIndex = index;
+    if (!els.nodeOptionLink) return;
+    els.nodeOptionLink.style.display = "flex";
+    if (els.nodeOptionLinkTarget) {
+      const label = opt?.name || "supplier";
+      els.nodeOptionLinkTarget.textContent = `Link chain for ${label}`;
+    }
+    if (els.nodeOptionSearch) {
+      els.nodeOptionSearch.value = "";
+      els.nodeOptionSearch.focus();
+    }
+    if (els.nodeOptionResults) els.nodeOptionResults.innerHTML = "";
+  }
+
+  function hideOptionLinker() {
+    activeOptionLinkIndex = null;
+    if (els.nodeOptionLink) els.nodeOptionLink.style.display = "none";
+    if (els.nodeOptionResults) els.nodeOptionResults.innerHTML = "";
+  }
+
+  async function createAndLinkSupplierChain(index, opt) {
+    const node = state.nodes.find((n) => n.id === activeNodeId);
+    if (!node) return;
+    const company = (opt.company || opt.name || "").trim();
+    const titleBase = company ? `${company} – ${node.name} Supply Chain` : `${node.name} Supplier Chain`;
+    const payload = {
+      title: titleBase,
+      category: state.meta.category || "general",
+      product: node.name,
+      description: `Supplier-specific chain for ${node.name}.`,
+      template: "empty"
+    };
+    try {
+      const res = await fetch("/api/supply-chains", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (json.ok && json.id) {
+        opt.chain_ref_id = json.id;
+        opt.chain_ref_title = json.title || titleBase;
+        setDirty(true);
+        renderNodeOptions(node);
+        quickToast("Supplier chain created");
+      } else {
+        quickToast(json.error || "Failed to create chain");
+      }
+    } catch (_e) {
+      quickToast("Failed to create chain");
+    }
+  }
+
+  function addNode(fields) {
+    const layerId = fields.layer || state.layers[0]?.id;
+    if (!layerId) return null;
+    const id = uniqueId(fields.name || "node", state.nodes);
+    const type = fields.type || "materials";
+    const manufacturer = fields.manufacturer || (type === "ip" ? fields.name : "");
+    const node = {
+      id,
+      name: fields.name || "Untitled node",
+      layer: layerId,
+      type,
+      manufacturer: manufacturer || "",
+      location: fields.location || "",
+      bottleneck: 0.3,
+      capacity: 0.5,
+      pricing_power: 0.4,
+      confidence: 0.5,
+      lead_time_months: 6,
+      notes: "",
+      definition: "",
+      why_it_matters: "",
+      glossary: "",
+      who_matters: [],
+      watchpoints: [],
+      display_family_override: "",
+      options: []
+    };
+    state.nodes.push(node);
+    setDirty(true);
+    return id;
+  }
+
+  function addEdge(fields) {
+    if (!fields.source || !fields.target || fields.source === fields.target) return;
+    const edge = {
+      source: fields.source,
+      target: fields.target,
+      type: fields.type || "materials",
+      criticality: toRatio(fields.criticality || 0.5)
+    };
+    state.edges.push(edge);
+    setDirty(true);
+  }
+
+  function applyMeta() {
+    if (els.title) els.title.value = state.meta.title || "";
+    if (els.description) els.description.value = state.meta.description || "";
+    if (els.aboutSummary) els.aboutSummary.value = state.about.summary || "";
+    if (els.aboutScope) els.aboutScope.value = state.about.scope || "";
+    if (els.aboutWhy) els.aboutWhy.value = state.about.why_it_matters || "";
+    if (els.aboutPlayers) els.aboutPlayers.value = joinLines(state.about.key_players);
+    if (els.aboutWatchpoints) els.aboutWatchpoints.value = joinLines(state.about.watchpoints);
+    if (els.category) els.category.value = state.meta.category || "";
+    if (els.product) els.product.value = state.meta.product || "";
+    if (els.status) els.status.value = state.meta.status || "active";
+  }
+
+	  function renderModules() {
+	    if (!els.moduleList) return;
+	    els.moduleList.innerHTML = "";
+	    const query = moduleSearchTerm.toLowerCase();
+	    const modules = query
+	      ? MODULES.filter((module) => {
+	          const blob = `${module.name || ""} ${module.description || ""}`.toLowerCase();
+	          return blob.includes(query);
+	        })
+	      : MODULES;
+	    if (!modules.length) {
+	      const empty = document.createElement("div");
+	      empty.className = "muted";
+	      empty.style.fontSize = "11px";
+	      empty.textContent = "No matching modules.";
+	      els.moduleList.appendChild(empty);
+	      return;
+	    }
+	    modules.forEach((module) => {
+	      const item = document.createElement("div");
+	      item.className = "supply-module-item";
+	      item.innerHTML = `
+	        <div>
+	          <div style="font-weight:600;font-size:12px;">${module.name}</div>
+          <div class="muted" style="font-size:11px;">${module.description}</div>
+        </div>
+        <button class="btn" type="button">Add</button>
+      `;
+      item.querySelector("button").addEventListener("click", () => {
+        module.apply();
+        renderAll();
+      });
+      els.moduleList.appendChild(item);
+    });
+  }
+
+  function renderParentList() {
+    if (!els.parentList) return;
+    els.parentList.innerHTML = "";
+    if (!chainId) {
+      if (els.parentEmpty) els.parentEmpty.style.display = "block";
+      return;
+    }
+    if (els.parentEmpty) els.parentEmpty.style.display = "none";
+    if (!state.parents.length) {
+      const empty = document.createElement("div");
+      empty.className = "muted";
+      empty.style.fontSize = "11px";
+      empty.textContent = "No parent systems linked yet.";
+      els.parentList.appendChild(empty);
+      return;
+    }
+    state.parents.forEach((parent) => {
+      const row = document.createElement("div");
+      row.className = "supply-parent-item";
+      row.innerHTML = `
+        <div>
+          <div style="font-size:12px;font-weight:600;">${parent.title}</div>
+          <div class="muted" style="font-size:11px;">${parent.category || "general"}${parent.product ? ` · ${parent.product}` : ""}</div>
+        </div>
+        <button class="btn" type="button">Remove</button>
+      `;
+      row.querySelector("button").addEventListener("click", () => detachParent(parent.id));
+      els.parentList.appendChild(row);
+    });
+  }
+
+  async function attachParent(parent) {
+    if (!chainId || !parent?.id) return;
+    try {
+      const body = new URLSearchParams();
+      body.set("parent_id", String(parent.id));
+      const resp = await fetch(`/api/supply-chains/${chainId}/component-of`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body
+      });
+      const json = await resp.json();
+      if (json.ok) {
+        if (!state.parents.find((p) => p.id === parent.id)) {
+          state.parents.push(parent);
+        }
+        renderParentList();
+        if (els.parentResults) els.parentResults.innerHTML = "";
+        if (els.parentSearch) els.parentSearch.value = "";
+      } else {
+        quickToast(json.error || "Failed to link parent");
+      }
+    } catch (_e) {
+      quickToast("Failed to link parent");
+    }
+  }
+
+  async function detachParent(parentId) {
+    if (!chainId) return;
+    try {
+      const resp = await fetch(`/api/supply-chains/${chainId}/component-of/${parentId}`, {
+        method: "DELETE"
+      });
+      const json = await resp.json();
+      if (json.ok) {
+        state.parents = state.parents.filter((p) => p.id !== parentId);
+        renderParentList();
+      } else {
+        quickToast(json.error || "Failed to remove parent");
+      }
+    } catch (_e) {
+      quickToast("Failed to remove parent");
+    }
+  }
+
+  function renderParentResults(results) {
+    if (!els.parentResults) return;
+    els.parentResults.innerHTML = "";
+    results.forEach((parent) => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "supply-parent-result";
+      row.innerHTML = `
+        <div>
+          <div style="font-size:12px;font-weight:600;">${parent.title}</div>
+          <div class="muted" style="font-size:11px;">${parent.category || "general"}${parent.product ? ` · ${parent.product}` : ""}</div>
+        </div>
+        <span class="pill">Add</span>
+      `;
+      row.addEventListener("click", () => attachParent(parent));
+      els.parentResults.appendChild(row);
+    });
+  }
+
+  function renderNodeChainResults(results) {
+    if (!els.nodeChainResults) return;
+    els.nodeChainResults.innerHTML = "";
+    results.forEach((chain) => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "supply-parent-result";
+      row.innerHTML = `
+        <div>
+          <div style="font-size:12px;font-weight:600;">${chain.title}</div>
+          <div class="muted" style="font-size:11px;">${chain.category || "general"}${chain.product ? ` · ${chain.product}` : ""}</div>
+        </div>
+        <span class="pill">Link</span>
+      `;
+      row.addEventListener("click", () => {
+        const node = state.nodes.find((n) => n.id === activeNodeId);
+        if (!node) return;
+        node.chain_ref_id = chain.id;
+        node.chain_ref_title = chain.title;
+        node.chain_ref_category = chain.category;
+        node.chain_ref_snapshot = null;
+        setDirty(true);
+        renderNodeChain(node);
+        renderNodeList();
+        renderGraph();
+        els.nodeChainResults.innerHTML = "";
+        if (els.nodeChainSearch) els.nodeChainSearch.value = "";
+      });
+      els.nodeChainResults.appendChild(row);
+    });
+  }
+
+  function renderOptionChainResults(results) {
+    if (!els.nodeOptionResults) return;
+    els.nodeOptionResults.innerHTML = "";
+    results.forEach((chain) => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "supply-parent-result";
+      row.innerHTML = `
+        <div>
+          <div style="font-size:12px;font-weight:600;">${chain.title}</div>
+          <div class="muted" style="font-size:11px;">${chain.category || "general"}${chain.product ? ` · ${chain.product}` : ""}</div>
+        </div>
+        <span class="pill">Link</span>
+      `;
+      row.addEventListener("click", () => {
+        const node = state.nodes.find((n) => n.id === activeNodeId);
+        if (!node) return;
+        if (!Array.isArray(node.options) || activeOptionLinkIndex === null) return;
+        const opt = node.options[activeOptionLinkIndex];
+        if (!opt) return;
+        opt.chain_ref_id = chain.id;
+        opt.chain_ref_title = chain.title;
+        setDirty(true);
+        renderNodeOptions(node);
+        hideOptionLinker();
+      });
+      els.nodeOptionResults.appendChild(row);
+    });
+  }
+
+  function renderAll() {
+    renderLayerList();
+    renderLayerFilter();
+    renderNodeSelects();
+    renderNodeList();
+    renderInspector();
+    renderLintList();
+    renderParentList();
+    renderVersionMeta();
+    renderGraphEmpty();
+    updateCounts();
+    updateLegend();
+    try {
+      renderGraph();
+    } catch (err) {
+      console.error("Supply chain graph render failed", err);
+      if (els.graphEmpty) {
+        els.graphEmpty.textContent = "Graph render error. Check console for details.";
+        els.graphEmpty.style.display = "block";
+      }
+    }
+  }
+
+  function scheduleChartResize() {
+    if (!chart) return;
+    // ECharts can initialize before the grid/layout settles (especially in PWAs / slow machines).
+    // A few delayed resizes make the graph reliably appear without forcing a re-render.
+    [50, 250, 1000].forEach((ms) => {
+      window.setTimeout(() => {
+        try {
+          chart.resize();
+          chart.dispatchAction({ type: "restore" });
+          initialZoomApplied = false;
+          renderGraph();
+        } catch (_e) {}
+      }, ms);
+    });
+  }
+
+  if (els.title) {
+    els.title.value = state.meta.title || "";
+    els.title.addEventListener("input", () => {
+      state.meta.title = els.title.value;
+      setDirty(true);
+    });
+  }
+  if (els.description) {
+    els.description.value = state.meta.description || "";
+    els.description.addEventListener("input", () => {
+      state.meta.description = els.description.value;
+      setDirty(true);
+    });
+  }
+  if (els.aboutSummary) {
+    els.aboutSummary.value = state.about.summary || "";
+    els.aboutSummary.addEventListener("input", () => {
+      state.about.summary = els.aboutSummary.value;
+      setDirty(true);
+    });
+  }
+  if (els.aboutScope) {
+    els.aboutScope.value = state.about.scope || "";
+    els.aboutScope.addEventListener("input", () => {
+      state.about.scope = els.aboutScope.value;
+      setDirty(true);
+    });
+  }
+  if (els.aboutWhy) {
+    els.aboutWhy.value = state.about.why_it_matters || "";
+    els.aboutWhy.addEventListener("input", () => {
+      state.about.why_it_matters = els.aboutWhy.value;
+      setDirty(true);
+    });
+  }
+  if (els.aboutPlayers) {
+    els.aboutPlayers.value = joinLines(state.about.key_players);
+    els.aboutPlayers.addEventListener("input", () => {
+      state.about.key_players = splitLines(els.aboutPlayers.value);
+      setDirty(true);
+    });
+  }
+  if (els.aboutWatchpoints) {
+    els.aboutWatchpoints.value = joinLines(state.about.watchpoints);
+    els.aboutWatchpoints.addEventListener("input", () => {
+      state.about.watchpoints = splitLines(els.aboutWatchpoints.value);
+      setDirty(true);
+    });
+  }
+  if (els.category) {
+    els.category.value = state.meta.category || "";
+    els.category.addEventListener("input", () => {
+      state.meta.category = els.category.value;
+      setDirty(true);
+    });
+  }
+  if (els.product) {
+    els.product.value = state.meta.product || "";
+    els.product.addEventListener("input", () => {
+      state.meta.product = els.product.value;
+      setDirty(true);
+    });
+  }
+  if (els.status) {
+    els.status.value = state.meta.status || "active";
+    els.status.addEventListener("change", () => {
+      state.meta.status = els.status.value;
+      setDirty(true);
+    });
+  }
+
+  if (els.viewMode) {
+    els.viewMode.addEventListener("change", () => {
+      viewMode = els.viewMode.value;
+      renderGraph();
+      updateLegend();
+    });
+  }
+
+	  if (els.search) {
+	    els.search.addEventListener("input", () => {
+	      setNodeSearch(els.search.value);
+	    });
+	  }
+
+	  if (els.nodeSearch) {
+	    els.nodeSearch.addEventListener("input", () => {
+	      setNodeSearch(els.nodeSearch.value);
+	    });
+	  }
+
+	  if (els.layerSearch) {
+	    els.layerSearch.addEventListener("input", () => {
+	      layerSearchTerm = els.layerSearch.value.trim();
+	      renderLayerList();
+	    });
+	  }
+
+	  if (els.moduleSearch) {
+	    els.moduleSearch.addEventListener("input", () => {
+	      moduleSearchTerm = els.moduleSearch.value.trim();
+	      renderModules();
+	    });
+	  }
+
+	  if (els.modulesExpand && els.modulesPanel) {
+	    els.modulesExpand.addEventListener("click", () => {
+	      modulesExpanded = !modulesExpanded;
+	      els.modulesPanel.classList.toggle("is-expanded", modulesExpanded);
+	      els.modulesExpand.textContent = modulesExpanded ? "Collapse" : "Expand";
+	    });
+	  }
+
+  if (els.layerFilter) {
+    els.layerFilter.addEventListener("change", () => {
+      layerFilter = els.layerFilter.value;
+      renderAll();
+    });
+  }
+
+  if (els.parentSearch) {
+    if (!chainId) {
+      els.parentSearch.disabled = true;
+    }
+    const doSearch = debounce(async () => {
+      const query = els.parentSearch.value.trim();
+      const results = await fetchChainSearch(query);
+      renderParentResults(results);
+    }, 250);
+    els.parentSearch.addEventListener("input", doSearch);
+  }
+
+  if (els.nodeChainSearch) {
+    const doSearch = debounce(async () => {
+      const query = els.nodeChainSearch.value.trim();
+      const results = await fetchChainSearch(query);
+      renderNodeChainResults(results);
+    }, 250);
+    els.nodeChainSearch.addEventListener("input", doSearch);
+  }
+
+  if (els.nodeOptionSearch) {
+    const doSearch = debounce(async () => {
+      const query = els.nodeOptionSearch.value.trim();
+      const results = await fetchChainSearch(query);
+      renderOptionChainResults(results);
+    }, 250);
+    els.nodeOptionSearch.addEventListener("input", doSearch);
+  }
+
+  if (els.nodeOptionCancel) {
+    els.nodeOptionCancel.addEventListener("click", () => {
+      hideOptionLinker();
+    });
+  }
+
+  const addLayerForm = document.getElementById("add-layer-form");
+  if (addLayerForm) {
+    addLayerForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const form = new FormData(addLayerForm);
+      const name = String(form.get("layer_name") || "").trim();
+      const color = String(form.get("layer_color") || "#64748b");
+      const family = String(form.get("layer_family") || "component").trim().toLowerCase() || "component";
+      if (!name) return;
+      const id = uniqueId(name, state.layers);
+      const maxOrder = Math.max(...state.layers.map((l) => l.order || 0), 0);
+      state.layers.push({ id, name, family, order: maxOrder + 1, color });
+      addLayerForm.reset();
+      setDirty(true);
+      renderAll();
+    });
+  }
+
+  const addNodeForm = document.getElementById("add-node-form");
+  if (addNodeForm) {
+    addNodeForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const form = new FormData(addNodeForm);
+      const name = String(form.get("node_name") || "").trim();
+      if (!name) return;
+      const layer = String(form.get("node_layer") || "");
+      const type = String(form.get("node_type") || "materials");
+      const manufacturer = String(form.get("node_manufacturer") || "");
+      const location = String(form.get("node_location") || "");
+      const id = addNode({ name, layer, type, manufacturer, location });
+      addNodeForm.reset();
+      setDirty(true);
+      renderAll();
+      if (id) selectNode(id);
+    });
+  }
+
+  const addEdgeForm = document.getElementById("add-edge-form");
+  if (addEdgeForm) {
+    addEdgeForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const form = new FormData(addEdgeForm);
+      addEdge({
+        source: String(form.get("edge_source") || ""),
+        target: String(form.get("edge_target") || ""),
+        type: String(form.get("edge_type") || "materials"),
+        criticality: Number(form.get("edge_criticality") || 60) / 100
+      });
+      addEdgeForm.reset();
+      setDirty(true);
+      renderAll();
+    });
+  }
+
+  if (els.nodeOptionForm) {
+    els.nodeOptionForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const node = state.nodes.find((n) => n.id === activeNodeId);
+      if (!node) {
+        quickToast("Select a node first");
+        return;
+      }
+      const form = new FormData(els.nodeOptionForm);
+      const name = String(form.get("option_name") || "").trim();
+      if (!name) return;
+      const company = String(form.get("option_company") || "").trim();
+      const mixRaw = String(form.get("option_mix") || "").trim();
+      const mixVal = mixRaw ? Math.max(0, Math.min(100, Number(mixRaw))) : null;
+      if (!Array.isArray(node.options)) node.options = [];
+      node.options.push({
+        name,
+        company,
+        mix_pct: mixVal
+      });
+      els.nodeOptionForm.reset();
+      setDirty(true);
+      renderNodeOptions(node);
+      renderNodeList();
+      renderGraph();
+    });
+  }
+
+  function bindNodeField(el, key, parser) {
+    if (!el) return;
+    el.addEventListener("input", () => {
+      const node = state.nodes.find((n) => n.id === activeNodeId);
+      if (!node) return;
+      node[key] = parser ? parser(el.value) : el.value;
+      setDirty(true);
+      renderGraph();
+      renderNodeList();
+      renderLintList();
+      renderPreview();
+      if (key === "name") {
+        renderNodeSelects();
+      }
+    });
+  }
+
+  bindNodeField(els.nodeName, "name");
+  bindNodeField(els.nodeLayer, "layer");
+  bindNodeField(els.nodeType, "type");
+  bindNodeField(els.nodeManufacturer, "manufacturer");
+  bindNodeField(els.nodeLocation, "location");
+  bindNodeField(els.nodeBottleneck, "bottleneck", (v) => Number(v) / 100);
+  bindNodeField(els.nodeCapacity, "capacity", (v) => Number(v) / 100);
+  bindNodeField(els.nodePricing, "pricing_power", (v) => Number(v) / 100);
+  bindNodeField(els.nodeConfidence, "confidence", (v) => Number(v) / 100);
+  bindNodeField(els.nodeLeadtime, "lead_time_months", (v) => Number(v));
+  bindNodeField(els.nodeImage, "image_url");
+  bindNodeField(els.nodeDefinition, "definition");
+  bindNodeField(els.nodeWhy, "why_it_matters");
+  bindNodeField(els.nodeGlossary, "glossary");
+  bindNodeField(els.nodeDisplayFamily, "display_family_override");
+  if (els.nodeNotes) {
+    els.nodeNotes.addEventListener("input", () => {
+      const node = state.nodes.find((n) => n.id === activeNodeId);
+      if (!node) return;
+      node.notes = els.nodeNotes.value;
+      setDirty(true);
+      renderLintList();
+      renderGraph();
+    });
+  }
+  if (els.nodeWhoMatters) {
+    els.nodeWhoMatters.addEventListener("input", () => {
+      const node = state.nodes.find((n) => n.id === activeNodeId);
+      if (!node) return;
+      node.who_matters = splitLines(els.nodeWhoMatters.value);
+      setDirty(true);
+      renderPreview();
+    });
+  }
+  if (els.nodeWatchpoints) {
+    els.nodeWatchpoints.addEventListener("input", () => {
+      const node = state.nodes.find((n) => n.id === activeNodeId);
+      if (!node) return;
+      node.watchpoints = splitLines(els.nodeWatchpoints.value);
+      setDirty(true);
+      renderPreview();
+    });
+  }
+
+  if (els.nodeDuplicate) {
+    els.nodeDuplicate.addEventListener("click", () => {
+      const node = state.nodes.find((n) => n.id === activeNodeId);
+      if (!node) return;
+      const clone = Object.assign({}, node, { name: `${node.name} Copy` });
+      clone.id = uniqueId(clone.name, state.nodes);
+      state.nodes.push(clone);
+      setDirty(true);
+      renderAll();
+      selectNode(clone.id);
+    });
+  }
+
+  if (els.nodeDelete) {
+    els.nodeDelete.addEventListener("click", () => {
+      if (!activeNodeId) return;
+      state.nodes = state.nodes.filter((n) => n.id !== activeNodeId);
+      state.edges = state.edges.filter((e) => e.source !== activeNodeId && e.target !== activeNodeId);
+      activeNodeId = null;
+      setDirty(true);
+      renderAll();
+    });
+  }
+
+  if (els.nodeChainOpen) {
+    els.nodeChainOpen.addEventListener("click", () => {
+      const node = state.nodes.find((n) => n.id === activeNodeId);
+      if (!node?.chain_ref_id) return;
+      window.open(`/visualizations/supply-chains/${node.chain_ref_id}`, "_blank");
+    });
+  }
+
+  if (els.nodeChainClear) {
+    els.nodeChainClear.addEventListener("click", () => {
+      const node = state.nodes.find((n) => n.id === activeNodeId);
+      if (!node) return;
+      node.chain_ref_id = null;
+      node.chain_ref_title = null;
+      node.chain_ref_category = null;
+      node.chain_ref_snapshot = null;
+      setDirty(true);
+      renderNodeChain(node);
+      renderNodeList();
+      renderGraph();
+    });
+  }
+
+  function persistableLayers() {
+    return state.layers.map((layer) => {
+      const out = Object.assign({}, layer);
+      delete out.family_label;
+      delete out.shape_key;
+      return out;
+    });
+  }
+
+  function persistableNodes() {
+    return state.nodes.map((node) => {
+      const out = Object.assign({}, node);
+      delete out.stage_family;
+      delete out.shape_key;
+      delete out.layer_family;
+      delete out.layer_name;
+      delete out.has_child_chain;
+      delete out.exposure;
+      delete out.exposure_preview;
+      delete out.lint;
+      return out;
+    });
+  }
+
+  function persistableEdges() {
+    return state.edges.map((edge) => {
+      const out = Object.assign({}, edge);
+      delete out.key;
+      delete out.source_name;
+      delete out.target_name;
+      delete out.source_family;
+      delete out.target_family;
+      delete out.lint;
+      return out;
+    });
+  }
+
+  const saveBtn = document.getElementById("chain-save-btn");
+  if (saveBtn) {
+    saveBtn.addEventListener("click", async () => {
+      const payload = {
+        title: state.meta.title,
+        description: state.meta.description,
+        category: state.meta.category,
+        product: state.meta.product,
+        status: state.meta.status,
+        data: {
+          about: state.about,
+          layers: persistableLayers(),
+          nodes: persistableNodes(),
+          edges: persistableEdges(),
+          bindings: state.bindings,
+          alerts: state.alerts
+        }
+      };
+      try {
+        const url = chainId ? `/api/supply-chains/${chainId}` : "/api/supply-chains";
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+        if (json.ok) {
+          chainId = json.id || chainId;
+          if (json.redirect) {
+            window.history.replaceState({}, "", json.redirect);
+          }
+          if (json.version) {
+            state.version = state.version || {};
+            state.version.draft = json.version;
+            renderVersionMeta();
+          }
+          if (chainId && els.parentSearch) {
+            els.parentSearch.disabled = false;
+            if (els.parentEmpty) els.parentEmpty.style.display = "none";
+          }
+          if (chainId && publishBtn) {
+            publishBtn.disabled = false;
+          }
+          if (chainId && deleteBtn) {
+            deleteBtn.disabled = false;
+          }
+          setDirty(false);
+          quickToast("Supply chain saved");
+        } else {
+          quickToast(json.error || "Save failed");
+        }
+      } catch (_e) {
+        quickToast("Save failed");
+      }
+    });
+  }
+
+  const exportBtn = document.getElementById("chain-export-btn");
+  if (exportBtn) {
+    exportBtn.addEventListener("click", () => {
+      const blob = new Blob(
+        [JSON.stringify({ meta: state.meta, data: { about: state.about, layers: persistableLayers(), nodes: persistableNodes(), edges: persistableEdges(), bindings: state.bindings, alerts: state.alerts } }, null, 2)],
+        { type: "application/json" }
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${slugify(state.meta.title || "supply-chain") || "supply-chain"}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  const publishBtn = document.getElementById("chain-publish-btn");
+  if (publishBtn) {
+    if (!chainId) {
+      publishBtn.disabled = true;
+    }
+    publishBtn.addEventListener("click", async () => {
+      if (!chainId) {
+        quickToast("Save the chain before publishing");
+        return;
+      }
+      const label = window.prompt("Publish label (optional)", "") || "";
+      try {
+        const res = await fetch(`/api/supply-chains/${chainId}/publish`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ label })
+        });
+        const json = await res.json();
+        if (json.ok) {
+          state.version = state.version || {};
+          state.version.published = json.version || null;
+          renderVersionMeta();
+          quickToast("Supply chain published");
+        } else {
+          quickToast(json.error || "Publish failed");
+        }
+      } catch (_e) {
+        quickToast("Publish failed");
+      }
+    });
+  }
+
+  const importInput = document.getElementById("chain-import-input");
+  if (importInput) {
+    importInput.addEventListener("change", async () => {
+      const file = importInput.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        if (parsed.meta) {
+          state.meta = Object.assign(state.meta, parsed.meta);
+        }
+        if (parsed.data) {
+          state.about = Object.assign(state.about, parsed.data.about || {});
+          state.layers = parsed.data.layers || state.layers;
+          state.nodes = parsed.data.nodes || state.nodes;
+          state.edges = parsed.data.edges || state.edges;
+          state.bindings = parsed.data.bindings || state.bindings;
+          state.alerts = parsed.data.alerts || state.alerts;
+        } else if (parsed.layers) {
+          state.layers = parsed.layers || state.layers;
+          state.nodes = parsed.nodes || state.nodes;
+          state.edges = parsed.edges || state.edges;
+        }
+        state.about.key_players = splitLines(state.about.key_players);
+        state.about.watchpoints = splitLines(state.about.watchpoints);
+        state.layers = state.layers.map((layer) => Object.assign({ family: normalizeLayerFamily(layer) }, layer));
+        state.nodes = state.nodes.map((node) => Object.assign({ who_matters: splitLines(node.who_matters), watchpoints: splitLines(node.watchpoints) }, node));
+        setDirty(true);
+        applyMeta();
+        renderAll();
+        quickToast("Import complete");
+      } catch (_e) {
+        quickToast("Invalid JSON");
+      }
+    });
+  }
+
+  const deleteBtn = document.getElementById("chain-delete-btn");
+  if (deleteBtn) {
+    if (!chainId) {
+      deleteBtn.disabled = true;
+    }
+    deleteBtn.addEventListener("click", async () => {
+      if (!chainId) return;
+      const ok = window.confirm("Delete this supply chain? This cannot be undone.");
+      if (!ok) return;
+      try {
+        const res = await fetch(`/api/supply-chains/${chainId}/delete`, { method: "POST" });
+        const json = await res.json();
+        if (json.ok) {
+          window.location.href = "/visualizations/supply-chains";
+        } else {
+          quickToast(json.error || "Delete failed");
+        }
+      } catch (_e) {
+        quickToast("Delete failed");
+      }
+    });
+  }
+
+  if (chart) {
+    chart.on("click", (params) => {
+      if (params.dataType === "node") {
+        selectNode(params.data.id);
+      }
+    });
+  }
+
+  window.addEventListener("resize", () => {
+    if (chart) {
+      chart.resize();
+      chart.dispatchAction({ type: "restore" });
+      initialZoomApplied = false;
+      renderGraph();
+    }
+  });
+
+  if (fullscreenBtn) {
+    fullscreenBtn.addEventListener("click", () => {
+      document.body.classList.toggle("supply-fullscreen");
+      const isFull = document.body.classList.contains("supply-fullscreen");
+      fullscreenBtn.textContent = isFull ? "Exit" : "Expand";
+      setTimeout(() => {
+        if (chart) {
+          chart.resize();
+          chart.dispatchAction({ type: "restore" });
+          initialZoomApplied = false;
+          renderGraph();
+        }
+      }, 120);
+    });
+  }
+
+  // Support `?view=1` deep links (open in fullscreen viewer mode).
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("view") === "1" || params.get("view") === "true") {
+      document.body.classList.add("supply-fullscreen");
+      if (fullscreenBtn) fullscreenBtn.textContent = "Exit";
+      setTimeout(() => {
+        if (chart) {
+          chart.resize();
+          chart.dispatchAction({ type: "restore" });
+          initialZoomApplied = false;
+          renderGraph();
+        }
+      }, 180);
+    }
+  } catch (_e) {}
+
+  applyMeta();
+  renderModules();
+  renderAll();
+  scheduleChartResize();
+  setDirty(false);
+})();
+</script>
+{% endblock %}

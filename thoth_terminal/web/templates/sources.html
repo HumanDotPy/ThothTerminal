@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  .wrap { max-width: 1400px; }
+</style>
+<div class="panel">
+  <div class="hd">
+    <h2>Sources</h2>
+    <div class="btnrow">
+      {% if include_deprecated %}
+        <a class="btn" href="/sources">Hide deprecated</a>
+      {% else %}
+        <a class="btn" href="/sources?include_deprecated=1">Show deprecated</a>
+      {% endif %}
+      <a class="btn" href="/sources/setup">Guided setup</a>
+      <form method="post" action="/sources/cleanup/company-pages" onsubmit="return confirm('Remove retired company/newsroom source definitions from the active catalog? Historical documents will be preserved.');">
+        <button class="btn" type="submit">Delete Company Pages</button>
+      </form>
+      <a class="btn primary" href="/sources/new">Add source</a>
+    </div>
+  </div>
+  <div class="bd" style="padding:0">
+    {% if notice %}
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);color:#9be7b3;">
+        {{ notice }}
+      </div>
+    {% endif %}
+    {% if error %}
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);color:#ff8b8b;">
+        {{ error }}
+      </div>
+    {% endif %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Connector</th>
+          <th>Interval</th>
+          <th>Health</th>
+          <th>Last new</th>
+          <th>Last success</th>
+          <th>Last run</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          {% set s = row.source %}
+          {% set st = row.state %}
+          {% set lr = row.last_run %}
+          <tr>
+            <td><a href="/sources/{{ s.id }}">{{ s.name }}</a></td>
+            <td>{{ s.config.get("connector") or "-" }}</td>
+            <td>
+              {% set min_s = s.config.get("poll_min_seconds") %}
+              {% set max_s = s.config.get("poll_max_seconds") %}
+              {% if min_s or max_s %}
+                {{ ((min_s or max_s) // 60) }}{% if max_s and min_s and max_s != min_s %}-{{ (max_s // 60) }}{% endif %}m
+              {% elif s.polling_interval_seconds %}
+                {{ (s.polling_interval_seconds // 60) }}m
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td>
+              {% if row.backoff_s %}
+                <span class="pill red">backoff {{ row.backoff_label }}</span>
+              {% elif row.sla_s %}
+                {% if row.stale %}
+                  <span class="pill red">stale</span>
+                {% else %}
+                  <span class="pill">fresh</span>
+                {% endif %}
+              {% else %}
+                <span class="pill">no SLA</span>
+              {% endif %}
+              {% if st and st.consecutive_failures %}
+                <span class="pill red">fail {{ st.consecutive_failures }}</span>
+              {% endif %}
+              {% if row.content_critical %}
+                <span class="pill red">no new {{ row.new_age_label }}</span>
+              {% elif row.content_silent %}
+                <span class="pill red">unusually quiet</span>
+              {% elif row.content_common %}
+                <span class="pill">adaptive</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if row.latest_new_local %}
+                <div>{{ row.latest_new_local }}</div>
+                <div style="color:var(--muted);font-size:11px;">{{ row.new_age_label }} ago</div>
+                {% if row.content_common %}
+                  <div style="color:var(--muted);font-size:11px;">usual {{ row.median_new_interval_label }} · alert {{ row.expected_silence_label }} · {{ row.zero_success_runs }} zero runs</div>
+                {% endif %}
+              {% else %}
+                <span class="pill">no history</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if st and st.last_success_at %}
+                {% if row.last_success_local %}<div>{{ row.last_success_local }}</div>{% endif %}
+                {% if row.last_success_utc %}<div style="color:var(--muted);font-size:11px;">{{ row.last_success_utc }}</div>{% endif %}
+                {% if row.age_label %}<span class="pill">{{ row.age_label }} ago</span>{% endif %}
+              {% else %}
+                <span class="pill">never</span>
+              {% endif %}
+              {% if row.sla_label %}<span class="pill">SLA {{ row.sla_label }}</span>{% endif %}
+            </td>
+            <td>
+              {% if lr %}
+                <span class="pill {% if lr.status != 'success' %}red{% endif %}">{{ lr.status }}</span>
+                <span class="pill">{{ lr.items_seen }} seen</span>
+                <span class="pill">{{ lr.items_new }} new</span>
+                <span class="pill">{{ lr.items_updated }} upd</span>
+                {% if lr.error %}
+                  <div style="color:var(--muted);font-size:11px;max-width:360px;line-height:1.3;margin-top:6px;">
+                    {{ lr.error|truncate(140) }}
+                  </div>
+                {% endif %}
+                {% if row.last_run_local %}<div style="margin-top:6px;">{{ row.last_run_local }}</div>{% endif %}
+                {% if row.last_run_utc %}<div style="color:var(--muted);font-size:11px;">{{ row.last_run_utc }}</div>{% endif %}
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td>
+              {% set en = s.config.get("enabled") %}
+              {% if en is sameas false or (en is none and s.config.get("disabled_reason")) %}
+                <span class="pill red">disabled</span>
+              {% else %}
+                <span class="pill">enabled</span>
+              {% endif %}
+            </td>
+            <td class="right">
+              <div class="btnrow" style="justify-content:flex-end;">
+                <form method="post" action="/sources/{{ s.id }}/run">
+                  <button class="btn" type="submit">Run</button>
+                </form>
+                <form method="post" action="/sources/{{ s.id }}/delete" onsubmit="return confirm('Delete source {{ s.name }} from the active catalog? Historical documents and run history will be preserved under retired provenance.');">
+                  <button class="btn" type="submit">Delete</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<link rel="stylesheet" href="/static/deepseek_harness.css?v={{ settings.static_assets_version }}&amp;native=20261005-2" />
+{% set agents_section = 'harness' %}
+{% include "_agents_nav.html" %}
+<section class="harness-workspace" aria-label="DeepSeek Harness">
+  <header class="harness-toolbar">
+    <span id="harness-status" role="status">Connecting to Harness…</span>
+    <div><button class="btn" id="harness-reload" type="button">Reconnect</button><button class="btn primary" id="harness-start" type="button" hidden>Start Harness</button><a class="btn" href="/agents/harness" target="_blank" rel="noopener">Open in a window</a></div>
+  </header>
+  <iframe id="harness-frame" title="DeepSeek Harness workspace" referrerpolicy="no-referrer" allow="clipboard-write" hidden></iframe>
+</section>
+{% endblock %}
+{% block scripts %}<script src="/static/deepseek_harness.js?v={{ settings.static_assets_version }}&amp;native=20261005-2" defer></script>{% endblock %}

@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block content %}
+{% set active_scope_filter = scope_filter|default('active_universe') %}
+{% set queue_counts = scope_counts|default({}) %}
+<div class="viz-page">
+  <div class="viz-header">
+    <div class="viz-title-row">
+      <div>
+        <div class="kicker">Instrument Requests</div>
+        <h1>Codex Instrument Queue</h1>
+        <p style="color:var(--muted);margin:8px 0 0;max-width:820px;">Structured requests for new datasets, chart packages, tracker entries, and research surfaces. Drafts live here until reviewed and promoted.</p>
+      </div>
+      <div class="btnrow">
+        <a href="/visualizations/datasets" class="btn">Datasets</a>
+        <a href="/stage-tracker" class="btn">Stage Tracker</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid" style="grid-template-columns:.9fr 1.1fr;gap:18px;">
+    <div class="panel">
+      <div class="hd"><h2>New Request</h2></div>
+      <div class="bd">
+        <form id="instrument-request-form" style="display:flex;flex-direction:column;gap:12px;">
+          <div class="field">
+            <label>Title</label>
+            <input type="text" name="title" required placeholder="TSMC AI Capex tracker package" />
+          </div>
+          <div class="grid-2col" style="gap:12px;">
+            <div class="field">
+              <label>Intent</label>
+              <input type="text" name="intent" value="instrument" />
+            </div>
+            <div class="field">
+              <label>Priority</label>
+              <input type="number" min="1" max="10" name="priority" value="5" />
+            </div>
+          </div>
+          <div class="field">
+            <label>Summary</label>
+            <textarea name="summary" rows="4" placeholder="What should be built and why it matters."></textarea>
+          </div>
+          <div class="grid-2col" style="gap:12px;">
+            <div class="field">
+              <label>Target Entities</label>
+              <input type="text" name="target_entities" placeholder="TSMC, NVDA" />
+            </div>
+            <div class="field">
+              <label>Desired Outputs</label>
+              <input type="text" name="desired_outputs" placeholder="dataset, chart, stage_tracker" />
+            </div>
+          </div>
+          <div class="field">
+            <label>Evidence Tier</label>
+            <input type="text" name="evidence_tier" placeholder="issuer_confirmed / sell_side / trusted_analyst" />
+          </div>
+          <div class="field">
+            <label>Provenance Summary</label>
+            <textarea name="provenance_summary" rows="3" placeholder="Short provenance note for the request."></textarea>
+          </div>
+          <div class="btnrow" style="justify-content:flex-end;">
+            <button type="submit" class="btn primary">Create Request</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="hd"><h2>Queue</h2></div>
+      <div class="bd">
+        <form method="get" action="/instruments/requests" class="grid-2col" style="gap:12px;margin-bottom:12px;">
+          <div class="field" style="margin:0;">
+            <label>Search</label>
+            <input type="text" name="q" value="{{ query }}" placeholder="capex, backlog, DRAM" />
+          </div>
+          <div class="field" style="margin:0;">
+            <label>Status</label>
+            <input type="text" name="status" value="{{ status_filter }}" placeholder="open / draft / review / live / all" />
+          </div>
+          <div class="field" style="margin:0;grid-column:1 / -1;">
+            <label>Scope</label>
+            <select name="scope">
+              <option value="active_universe" {% if active_scope_filter == "active_universe" %}selected{% endif %}>Active universe</option>
+              <option value="off_universe" {% if active_scope_filter == "off_universe" %}selected{% endif %}>Off-universe backlog</option>
+              <option value="manual" {% if active_scope_filter == "manual" %}selected{% endif %}>Manual / unscoped</option>
+              <option value="all" {% if active_scope_filter == "all" %}selected{% endif %}>All scopes</option>
+            </select>
+          </div>
+          <div class="btnrow" style="justify-content:flex-end;grid-column:1 / -1;">
+            <button class="btn" type="submit">Filter</button>
+          </div>
+        </form>
+        <div class="viz-equities" style="gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+          <a class="pill mono" href="/instruments/requests?status={{ status_filter }}&scope=active_universe{% if query %}&q={{ query|urlencode }}{% endif %}">Universe {{ queue_counts.get('active_universe', 0) }}</a>
+          <a class="pill mono" href="/instruments/requests?status={{ status_filter }}&scope=off_universe{% if query %}&q={{ query|urlencode }}{% endif %}">Backlog {{ queue_counts.get('off_universe', 0) }}</a>
+          <a class="pill mono" href="/instruments/requests?status={{ status_filter }}&scope=manual{% if query %}&q={{ query|urlencode }}{% endif %}">Manual {{ queue_counts.get('manual', 0) }}</a>
+          <a class="pill mono" href="/instruments/requests?status={{ status_filter }}&scope=all{% if query %}&q={{ query|urlencode }}{% endif %}">All {{ queue_counts.get('all', 0) }}</a>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          {% for item in items %}
+          <a href="/instruments/requests/{{ item.id }}" class="panel" style="text-decoration:none;">
+            <div class="bd" style="display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
+                <div>
+                  <div style="font-size:16px;font-weight:600;">{{ item.title }}</div>
+                  <div style="color:var(--muted);font-size:12px;">{{ item.intent }}{% if item.evidence_tier %} · {{ item.evidence_tier }}{% endif %}</div>
+                </div>
+                <div class="viz-equities" style="gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+                  <span class="pill mono">{{ item.status }}</span>
+                  <span class="pill mono">p{{ item.priority }}</span>
+                  <span class="pill mono">{{ item.queue_scope|replace('_', ' ') }}</span>
+                </div>
+              </div>
+              {% if item.summary %}
+              <div style="color:var(--text);font-size:13px;line-height:1.5;">{{ item.summary }}</div>
+              {% endif %}
+              <div style="display:flex;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:11px;">
+                <span>Entities: {{ item.target_entities|join(', ') if item.target_entities else "none" }}</span>
+                <span>Outputs: {{ item.desired_outputs|join(', ') if item.desired_outputs else "none" }}</span>
+              </div>
+            </div>
+          </a>
+          {% else %}
+          <div class="viz-empty">
+            <h3>No instrument requests yet</h3>
+            <p>Create a request when a missing chart, dataset, or tracker would materially improve coverage.</p>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  const form = document.getElementById('instrument-request-form');
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const fd = new FormData(form);
+    const payload = {
+      title: fd.get('title'),
+      intent: fd.get('intent'),
+      priority: Number(fd.get('priority') || 5),
+      summary: fd.get('summary'),
+      evidence_tier: fd.get('evidence_tier'),
+      provenance_summary: fd.get('provenance_summary'),
+      target_entities: String(fd.get('target_entities') || '').split(',').map((v) => v.trim()).filter(Boolean),
+      desired_outputs: String(fd.get('desired_outputs') || '').split(',').map((v) => v.trim()).filter(Boolean),
+    };
+    const resp = await fetch('/api/instrument-requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (data.ok && data.redirect) {
+      window.location.href = data.redirect;
+      return;
+    }
+    quickToast(data.error || 'Failed to create instrument request', 'error');
+  });
+})();
+</script>
+{% endblock %}

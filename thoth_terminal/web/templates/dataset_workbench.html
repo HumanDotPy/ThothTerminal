@@ -1,0 +1,1147 @@
+{% extends "base.html" %}
+{% block content %}
+{% set is_analyst_consensus = (dataset_summary.family or dataset.family) == 'analyst_evidence' %}
+{% set context_sections = [
+  ('Instrument Requests', linked_request_rows),
+  ('Stage Tracker', linked_stage_rows),
+  ('Notes', linked_note_rows),
+  ('Theses', linked_thesis_rows),
+  ('Supply Chains', linked_supply_chain_rows),
+] %}
+<div class="viz-page dataset-workbench-page">
+  <div class="viz-header">
+    <div class="viz-title-row">
+      <div>
+        <div class="kicker">{{ 'Consensus Table' if is_analyst_consensus else 'Dataset Workbench' }}</div>
+        <h1>{{ dataset_summary.display_title or dataset.title }}</h1>
+        <p style="color:var(--muted);margin:8px 0 0;max-width:860px;">{{ 'Attributed analyst and institutional evidence, reduced to modelable rows first. Dataset mechanics stay below the table.' if is_analyst_consensus else (dataset.description or 'Institutional dataset surface for structured tables, family-aware dashboards, views, draft editing, provenance, and linked research context.') }}</p>
+        <div class="viz-equities" style="gap:8px;flex-wrap:wrap;margin-top:12px;">
+          {% if is_analyst_consensus %}
+          <span class="pill mono">Consensus</span>
+          <span class="pill mono">rows {{ dataset_profile.row_count }}</span>
+          {% else %}
+          <span class="pill mono">{{ dataset_summary.family_label or dataset_summary.family }}</span>
+          <span class="pill mono">{{ dataset_summary.category }}</span>
+          {% if dataset_summary.source_kind %}<span class="pill mono">{{ dataset_summary.source_kind }}</span>{% endif %}
+          {% endif %}
+          {% if dataset_summary.evidence_tier_summary %}<span class="pill mono">{{ dataset_summary.evidence_tier_summary }}</span>{% endif %}
+          {% if dataset_profile.date_range %}<span class="pill mono">{{ dataset_profile.date_range.label }}</span>{% endif %}
+          {% if active_view %}<span class="pill mono">view {{ active_view.name }}</span>{% else %}<span class="pill mono">base dataset</span>{% endif %}
+        </div>
+      </div>
+      <div class="btnrow">
+        <a href="/visualizations/datasets" class="btn">← Datasets</a>
+        <a href="/api/datasets/{{ dataset.id }}/export?format=csv{% if active_view %}&view_id={{ active_view.id }}{% endif %}" class="btn primary">Export CSV</a>
+        <a href="/api/datasets/{{ dataset.id }}/export?format=xlsx{% if active_view %}&view_id={{ active_view.id }}{% endif %}" class="btn primary">Export XLSX</a>
+      </div>
+    </div>
+  </div>
+
+  <section
+    class="d3-analysis-board"
+    data-dataset-id="{{ dataset.id }}"
+    data-view-id="{{ active_view.id if active_view else '' }}"
+    data-schema-id="dataset-d3-schema"
+    data-default-limit="1500"
+    aria-label="Dataset analysis board"
+  >
+    <script id="dataset-d3-schema" type="application/json">
+      {{ {
+        "id": dataset.id,
+        "slug": dataset.slug,
+        "title": dataset_summary.display_title or dataset.title,
+        "family": dataset_summary.family or dataset.family,
+        "columns": dataset_columns,
+        "profile": dataset_profile,
+        "active_view": {"id": active_view.id, "name": active_view.name} if active_view else none
+      }|tojson }}
+    </script>
+    <div class="d3-board-main">
+      <div class="d3-board-stage">
+        <div class="d3-board-head">
+          <div>
+            <div class="kicker">D3 Analysis Board</div>
+            <h2 class="d3-board-title"></h2>
+            <p class="d3-board-subtitle"></p>
+          </div>
+          <div class="d3-board-actions" role="group" aria-label="Chart actions">
+            <button type="button" class="d3-icon-btn is-active" data-mode="chart" title="Chart" aria-label="Chart">▥</button>
+            <button type="button" class="d3-icon-btn" data-mode="table" title="Table" aria-label="Table">▦</button>
+            <button type="button" class="d3-icon-btn" data-action="download" title="Download CSV" aria-label="Download CSV">⇩</button>
+            <button type="button" class="d3-icon-btn" data-action="reset" title="Reset chart" aria-label="Reset chart">↻</button>
+          </div>
+        </div>
+        <div class="d3-chart-wrap" data-chart-host>
+          <div class="d3-chart-loading">Loading chart data...</div>
+        </div>
+        <div class="d3-table-wrap" data-table-host hidden></div>
+      </div>
+      <aside class="d3-board-controls" aria-label="Chart controls">
+        <input class="d3-search" type="search" placeholder="Search..." autocomplete="off" />
+        <div class="d3-series-filter">
+          <div class="d3-filter-head">
+            <span>Series</span>
+            <button type="button" data-action="series-reset">Reset</button>
+          </div>
+          <input class="d3-series-search" type="search" placeholder="Filter series..." autocomplete="off" />
+          <div class="d3-series-list" data-series-list></div>
+        </div>
+        <div class="d3-control-grid">
+          <label>Chart
+            <select data-control="chartType">
+              <option value="scatter">Scatter</option>
+              <option value="line">Line</option>
+              <option value="bar">Bar</option>
+            </select>
+          </label>
+          <label>X <select data-control="x"></select></label>
+          <label>Y <select data-control="y"></select></label>
+          <label>Color <select data-control="color"></select></label>
+          <label>Size <select data-control="size"></select></label>
+          <label>Label <select data-control="label"></select></label>
+          <label>Rows
+            <select data-control="limit">
+              <option value="500">500</option>
+              <option value="1500" selected>1,500</option>
+              <option value="3000">3,000</option>
+              <option value="5000">5,000</option>
+            </select>
+          </label>
+        </div>
+        <div class="d3-toggle-stack">
+          <label><input type="checkbox" data-control="logX"> Log X</label>
+          <label><input type="checkbox" data-control="optimalOnly"> Optimal Only</label>
+          <label><input type="checkbox" data-control="logY"> Log Y</label>
+          <label><input type="checkbox" data-control="labels"> Labels</label>
+          <label><input type="checkbox" data-control="connect"> Connect Groups</label>
+          <label><input type="checkbox" data-control="highContrast"> High Contrast</label>
+        </div>
+        <div class="d3-status" data-status></div>
+      </aside>
+    </div>
+  </section>
+
+  {% if is_analyst_consensus %}
+  <div class="panel consensus-embedded-panel" style="margin-bottom:22px;">
+    <div class="hd">
+      <div class="hd-left"><h2>Consensus Evidence</h2><span class="pill">{{ dataset_rows|length }} rows</span></div>
+      <a class="btn" href="/consensus?q={{ (dataset_summary.display_title or dataset.title).replace(' Analyst Evidence','') }}">Open Consensus</a>
+    </div>
+    <div class="bd">
+      <table class="consensus-table evidence">
+        <thead>
+          <tr>
+            <th>Published</th>
+            <th>Source</th>
+            <th>Metric</th>
+            <th>Period</th>
+            <th>Value</th>
+            <th>Rating / Target</th>
+            <th>Confidence</th>
+            <th>Summary</th>
+            <th>Doc</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in dataset_rows[:80] %}
+            {% set v = row["values"] or {} %}
+            {% set value = v.get("forecast_value") if v.get("forecast_value") is not none else v.get("price_target") %}
+            {% set rating_target = (v.get("rating") or '') ~ ((' / ' ~ v.get("price_target")) if v.get("price_target") is not none else '') %}
+            <tr class="{{ 'needs-routing' if not (v.get('metric_key') or value or v.get('rating')) else '' }}">
+              <td data-label="Published" class="mono">{{ v.get("published_at") or 'n/a' }}</td>
+              <td data-label="Source" class="wrap-cell">{{ v.get("underlying_firm") or v.get("source_name") or v.get("outlet") or 'n/a' }}</td>
+              <td data-label="Metric" class="wrap-cell">{{ v.get("metric_key") or v.get("evidence_kind") or 'evidence' }}</td>
+              <td data-label="Period" class="mono">{{ v.get("forecast_period") or 'latest' }}</td>
+              <td data-label="Value" class="mono">{{ value if value is not none else 'n/a' }}{% if v.get("unit") %} {{ v.get("unit") }}{% elif v.get("currency") %} {{ v.get("currency") }}{% endif %}</td>
+              <td data-label="Rating / Target">{{ rating_target.strip(' /') or 'n/a' }}</td>
+              <td data-label="Confidence">{{ v.get("trust_label") or v.get("evidence_tier") or 'n/a' }}</td>
+              <td data-label="Summary" class="summary-cell">{{ v.get("summary") or '' }}</td>
+              <td data-label="Doc">{% if v.get("source_document_id") %}<a href="/docs/{{ v.get("source_document_id") }}">Doc</a>{% elif v.get("source_url") %}<a href="{{ v.get("source_url") }}" target="_blank" rel="noreferrer">Link</a>{% else %}n/a{% endif %}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="9">No analyst evidence rows are available.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="panel" style="margin-bottom:22px;">
+    <div class="hd">
+      <h2>{{ dataset_dashboard.family_label or dataset_summary.family_label }} Dashboard</h2>
+      <span class="pill">{{ dataset_dashboard.framing or 'Family-aware institutional summary' }}</span>
+    </div>
+    <div class="bd" style="display:flex;flex-direction:column;gap:18px;">
+      <div class="viz-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;">
+        {% for card in dataset_dashboard.kpis or [] %}
+        <div class="viz-card" style="min-height:0;padding:16px 18px;">
+          <div class="kicker">{{ card.label }}</div>
+          <div style="font-size:24px;font-weight:700;margin-top:6px;">{{ card.value }}</div>
+          {% if card.detail %}<div style="margin-top:6px;color:var(--muted);font-size:12px;">{{ card.detail }}</div>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+
+      {% if dataset_dashboard.warnings %}
+      <div class="viz-card" style="min-height:0;padding:16px 18px;border-color:rgba(244,177,106,.35);background:rgba(244,177,106,.05);">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+          <div>
+            <div class="kicker">Family Fit Warnings</div>
+            <div style="margin-top:6px;color:var(--muted);font-size:12px;">This dataset family is not fully aligned with the observed schema or linked context.</div>
+          </div>
+          <span class="pill mono">attention {{ dataset_dashboard.warnings|length }}</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px;">
+          {% for warning in dataset_dashboard.warnings %}
+          <div class="link-row">
+            <div>
+              <div>{{ warning.title }}</div>
+              <div style="color:var(--muted);font-size:11px;">{{ warning.detail }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="grid" style="grid-template-columns:1.15fr .85fr;gap:18px;">
+        <div class="viz-card" style="min-height:0;padding:18px 20px;">
+          <div class="kicker">Family Framing</div>
+          <div style="font-size:20px;font-weight:700;margin-top:8px;">{{ dataset_dashboard.summary or dataset_summary.family_summary }}</div>
+          <div style="margin-top:10px;color:var(--muted);line-height:1.6;">{{ dataset_dashboard.framing or 'Structured dataset dashboard.' }}</div>
+          {% if dataset_dashboard.lineage and dataset_dashboard.lineage.summary %}
+          <div style="margin-top:14px;padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.03);color:var(--muted);line-height:1.5;">
+            {{ dataset_dashboard.lineage.summary }}
+          </div>
+          {% endif %}
+        </div>
+        <div class="viz-card" style="min-height:0;padding:18px 20px;">
+          <div class="kicker">Identity</div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px;">
+            {% for item in dataset_dashboard.identity or [] %}
+            <div class="link-row">
+              <div style="color:var(--muted);font-size:12px;">{{ item.label }}</div>
+              <div style="font-family:var(--mono);font-size:12px;text-align:right;">{{ item.value }}</div>
+            </div>
+            {% else %}
+            <div style="color:var(--muted);font-size:12px;">No specialized identity fields are authored for this family yet.</div>
+            {% endfor %}
+          </div>
+          {% if dataset_dashboard.related_objects %}
+          <div style="margin-top:14px;">
+            <div class="kicker" style="margin-bottom:8px;">Linked Research Surface</div>
+            <div class="viz-equities" style="gap:8px;flex-wrap:wrap;">
+              {% for item in dataset_dashboard.related_objects %}
+              <span class="pill mono">{{ item.label }} {{ item.value }}</span>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if dataset_dashboard.chart_cards %}
+      <div class="panel" style="margin:0;">
+        <div class="hd"><h2>Family Trends</h2><span class="pill mono">{{ dataset_dashboard.family_label or dataset.family }}</span></div>
+        <div class="bd"><div class="viz-grid dataset-chart-grid" id="dataset-family-chart-grid"></div></div>
+      </div>
+      {% endif %}
+
+      {% if dataset_dashboard.cards %}
+      <div class="viz-grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;">
+        {% for card in dataset_dashboard.cards %}
+        <div class="viz-card" style="min-height:0;padding:18px 20px;{% if card.wide %}grid-column:1 / -1;{% endif %}">
+          <div class="viz-card-header" style="margin-bottom:12px;"><h2 style="font-size:18px;">{{ card.title }}</h2></div>
+          {% if card.description %}<div style="color:var(--muted);font-size:12px;line-height:1.5;margin:-4px 0 12px;">{{ card.description }}</div>{% endif %}
+          {% if card.kind == 'table' %}
+          <div class="table-preview">
+            <table class="table-preview-table">
+              <thead><tr>{% for col in card.columns %}<th class="{{ col.class_name or '' }}">{{ col.label }}</th>{% endfor %}</tr></thead>
+              <tbody>
+                {% for row in card.rows %}
+                <tr>{% for col in card.columns %}<td class="{{ col.class_name or '' }}">{{ row["values"][col.key] if row["values"] and col.key in row["values"] else '—' }}</td>{% endfor %}</tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% elif card.kind == 'list' %}
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            {% for item in card["items"] %}
+            <div class="link-row">
+              <div><div>{{ item.label }}</div>{% if item.meta %}<div style="color:var(--muted);font-size:11px;">{{ item.meta }}</div>{% endif %}</div>
+              <div style="text-align:right;font-size:12px;">{% if item.url %}<a href="{{ item.url }}" target="_blank" rel="noreferrer">{{ item.value }}</a>{% else %}{{ item.value }}{% endif %}</div>
+            </div>
+            {% endfor %}
+          </div>
+          {% elif card.kind == 'grouped-list' %}
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            {% for group in card.groups %}
+            <div>
+              <div class="kicker" style="margin-bottom:8px;">{{ group.label }}</div>
+              <div class="viz-equities" style="gap:8px;flex-wrap:wrap;">{% for item in group["items"] %}<span class="pill mono">{{ item.label }} {{ item.value }}</span>{% endfor %}</div>
+            </div>
+            {% endfor %}
+          </div>
+          {% elif card.kind == 'pairs' %}
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            {% for item in card["items"] %}
+            <div class="link-row">
+              <div><div>{{ item.label }}</div>{% if item.meta %}<div style="color:var(--muted);font-size:11px;">{{ item.meta }}</div>{% endif %}</div>
+              <div style="font-family:var(--mono);font-size:12px;">{{ item.value }}</div>
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="grid" style="grid-template-columns:1.15fr .85fr;gap:22px;align-items:start;">
+    <div style="display:flex;flex-direction:column;gap:18px;">
+      <div class="panel">
+        <div class="hd"><h2>Quick Look</h2></div>
+        <div class="bd">
+          <div class="viz-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;">
+            <div class="viz-card" style="min-height:0;"><div class="kicker">Rows</div><div style="font-size:28px;font-weight:700;">{{ dataset_profile.row_count }}</div><div style="color:var(--muted);font-size:12px;">{{ dataset_summary.counts.columns }} columns</div></div>
+            <div class="viz-card" style="min-height:0;"><div class="kicker">Metrics</div><div style="font-size:28px;font-weight:700;">{{ dataset_profile.metric_count }}</div><div style="color:var(--muted);font-size:12px;">{{ dataset_profile.dimension_count }} dimensions</div></div>
+            <div class="viz-card" style="min-height:0;"><div class="kicker">Views</div><div style="font-size:28px;font-weight:700;">{{ dataset_summary.counts.views }}</div><div style="color:var(--muted);font-size:12px;">{{ dataset_profile.timestamp_count }} timestamp columns</div></div>
+            <div class="viz-card" style="min-height:0;"><div class="kicker">Context</div><div style="font-size:28px;font-weight:700;">{{ dataset_summary.counts.links }}</div><div style="color:var(--muted);font-size:12px;">{{ linked_chart_rows|length }} linked charts · {{ dataset_summary.counts.views }} views</div></div>
+          </div>
+          {% if dataset_profile.cards %}
+          <div class="viz-grid" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px;">
+            {% for card in dataset_profile.cards %}
+            <div class="viz-card" style="min-height:0;padding:14px 16px;">
+              <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
+                <div><div class="kicker">{{ card.label }}</div><div style="font-size:22px;font-weight:700;">{{ card.latest_display if card.latest_display is not none else 'n/a' }}</div></div>
+                <div style="text-align:right;color:var(--muted);font-size:11px;"><div>min {{ card.min_display if card.min_display is not none else 'n/a' }}</div><div>max {{ card.max_display if card.max_display is not none else 'n/a' }}</div></div>
+              </div>
+              <div style="margin-top:8px;color:var(--muted);font-size:12px;">{{ card.observations }} observations{% if card.latest_date %} · latest {{ card.latest_date }}{% endif %}</div>
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hd"><h2>Explorer</h2><span class="pill">{% if active_view %}{{ active_view.name }}{% else %}Base Dataset{% endif %}</span></div>
+        <div class="bd" style="display:flex;flex-direction:column;gap:14px;">
+          <div class="grid" style="grid-template-columns:1.2fr .4fr .7fr;gap:12px;">
+            <div class="field" style="margin:0;"><label>Row Search</label><input type="text" id="dataset-row-filter" placeholder="Search values, entities, periods, metrics..." /></div>
+            <div class="field" style="margin:0;"><label>Limit</label><select id="dataset-row-limit"><option value="25">25</option><option value="50">50</option><option value="100" selected>100</option><option value="250">250</option><option value="500">500</option></select></div>
+            <div class="field" style="margin:0;">
+              <label>Visible Columns</label>
+              <details style="border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 12px;background:rgba(255,255,255,.02);"><summary style="cursor:pointer;color:var(--muted);font-size:12px;">Choose columns</summary><div id="dataset-column-toggles" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-top:10px;"></div></details>
+            </div>
+          </div>
+          <div class="table-preview"><table class="table-preview-table"><thead id="dataset-table-head"></thead><tbody id="dataset-table-body"></tbody></table></div>
+          <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:12px;"><div id="dataset-table-summary">Loading rows…</div><div>{% if active_view %}Working from saved view <strong>{{ active_view.name }}</strong>.{% else %}Working from the draft/base dataset snapshot.{% endif %}</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hd"><h2>Draft Spreadsheet</h2><span class="pill">draft-only editing</span></div>
+        <div class="bd" style="display:flex;flex-direction:column;gap:14px;">
+          <div class="grid" style="grid-template-columns:1fr auto auto auto;gap:10px;align-items:end;">
+            <div class="field" style="margin:0;"><label>Draft Row Search</label><input type="text" id="draft-row-search" placeholder="Search the draft snapshot..." /></div>
+            <button type="button" class="btn" id="draft-row-reload">Reload</button>
+            <button type="button" class="btn" id="draft-row-add">+ Add Row</button>
+            <button type="button" class="btn primary" id="draft-row-save">Save Dirty Rows</button>
+          </div>
+          <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:12px;"><div id="draft-row-summary">Draft rows ready.</div><div id="draft-row-status">Published snapshots remain immutable; edits stay on the draft until publish.</div></div>
+          <div class="table-preview"><table class="table-preview-table"><thead id="draft-table-head"></thead><tbody id="draft-table-body"></tbody></table></div>
+          <div class="field" style="margin:0;"><label>Bulk Paste Rows</label><textarea id="draft-bulk-paste" rows="4" placeholder="Paste CSV or TSV rows. Existing dataset columns are used automatically."></textarea></div>
+          <div class="btnrow" style="justify-content:flex-end;"><button type="button" class="btn" id="draft-bulk-paste-btn">Append Pasted Rows</button></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hd"><h2>Chart Suggestions</h2></div>
+        <div class="bd">
+          <div class="viz-grid dataset-chart-grid" id="dataset-chart-grid"></div>
+          <div class="viz-empty" id="dataset-chart-empty" style="display:none;"><h3>No chart suggestion available</h3><p>Add a timestamp column and at least one numeric metric to generate chart-ready cards and create linked visualizations from the workbench.</p></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hd"><h2>Lineage / Provenance</h2></div>
+        <div class="bd" style="display:flex;flex-direction:column;gap:8px;">
+          {% if dataset_summary.provenance_summary %}
+          <div style="padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.02);line-height:1.5;">{{ dataset_summary.provenance_summary }}</div>
+          {% endif %}
+          {% for row in fact_rows %}
+          <div class="link-row">
+            <div>
+              <div>{{ row.metric_label or row.metric_key }} · {{ row.period_label or (row.as_of_date if row.as_of_date else 'undated') }}</div>
+              <div style="color:var(--muted);font-size:11px;">{{ row.evidence_tier or 'unknown' }}{% if row.provenance_label %} · {{ row.provenance_label }}{% endif %}{% if row.provenance_url %} · <a href="{{ row.provenance_url }}" target="_blank" rel="noreferrer">source</a>{% endif %}</div>
+            </div>
+            <div style="font-family:var(--mono);font-size:12px;">{{ row.value_number if row.value_number is not none else (row.value_text or '—') }}</div>
+          </div>
+          {% else %}
+          <div style="color:var(--muted);font-size:12px;">No raw fact lineage recorded yet for this dataset.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;">
+      <div class="panel">
+        <div class="hd"><h2>Metadata & Publish</h2></div>
+        <div class="bd" style="display:flex;flex-direction:column;gap:14px;">
+          <div class="viz-equities" style="gap:8px;flex-wrap:wrap;">
+            <span class="pill mono">draft {{ dataset_summary.draft_version.version if dataset_summary.draft_version else 'none' }}</span>
+            {% if dataset_summary.published_version %}<span class="pill mono">published v{{ dataset_summary.published_version.version }}</span>{% else %}<span class="pill mono">published none</span>{% endif %}
+            <span class="pill mono">updated {{ (dataset_summary.updated_at or '')[:16]|replace('T',' ') if dataset_summary.updated_at else 'unknown' }}</span>
+          </div>
+          <form id="dataset-publish-form" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;">
+            <div class="field" style="margin:0;flex:1 1 200px;"><label>Publish Label</label><input type="text" name="label" placeholder="March close, post-earnings refresh" /></div>
+            <button class="btn primary" type="submit">Publish Snapshot</button>
+          </form>
+          <details open>
+            <summary style="cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--muted);">Edit metadata</summary>
+            <form id="dataset-metadata-form" style="margin-top:12px;display:flex;flex-direction:column;gap:12px;">
+              <div class="field" style="margin:0;"><label>Title</label><input type="text" name="title" value="{{ dataset.title }}" required /></div>
+              <div class="field" style="margin:0;"><label>Description</label><textarea name="description" rows="4">{{ dataset.description or '' }}</textarea></div>
+              <div class="grid-2col" style="gap:12px;">
+                <div class="field" style="margin:0;"><label>Category</label><input type="text" name="category" value="{{ dataset.category }}" /></div>
+                <div class="field" style="margin:0;"><label>Family</label><input type="text" name="family" value="{{ dataset.family }}" /></div>
+              </div>
+              <div class="grid-2col" style="gap:12px;">
+                <div class="field" style="margin:0;"><label>Source Kind</label><input type="text" name="source_kind" value="{{ dataset.source_kind or '' }}" /></div>
+                <div class="field" style="margin:0;"><label>Status</label><input type="text" name="status" value="{{ dataset.status }}" /></div>
+              </div>
+              <div class="field" style="margin:0;"><label>Provenance Summary</label><textarea name="provenance_summary" rows="3">{{ dataset_summary.provenance_summary or '' }}</textarea></div>
+              <div class="field" style="margin:0;"><label>Evidence Tier Summary</label><input type="text" name="evidence_tier_summary" value="{{ dataset_summary.evidence_tier_summary or '' }}" /></div>
+              <div class="btnrow" style="justify-content:flex-end;"><button class="btn primary" type="submit">Save Metadata</button></div>
+            </form>
+          </details>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hd"><h2>Saved Views</h2></div>
+        <div class="bd" style="display:flex;flex-direction:column;gap:14px;">
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <a class="btn {% if not active_view %}primary{% endif %}" href="/visualizations/datasets/{{ dataset.id }}">Base Dataset</a>
+            {% for view in dataset_views %}
+            <div class="link-row">
+              <div><div><a href="/visualizations/datasets/{{ dataset.id }}?view_id={{ view.id }}">{{ view.name }}</a></div>{% if view.description %}<div style="color:var(--muted);font-size:11px;">{{ view.description }}</div>{% endif %}</div>
+              <div class="btnrow">{% if active_view and active_view.id == view.id %}<span class="pill mono">active</span>{% endif %}<button type="button" class="btn dataset-view-duplicate-btn" data-view-id="{{ view.id }}" data-view-name="{{ view.name }}" style="padding:6px 10px;">Duplicate</button></div>
+            </div>
+            {% else %}
+            <div style="color:var(--muted);font-size:12px;">No saved views yet.</div>
+            {% endfor %}
+          </div>
+
+          <div style="padding:14px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.03);display:flex;flex-direction:column;gap:12px;">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+              <div><div class="kicker">View Builder</div><div style="margin-top:4px;color:var(--muted);font-size:12px;">Structured filters, column order, and sort rules. Advanced JSON stays available but hidden by default.</div></div>
+              <div class="btnrow"><button type="button" class="btn" id="view-builder-duplicate-current">Duplicate Current</button><button type="button" class="btn" id="view-builder-preview">Preview</button><button type="button" class="btn primary" id="view-builder-save">Save View</button></div>
+            </div>
+
+            {% if dataset_view_builder.recommended_views %}
+            <div>
+              <div class="kicker" style="margin-bottom:8px;">Recommended Views</div>
+              <div class="viz-equities" style="gap:8px;flex-wrap:wrap;">
+                {% for item in dataset_view_builder.recommended_views %}
+                <button type="button" class="btn dataset-view-recommended-btn" data-name="{{ item.name }}" data-columns='{{ item.columns|tojson }}' data-filters='{{ item.filters|tojson }}' data-sort='{{ item.sort_spec|tojson }}'>{{ item.name }}</button>
+                {% endfor %}
+              </div>
+            </div>
+            {% endif %}
+
+            <form id="dataset-view-builder-form" style="display:flex;flex-direction:column;gap:12px;">
+              <div class="field" style="margin:0;"><label>Name</label><input type="text" name="name" id="view-builder-name" required placeholder="Timeline Core, Recent Capex, Taiwan Slice" /></div>
+              <div class="field" style="margin:0;"><label>Description</label><input type="text" name="description" id="view-builder-description" placeholder="Saved analytical slice for repeat work." /></div>
+              <div style="display:flex;flex-direction:column;gap:10px;"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;"><div class="kicker">Filter Rules</div><button type="button" class="btn" id="view-builder-add-filter">+ Add Filter</button></div><div id="view-builder-filter-rules" style="display:flex;flex-direction:column;gap:10px;"></div></div>
+              <div style="display:flex;flex-direction:column;gap:10px;"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;"><div class="kicker">Sort Order</div><button type="button" class="btn" id="view-builder-add-sort">+ Add Sort</button></div><div id="view-builder-sort-rules" style="display:flex;flex-direction:column;gap:10px;"></div></div>
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                <div class="kicker">Column Selection / Order</div>
+                <div class="grid" style="grid-template-columns:.9fr 1.1fr;gap:12px;">
+                  <div style="padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.02);"><div style="color:var(--muted);font-size:12px;margin-bottom:8px;">Available columns</div><div id="view-builder-column-picker" style="display:grid;grid-template-columns:1fr;gap:8px;"></div></div>
+                  <div style="padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.02);"><div style="color:var(--muted);font-size:12px;margin-bottom:8px;">Selected order</div><div id="view-builder-selected-columns" style="display:flex;flex-direction:column;gap:8px;"></div></div>
+                </div>
+              </div>
+              <details><summary style="cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--muted);">Advanced JSON fallback</summary><div class="field" style="margin:12px 0 0;"><label>Advanced Filters JSON</label><textarea id="view-builder-advanced-filters" rows="4" placeholder='{"rules":[{"column":"reporter_iso","op":"eq","value":"TW"}]}'></textarea></div></details>
+            </form>
+
+            <div id="view-builder-preview-panel" style="display:none;flex-direction:column;gap:10px;">
+              <div class="kicker">Preview Before Save</div>
+              <div class="table-preview"><table class="table-preview-table"><thead id="view-preview-head"></thead><tbody id="view-preview-body"></tbody></table></div>
+              <div id="view-preview-summary" style="color:var(--muted);font-size:12px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hd"><h2>Institutional Context</h2></div>
+        <div class="bd" style="display:flex;flex-direction:column;gap:14px;">
+          {% for title, rows in context_sections %}
+          <div>
+            <div class="pill">{{ title }}</div>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+              {% for row in rows %}
+              <div class="link-row">
+                <div><div><a href="{{ row.href }}">{{ row.title }}</a></div><div style="color:var(--muted);font-size:11px;">{{ row.relation }} · {{ row.meta }}</div></div>
+                <button type="button" class="btn dataset-unlink-btn" data-link-id="{{ row.link_id }}" style="padding:6px 10px;">✕</button>
+              </div>
+              {% else %}
+              <div style="color:var(--muted);font-size:12px;">No linked {{ title.lower() }}.</div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+          <div>
+            <div class="pill">Linked Charts</div>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+              {% for chart, view in linked_chart_rows %}
+              <div class="link-row"><div><div><a href="/visualizations/{{ chart.id }}">{{ chart.title }}</a></div><div style="color:var(--muted);font-size:11px;">{{ view.name }}</div></div></div>
+              {% else %}
+              <div style="color:var(--muted);font-size:12px;">No linked charts.</div>
+              {% endfor %}
+            </div>
+          </div>
+          <details open>
+            <summary style="cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--muted);">Link research object</summary>
+            <div style="display:flex;flex-direction:column;gap:12px;margin-top:12px;">
+              {% for kind, label in [('note', 'Note'), ('thesis', 'Thesis'), ('instrument_request', 'Instrument Request'), ('product_stage', 'Stage Entry'), ('supply_chain', 'Supply Chain')] %}
+              <form class="dataset-link-form" data-search-kind="{{ kind }}" data-object-type="{{ kind }}">
+                <div class="field" style="margin:0;">
+                  <label>Link {{ label }}</label>
+                  <input type="text" class="dataset-link-query" placeholder="Search {{ label.lower() }}..." />
+                  <div class="search-results dataset-link-results" style="display:none;"></div>
+                  <input type="hidden" name="object_id" value="" />
+                  <input type="hidden" name="relation" value="context" />
+                </div>
+                <div class="btnrow" style="justify-content:flex-end;"><button class="btn" type="submit">Link {{ label }}</button></div>
+              </form>
+              {% endfor %}
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hd"><h2>Import</h2></div>
+        <div class="bd">
+          <form id="dataset-import-form">
+            <div class="field"><label>CSV Text</label><textarea name="csv_text" rows="6" placeholder="period_date,value&#10;2025-12-01,1000&#10;2026-01-01,1200"></textarea></div>
+            <div class="field"><label>XLSX Upload</label><input type="file" name="upload" accept=".xlsx,.csv,text/csv" /></div>
+            <div class="field"><label>Import Label</label><input type="text" name="label" placeholder="March refresh" /></div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);"><input type="checkbox" name="publish_after" />Publish snapshot after import</label>
+            <div class="btnrow" style="justify-content:flex-end;margin-top:12px;"><button class="btn primary" type="submit">Import</button></div>
+          </form>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hd"><h2>Version History</h2></div>
+        <div class="bd"><div style="display:flex;flex-direction:column;gap:8px;">
+          {% for row in dataset_version_rows %}
+          <div class="link-row"><div style="display:flex;gap:8px;flex-wrap:wrap;"><span class="pill">{{ row.status }}</span><span class="pill">v{{ row.version }}</span>{% if row.label %}<span class="pill">{{ row.label }}</span>{% endif %}</div><div style="color:var(--muted);font-size:11px;">{{ row.updated_at.strftime('%Y-%m-%d %H:%M') }}</div></div>
+          {% else %}
+          <div style="color:var(--muted);font-size:12px;">No versions yet.</div>
+          {% endfor %}
+        </div></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/charting.js?v={{ settings.static_assets_version }}"></script>
+<script src="/static/vendor/echarts.min.js?v={{ settings.static_assets_version }}"></script>
+<script src="/static/vendor/d3.v7.min.js?v={{ settings.static_assets_version }}"></script>
+<script src="/static/dataset_d3_charts.js?v={{ settings.static_assets_version }}"></script>
+<script>
+(function() {
+  const DATASET = {{ dataset_payload_json|safe }};
+  const DASHBOARD = {{ dataset_dashboard_json|safe }};
+  const VIEW_BUILDER = {{ dataset_view_builder_json|safe }};
+  const DRAFT = {{ dataset_draft_rows_json|safe }};
+  const CHARTS = {{ chart_suggestions_json|safe }};
+  const allColumns = Array.isArray(DATASET.columns) ? DATASET.columns : [];
+  const allRows = Array.isArray(DATASET.rows) ? DATASET.rows : [];
+  let visibleKeys = allColumns.map((col) => String(col.key || ''));
+  const draftState = {
+    columns: Array.isArray(DRAFT.columns) ? DRAFT.columns : [],
+    rows: Array.isArray(DRAFT.rows) ? DRAFT.rows.map((row) => ({ ...row, values: { ...(row.values || {}) }, _dirty: false })) : [],
+    total: Number(DRAFT.total || 0),
+  };
+  const viewState = { name: '', description: '', filter_rules: [], columns: allColumns.map((col) => String(col.key || '')), sort_spec: [] };
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>\"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] || char));
+  }
+
+  function formatCell(value) {
+    if (value === null || value === undefined || value === '') return '—';
+    if (typeof value === 'number') return Number.isInteger(value) ? value.toLocaleString() : value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    if (typeof value === 'boolean') return value ? 'true' : 'false';
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+  }
+
+  function columnClass(col, value) {
+    const dataType = String(col?.data_type || '').toLowerCase();
+    const role = String(col?.role || '').toLowerCase();
+    if (dataType === 'number' || role === 'metric' || (typeof value === 'number' && Number.isFinite(value))) return 'is-numeric';
+    if (dataType === 'date' || role === 'timestamp') return 'is-date';
+    return '';
+  }
+
+  function formatNumberShort(value, unit = '') {
+    if (window.ThothCharting?.formatShort) return window.ThothCharting.formatShort(value, { unit });
+    const n = Number(value);
+    return Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(value ?? '');
+  }
+
+  function seriesForRange(series, range) {
+    if (window.ThothCharting?.seriesForRange) return window.ThothCharting.seriesForRange(series, range);
+    return Array.isArray(series) ? series : [];
+  }
+
+  function renderRowsTable(headId, bodyId, columns, rows) {
+    const head = document.getElementById(headId);
+    const body = document.getElementById(bodyId);
+    if (!head || !body) return;
+    head.innerHTML = `<tr>${columns.map((col) => `<th class="${columnClass(col)}">${escapeHtml(col.label || col.key || '')}</th>`).join('')}<\/tr>`;
+    if (!rows.length) {
+      body.innerHTML = `<tr><td class="table-empty-cell" colspan="${Math.max(columns.length, 1)}">No rows available.</td></tr>`;
+      return;
+    }
+    body.innerHTML = rows.map((row) => `<tr>${columns.map((col) => {
+      const value = (row.values || {})[String(col.key || '')];
+      const cls = columnClass(col, value);
+      return `<td class="${cls}">${escapeHtml(formatCell(value))}</td>`;
+    }).join('')}<\/tr>`).join('');
+  }
+
+  function chartOption(card, range = '5Y') {
+    if (window.ThothCharting?.buildEChartOption) {
+      return window.ThothCharting.buildEChartOption(card, {
+        range,
+        mode: 'compact',
+        showLegend: Boolean(card.show_legend),
+        yLabel: card.y_label || card.title || '',
+        includeZero: Boolean(card.baseline_zero),
+      });
+    }
+    const visibleSeries = seriesForRange(card.series || [], range);
+    return { xAxis: { type: 'category', data: visibleSeries.map((row) => row.date) }, yAxis: { type: 'value' }, series: [{ type: 'line', data: visibleSeries.map((row) => row.value) }] };
+  }
+
+  function rangeControls(selected = '5Y') {
+    return ['6M', 'YTD', '1Y', '2Y', '5Y', '10Y', 'ALL'].map((range) => `<button type="button" class="dataset-range-btn ${range === selected ? 'active' : ''}" data-range="${range}">${range === 'ALL' ? 'All' : range}</button>`).join('');
+  }
+
+  function renderChartStats(wrapper, card, range = '5Y') {
+    const stat = wrapper.querySelector('[data-chart-stat]');
+    const meta = wrapper.querySelector('[data-chart-meta]');
+    if (!stat && !meta) return;
+    const summary = window.ThothCharting?.latestSummary ? window.ThothCharting.latestSummary(card, { range }) : null;
+    const unit = card.unit || summary?.unit || '';
+    if (stat) {
+      const latest = summary?.latest?.value;
+      const date = summary?.latest?.date || '';
+      const delta = Number(summary?.deltaPct);
+      const deltaClass = Number.isFinite(delta) ? (delta >= 0 ? 'up' : 'down') : '';
+      stat.innerHTML = latest === null || latest === undefined
+        ? '<span class="dataset-chart-value">n/a</span>'
+        : `<span class="dataset-chart-value">${escapeHtml(formatNumberShort(latest, unit))}</span><span class="dataset-chart-date">${escapeHtml(String(date || 'latest'))}</span>${Number.isFinite(delta) ? `<span class="dataset-chart-delta ${deltaClass}">${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%</span>` : ''}`;
+    }
+    if (meta) {
+      const pieces = [];
+      if (summary?.range) pieces.push(summary.range);
+      if (summary?.count) pieces.push(`${summary.count} pts`);
+      if (card.y_label) pieces.push(card.y_label);
+      meta.textContent = pieces.join(' · ');
+    }
+  }
+
+  function bindRangeControls(wrapper, chart, card, selected = '5Y') {
+    wrapper.querySelectorAll('.dataset-range-btn').forEach((button) => {
+      button.addEventListener('click', () => {
+        const range = String(button.dataset.range || selected);
+        wrapper.querySelectorAll('.dataset-range-btn').forEach((item) => item.classList.remove('active'));
+        button.classList.add('active');
+        chart.setOption(chartOption(card, range), true);
+        renderChartStats(wrapper, card, range);
+      });
+    });
+  }
+
+  function renderFamilyCharts() {
+    const grid = document.getElementById('dataset-family-chart-grid');
+    if (!grid || !Array.isArray(DASHBOARD.chart_cards) || !DASHBOARD.chart_cards.length) return;
+    if (!window.echarts) {
+      grid.innerHTML = '<div class="viz-empty"><h3>Charts unavailable</h3><p>Dataset controls remain available while the chart renderer is unavailable.</p></div>';
+      return;
+    }
+    DASHBOARD.chart_cards.forEach((card, idx) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'viz-card dataset-chart-card';
+      const seriesCount = Array.isArray(card.series) && card.series.length && Array.isArray(card.series[0]?.data) ? card.series.length : 1;
+      wrapper.innerHTML = `<div class="dataset-chart-top"><div class="dataset-chart-title"><div class="kicker">Family Trend</div><h2>${escapeHtml(card.title || 'Chart')}</h2><p class="viz-subtitle">${escapeHtml(card.subtitle || card.y_label || '')}</p></div><div class="dataset-chart-stat" data-chart-stat></div></div><div class="dataset-chart-meta" data-chart-meta></div><div class="dataset-chart-context">${(card.context || []).map((item) => `<span class="pill mono">${escapeHtml(item.label)} ${escapeHtml(item.value)}</span>`).join('')}</div><div class="chart-range-control">${rangeControls()}</div><div class="dataset-chart-canvas" id="family-chart-${idx}"></div><div class="dataset-chart-footer"><div>${seriesCount} ${seriesCount === 1 ? 'series' : 'grouped series'}</div><button type="button" class="btn primary dataset-family-chart-create" data-chart-index="${idx}">Create Chart</button></div>`;
+      grid.appendChild(wrapper);
+      const chart = echarts.init(document.getElementById(`family-chart-${idx}`));
+      chart.setOption(chartOption(card));
+      bindRangeControls(wrapper, chart, card);
+      renderChartStats(wrapper, card);
+      window.addEventListener('resize', () => chart.resize());
+    });
+    grid.querySelectorAll('.dataset-family-chart-create').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const index = parseInt(String(btn.dataset.chartIndex || '0'), 10);
+        const card = DASHBOARD.chart_cards[index];
+        const resp = await fetch(`/api/datasets/{{ dataset.id }}/charts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: `${DATASET.title} · ${card.title}`,
+            subtitle: card.subtitle || '',
+            x_key: card.x_key,
+            y_key: card.y_key,
+            series_name: card.series_label || card.title,
+            display_type: card.display_type || 'line',
+            chart_style: 'line',
+            color: card.color || '#47a3ff',
+            series_views: Array.isArray(card.series_views) ? card.series_views : []
+          })
+        });
+        const data = await resp.json();
+        if (data.ok && data.redirect) {
+          window.location.href = data.redirect;
+          return;
+        }
+        quickToast(data.error || 'Failed to create chart', 'error');
+      });
+    });
+  }
+
+  function renderCharts() {
+    const grid = document.getElementById('dataset-chart-grid');
+    const empty = document.getElementById('dataset-chart-empty');
+    if (!grid || !empty) return;
+    grid.innerHTML = '';
+    if (!CHARTS.length) {
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+    if (!window.echarts) {
+      empty.style.display = 'block';
+      empty.querySelector('h3').textContent = 'Charts unavailable';
+      empty.querySelector('p').textContent = 'Dataset controls remain available while the chart renderer is unavailable.';
+      return;
+    }
+    CHARTS.forEach((card, idx) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'viz-card dataset-chart-card';
+      wrapper.innerHTML = `<div class="dataset-chart-top"><div class="dataset-chart-title"><div class="kicker">Suggestion</div><h2>${escapeHtml(card.title || 'Chart')}</h2><p class="viz-subtitle">${escapeHtml(card.subtitle || card.y_label || '')}</p></div><div class="dataset-chart-stat" data-chart-stat></div></div><div class="dataset-chart-meta" data-chart-meta></div><div class="chart-range-control">${rangeControls()}</div><div class="dataset-chart-canvas" id="dataset-chart-${idx}"></div><div class="dataset-chart-footer"><div>${(card.series || []).length} preview points</div><button type="button" class="btn primary dataset-chart-create" data-chart-index="${idx}">Create Chart</button></div>`;
+      grid.appendChild(wrapper);
+      const chart = echarts.init(document.getElementById(`dataset-chart-${idx}`));
+      chart.setOption(chartOption(card));
+      bindRangeControls(wrapper, chart, card);
+      renderChartStats(wrapper, card);
+      window.addEventListener('resize', () => chart.resize());
+    });
+    grid.querySelectorAll('.dataset-chart-create').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const index = parseInt(String(btn.dataset.chartIndex || '0'), 10);
+        const card = CHARTS[index];
+        const resp = await fetch(`/api/datasets/{{ dataset.id }}/charts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: `${DATASET.title} · ${card.title}`, subtitle: card.subtitle || '', x_key: card.x_key, y_key: card.y_key, series_name: card.series_label || card.title, display_type: card.display_type || 'line', chart_style: 'line', color: card.color || '#47a3ff' }) });
+        const data = await resp.json();
+        if (data.ok && data.redirect) {
+          window.location.href = data.redirect;
+          return;
+        }
+        quickToast(data.error || 'Failed to create chart', 'error');
+      });
+    });
+  }
+
+  function filteredRows() {
+    const query = String(document.getElementById('dataset-row-filter')?.value || '').trim().toLowerCase();
+    const limit = parseInt(String(document.getElementById('dataset-row-limit')?.value || '100'), 10);
+    let rows = allRows.map((row) => ({ row_key: row.row_key, values: row.values || {} }));
+    if (query) rows = rows.filter((row) => Object.values(row.values || {}).some((value) => String(value ?? '').toLowerCase().includes(query)));
+    return rows.slice(0, Math.max(1, Math.min(limit, 500)));
+  }
+
+  function renderColumnToggles() {
+    const root = document.getElementById('dataset-column-toggles');
+    if (!root) return;
+    root.innerHTML = '';
+    allColumns.forEach((col) => {
+      const label = document.createElement('label');
+      label.style.display = 'flex';
+      label.style.alignItems = 'center';
+      label.style.gap = '8px';
+      label.style.fontSize = '12px';
+      label.style.color = 'var(--muted)';
+      label.innerHTML = `<input type="checkbox" checked value="${escapeHtml(String(col.key || ''))}" /> ${escapeHtml(String(col.label || col.key || ''))}`;
+      label.querySelector('input').addEventListener('change', () => {
+        visibleKeys = Array.from(root.querySelectorAll('input:checked')).map((input) => String(input.value || ''));
+        renderTable();
+      });
+      root.appendChild(label);
+    });
+  }
+
+  function renderTable() {
+    const shownColumns = allColumns.filter((col) => visibleKeys.includes(String(col.key || '')));
+    const rows = filteredRows();
+    renderRowsTable('dataset-table-head', 'dataset-table-body', shownColumns, rows);
+    const summary = document.getElementById('dataset-table-summary');
+    if (summary) summary.textContent = `Showing ${rows.length} of ${allRows.length} loaded rows · ${shownColumns.length} visible columns.`;
+  }
+
+  async function submitJson(url, payload) {
+    const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    return resp.json();
+  }
+
+  function seedViewState(seed) {
+    const active = seed || VIEW_BUILDER.active || {};
+    document.getElementById('view-builder-name').value = String(active.name || '');
+    document.getElementById('view-builder-description').value = String(active.description || '');
+    document.getElementById('view-builder-advanced-filters').value = '';
+    viewState.name = String(active.name || '');
+    viewState.description = String(active.description || '');
+    viewState.filter_rules = Array.isArray((active.filters || {}).rules) ? (active.filters || {}).rules.map((rule) => ({ column: String(rule.column || ''), op: String(rule.op || 'eq'), value: String(rule.value ?? '') })) : [];
+    viewState.columns = Array.isArray(active.columns) && active.columns.length ? active.columns.map((value) => String(value || '')) : allColumns.map((col) => String(col.key || ''));
+    viewState.sort_spec = Array.isArray(active.sort_spec) ? active.sort_spec.map((rule) => ({ column: String(rule.column || ''), direction: String(rule.direction || 'asc') })) : [];
+    renderViewBuilder();
+  }
+
+  function renderViewBuilder() {
+    const filterRoot = document.getElementById('view-builder-filter-rules');
+    const sortRoot = document.getElementById('view-builder-sort-rules');
+    const picker = document.getElementById('view-builder-column-picker');
+    const selected = document.getElementById('view-builder-selected-columns');
+    filterRoot.innerHTML = viewState.filter_rules.length ? '' : '<div style="color:var(--muted);font-size:12px;">No filter rules yet.</div>';
+    sortRoot.innerHTML = viewState.sort_spec.length ? '' : '<div style="color:var(--muted);font-size:12px;">No sort rules yet.</div>';
+    picker.innerHTML = '';
+    selected.innerHTML = '';
+
+    viewState.filter_rules.forEach((rule, index) => {
+      const row = document.createElement('div');
+      row.className = 'grid';
+      row.style.gridTemplateColumns = '1fr .8fr 1fr auto';
+      row.style.gap = '8px';
+      row.innerHTML = `<select data-kind="column" data-index="${index}">${allColumns.map((col) => `<option value="${escapeHtml(String(col.key || ''))}" ${String(col.key || '') === rule.column ? 'selected' : ''}>${escapeHtml(String(col.label || col.key || ''))}</option>`).join('')}</select><select data-kind="op" data-index="${index}">${VIEW_BUILDER.operators.map((item) => `<option value="${escapeHtml(String(item.value || ''))}" ${String(item.value || '') === rule.op ? 'selected' : ''}>${escapeHtml(String(item.label || item.value || ''))}</option>`).join('')}</select><input type="text" data-kind="value" data-index="${index}" value="${escapeHtml(rule.value || '')}" placeholder="Value" /><button type="button" class="btn" data-kind="remove" data-index="${index}">Remove</button>`;
+      row.querySelectorAll('[data-kind]').forEach((control) => {
+        control.addEventListener('input', () => updateViewBuilderControl(control));
+        control.addEventListener('change', () => updateViewBuilderControl(control));
+        if (String(control.dataset.kind || '') === 'remove') control.addEventListener('click', () => { viewState.filter_rules.splice(index, 1); renderViewBuilder(); });
+      });
+      filterRoot.appendChild(row);
+    });
+
+    viewState.sort_spec.forEach((rule, index) => {
+      const row = document.createElement('div');
+      row.className = 'grid';
+      row.style.gridTemplateColumns = '1fr .8fr auto';
+      row.style.gap = '8px';
+      row.innerHTML = `<select data-kind="sort-column" data-index="${index}">${allColumns.map((col) => `<option value="${escapeHtml(String(col.key || ''))}" ${String(col.key || '') === rule.column ? 'selected' : ''}>${escapeHtml(String(col.label || col.key || ''))}</option>`).join('')}</select><select data-kind="sort-direction" data-index="${index}"><option value="asc" ${rule.direction === 'asc' ? 'selected' : ''}>Ascending</option><option value="desc" ${rule.direction === 'desc' ? 'selected' : ''}>Descending</option></select><button type="button" class="btn" data-kind="sort-remove" data-index="${index}">Remove</button>`;
+      row.querySelectorAll('[data-kind]').forEach((control) => {
+        control.addEventListener('input', () => updateViewBuilderControl(control));
+        control.addEventListener('change', () => updateViewBuilderControl(control));
+        if (String(control.dataset.kind || '') === 'sort-remove') control.addEventListener('click', () => { viewState.sort_spec.splice(index, 1); renderViewBuilder(); });
+      });
+      sortRoot.appendChild(row);
+    });
+
+    allColumns.forEach((col) => {
+      const key = String(col.key || '');
+      const label = document.createElement('label');
+      label.style.display = 'flex';
+      label.style.alignItems = 'center';
+      label.style.gap = '8px';
+      label.style.fontSize = '12px';
+      label.innerHTML = `<input type="checkbox" value="${escapeHtml(key)}" ${viewState.columns.includes(key) ? 'checked' : ''} /> ${escapeHtml(String(col.label || key))}`;
+      label.querySelector('input').addEventListener('change', (event) => {
+        if (event.currentTarget.checked) {
+          if (!viewState.columns.includes(key)) viewState.columns.push(key);
+        } else {
+          viewState.columns = viewState.columns.filter((value) => value !== key);
+        }
+        renderViewBuilder();
+      });
+      picker.appendChild(label);
+    });
+
+    if (!viewState.columns.length) {
+      selected.innerHTML = '<div style="color:var(--muted);font-size:12px;">Select at least one column.</div>';
+    } else {
+      viewState.columns.forEach((key, index) => {
+        const column = allColumns.find((item) => String(item.key || '') === key) || { key, label: key };
+        const row = document.createElement('div');
+        row.className = 'link-row';
+        row.innerHTML = `<div>${escapeHtml(String(column.label || column.key || ''))}</div><div class="btnrow"><button type="button" class="btn" data-action="up" data-index="${index}" style="padding:6px 10px;">↑</button><button type="button" class="btn" data-action="down" data-index="${index}" style="padding:6px 10px;">↓</button><button type="button" class="btn" data-action="remove" data-index="${index}" style="padding:6px 10px;">✕</button></div>`;
+        row.querySelectorAll('button[data-action]').forEach((button) => {
+          button.addEventListener('click', () => {
+            const targetIndex = parseInt(String(button.dataset.index || '0'), 10);
+            const action = String(button.dataset.action || '');
+            if (action === 'remove') viewState.columns.splice(targetIndex, 1);
+            if (action === 'up' && targetIndex > 0) [viewState.columns[targetIndex - 1], viewState.columns[targetIndex]] = [viewState.columns[targetIndex], viewState.columns[targetIndex - 1]];
+            if (action === 'down' && targetIndex < viewState.columns.length - 1) [viewState.columns[targetIndex + 1], viewState.columns[targetIndex]] = [viewState.columns[targetIndex], viewState.columns[targetIndex + 1]];
+            renderViewBuilder();
+          });
+        });
+        selected.appendChild(row);
+      });
+    }
+  }
+
+  function updateViewBuilderControl(control) {
+    const index = parseInt(String(control.dataset.index || '0'), 10);
+    const kind = String(control.dataset.kind || '');
+    if (kind === 'column' || kind === 'op' || kind === 'value') {
+      if (!viewState.filter_rules[index]) return;
+      if (kind === 'column') viewState.filter_rules[index].column = String(control.value || '');
+      if (kind === 'op') viewState.filter_rules[index].op = String(control.value || 'eq');
+      if (kind === 'value') viewState.filter_rules[index].value = String(control.value || '');
+    }
+    if (kind === 'sort-column' || kind === 'sort-direction') {
+      if (!viewState.sort_spec[index]) return;
+      if (kind === 'sort-column') viewState.sort_spec[index].column = String(control.value || '');
+      if (kind === 'sort-direction') viewState.sort_spec[index].direction = String(control.value || 'asc');
+    }
+  }
+
+  function collectViewPayload() {
+    return {
+      name: String(document.getElementById('view-builder-name')?.value || '').trim(),
+      description: String(document.getElementById('view-builder-description')?.value || '').trim(),
+      filter_rules: viewState.filter_rules.filter((rule) => rule.column && String(rule.value || '').trim() !== ''),
+      columns: viewState.columns,
+      sort_spec: viewState.sort_spec.filter((rule) => rule.column),
+      advanced_filters: String(document.getElementById('view-builder-advanced-filters')?.value || '').trim(),
+    };
+  }
+
+  async function previewViewBuilder() {
+    const payload = collectViewPayload();
+    if (!payload.name) payload.name = 'Preview';
+    const data = await submitJson(`/api/datasets/{{ dataset.id }}/views/preview`, payload);
+    if (!data.ok) {
+      quickToast(data.error || 'Failed to preview view', 'error');
+      return;
+    }
+    document.getElementById('view-builder-preview-panel').style.display = 'flex';
+    const preview = data.preview || {};
+    const selectedColumns = (payload.columns || []).map((key) => allColumns.find((col) => String(col.key || '') === key) || { key, label: key });
+    renderRowsTable('view-preview-head', 'view-preview-body', selectedColumns, preview.rows || []);
+    document.getElementById('view-preview-summary').textContent = `Showing ${preview.preview_count || 0} preview rows of ${preview.total || 0}.`;
+  }
+
+  function renderDraftSummary() {
+    document.getElementById('draft-row-summary').textContent = `Showing ${draftState.rows.length} loaded draft rows · ${draftState.rows.filter((row) => row._dirty).length} dirty.`;
+  }
+
+  function draftRowErrors(row, key) {
+    return (row.validation_errors || []).filter((item) => !key || String(item.column || '') === key);
+  }
+
+  function renderDraftTable() {
+    const head = document.getElementById('draft-table-head');
+    const body = document.getElementById('draft-table-body');
+    const search = String(document.getElementById('draft-row-search')?.value || '').trim().toLowerCase();
+    const rows = draftState.rows.filter((row) => !search || String(row.row_key || '').toLowerCase().includes(search) || Object.values(row.values || {}).some((value) => String(value ?? '').toLowerCase().includes(search)));
+    head.innerHTML = `<tr>${draftState.columns.map((col) => `<th>${escapeHtml(String(col.label || col.key || ''))}</th>`).join('')}<th style="width:150px;">Actions</th></tr>`;
+    if (!draftState.columns.length) {
+      body.innerHTML = '<tr><td colspan="2" style="color:var(--muted);">Draft editing requires dataset columns. Import a sheet or define columns first.</td></tr>';
+      renderDraftSummary();
+      return;
+    }
+    body.innerHTML = rows.length ? rows.map((row) => {
+      const errorHtml = (row.validation_errors || []).length ? `<tr><td colspan="${draftState.columns.length + 1}" style="color:#f4b16a;font-size:12px;">${row.validation_errors.map((item) => escapeHtml(item.message || 'Validation error')).join(' · ')}</td></tr>` : '';
+      return `<tr${row._dirty ? ' style="background:rgba(71,163,255,.06);"' : ''}>${draftState.columns.map((col) => {
+        const key = String(col.key || '');
+        return `<td><input type="text" data-row-key="${escapeHtml(String(row.row_key || ''))}" data-column-key="${escapeHtml(key)}" value="${escapeHtml(String((row.values || {})[key] ?? ''))}" style="width:100%;border:${draftRowErrors(row, key).length ? '1px solid #f4b16a' : '1px solid rgba(255,255,255,.08)'};border-radius:10px;padding:8px 10px;background:rgba(255,255,255,.03);color:var(--text);" /></td>`;
+      }).join('')}<td><div class="btnrow" style="justify-content:flex-end;">${row._dirty ? '<span class="pill mono">dirty</span>' : ''}<button type="button" class="btn draft-row-delete" data-row-key="${escapeHtml(String(row.row_key || ''))}" style="padding:6px 10px;">Delete</button></div></td></tr>${errorHtml}`;
+    }).join('') : `<tr><td colspan="${draftState.columns.length + 1}" style="color:var(--muted);">No draft rows match this filter.</td></tr>`;
+    body.querySelectorAll('input[data-row-key]').forEach((input) => {
+      input.addEventListener('input', () => {
+        const row = draftState.rows.find((item) => String(item.row_key || '') === String(input.dataset.rowKey || ''));
+        if (!row) return;
+        row.values[String(input.dataset.columnKey || '')] = input.value;
+        row._dirty = true;
+        renderDraftSummary();
+      });
+    });
+    body.querySelectorAll('.draft-row-delete').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const rowKey = String(button.dataset.rowKey || '');
+        const row = draftState.rows.find((item) => String(item.row_key || '') === rowKey);
+        if (row && rowKey.startsWith('client-')) {
+          draftState.rows = draftState.rows.filter((item) => String(item.row_key || '') !== rowKey);
+          renderDraftTable();
+          return;
+        }
+        const resp = await fetch(`/api/datasets/{{ dataset.id }}/draft-rows/${encodeURIComponent(rowKey)}`, { method: 'DELETE' });
+        const data = await resp.json();
+        if (data.ok) {
+          await loadDraftRows();
+          return;
+        }
+        quickToast(data.error || 'Failed to delete draft row', 'error');
+      });
+    });
+    renderDraftSummary();
+  }
+
+  async function loadDraftRows() {
+    const query = String(document.getElementById('draft-row-search')?.value || '').trim();
+    const params = new URLSearchParams({ limit: '50' });
+    if (query) params.set('q', query);
+    const resp = await fetch(`/api/datasets/{{ dataset.id }}/draft-rows?${params.toString()}`);
+    const data = await resp.json();
+    if (!data.ok) {
+      quickToast(data.error || 'Failed to load draft rows', 'error');
+      return;
+    }
+    draftState.columns = Array.isArray(data.draft?.columns) ? data.draft.columns : [];
+    draftState.rows = Array.isArray(data.draft?.rows) ? data.draft.rows.map((row) => ({ ...row, values: { ...(row.values || {}) }, _dirty: false })) : [];
+    renderDraftTable();
+  }
+
+  async function saveDirtyRows() {
+    const dirtyRows = draftState.rows.filter((row) => row._dirty);
+    if (!dirtyRows.length) {
+      quickToast('No dirty rows to save', 'info');
+      return;
+    }
+    for (const row of dirtyRows) {
+      const data = await submitJson(`/api/datasets/{{ dataset.id }}/draft-rows`, { row_key: String(row.row_key || '').startsWith('client-') ? '' : row.row_key, sort_order: row.sort_order, values: row.values });
+      if (data.ok && data.row) {
+        row.row_key = data.row.row_key;
+        row.values = { ...(data.row.values || {}) };
+        row.sort_order = data.row.sort_order;
+        row.validation_errors = data.row.validation_errors || [];
+        row._dirty = false;
+      } else {
+        row.validation_errors = Array.isArray(data.errors) ? data.errors : [{ message: data.error || 'Failed to save row' }];
+      }
+    }
+    document.getElementById('draft-row-status').textContent = 'Draft save cycle complete.';
+    renderDraftTable();
+  }
+
+  function addDraftRow() {
+    const values = {};
+    draftState.columns.forEach((col) => { values[String(col.key || '')] = ''; });
+    draftState.rows.unshift({ row_key: `client-${Date.now()}`, values, sort_order: 0, validation_errors: [], _dirty: true });
+    renderDraftTable();
+  }
+
+  async function bulkPasteDraftRows() {
+    const text = String(document.getElementById('draft-bulk-paste')?.value || '').trim();
+    if (!text) {
+      quickToast('Paste some rows first', 'error');
+      return;
+    }
+    const data = await submitJson(`/api/datasets/{{ dataset.id }}/draft-rows/bulk-paste`, { text });
+    if (data.ok) {
+      document.getElementById('draft-bulk-paste').value = '';
+      await loadDraftRows();
+      return;
+    }
+    quickToast(data.error || 'Bulk paste failed', 'error');
+  }
+
+  document.getElementById('dataset-row-filter')?.addEventListener('input', renderTable);
+  document.getElementById('dataset-row-limit')?.addEventListener('change', renderTable);
+  document.getElementById('dataset-metadata-form')?.addEventListener('submit', async (event) => { event.preventDefault(); const data = await submitJson(`/api/datasets/{{ dataset.id }}/metadata`, Object.fromEntries(new FormData(event.currentTarget).entries())); if (data.ok) { window.location.reload(); return; } quickToast(data.error || 'Failed to save metadata', 'error'); });
+  document.getElementById('dataset-publish-form')?.addEventListener('submit', async (event) => { event.preventDefault(); const data = await submitJson(`/api/datasets/{{ dataset.id }}/publish`, Object.fromEntries(new FormData(event.currentTarget).entries())); if (data.ok) { window.location.reload(); return; } quickToast(data.error || 'Failed to publish dataset', 'error'); });
+  document.getElementById('dataset-import-form')?.addEventListener('submit', async (event) => { event.preventDefault(); const formData = new FormData(event.currentTarget); const resp = await fetch(`/api/datasets/{{ dataset.id }}/import`, { method: 'POST', body: formData }); const data = await resp.json(); if (data.ok && data.redirect) { window.location.href = data.redirect; return; } quickToast(data.error || 'Import failed', 'error'); });
+
+  document.querySelectorAll('.dataset-unlink-btn').forEach((btn) => btn.addEventListener('click', async () => { const resp = await fetch(`/api/datasets/{{ dataset.id }}/links/${btn.dataset.linkId}`, { method: 'DELETE' }); const data = await resp.json(); if (data.ok) { window.location.reload(); return; } quickToast(data.error || 'Failed to unlink object', 'error'); }));
+  document.querySelectorAll('.dataset-link-form').forEach((form) => {
+    const kind = String(form.dataset.searchKind || '');
+    const objectType = String(form.dataset.objectType || '');
+    const input = form.querySelector('.dataset-link-query');
+    const hidden = form.querySelector('input[name="object_id"]');
+    const results = form.querySelector('.dataset-link-results');
+    let timer = null;
+    let searchAbort = null;
+    input?.addEventListener('input', () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(async () => {
+        const q = String(input.value || '').trim();
+        hidden.value = '';
+        if (!q) {
+          if (searchAbort) {
+            searchAbort.abort();
+            searchAbort = null;
+          }
+          results.style.display = 'none';
+          results.innerHTML = '';
+          return;
+        }
+        if (searchAbort) searchAbort.abort();
+        const controller = new AbortController();
+        searchAbort = controller;
+        try {
+          const resp = await fetch(`/api/search?kind=${encodeURIComponent(kind)}&q=${encodeURIComponent(q)}&limit=6`, { signal: controller.signal });
+          const data = await resp.json();
+          const items = Array.isArray(data.items) ? data.items : [];
+          results.innerHTML = items.map((item) => `<button type="button" class="btn" data-id="${item.id}" style="width:100%;justify-content:flex-start;">${escapeHtml(item.label)}</button>`).join('');
+          results.style.display = items.length ? 'grid' : 'none';
+          results.querySelectorAll('button[data-id]').forEach((button) => button.addEventListener('click', () => { hidden.value = String(button.dataset.id || ''); input.value = button.textContent || ''; results.style.display = 'none'; }));
+        } catch (error) {
+          if (!error || error.name !== 'AbortError') {
+            results.style.display = 'none';
+            results.innerHTML = '';
+          }
+        } finally {
+          if (searchAbort === controller) searchAbort = null;
+        }
+      }, 180);
+    });
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!hidden.value) {
+        quickToast('Pick a search result first', 'error');
+        return;
+      }
+      const data = await submitJson(`/api/datasets/{{ dataset.id }}/links`, { object_type: objectType, object_id: hidden.value, relation: 'context' });
+      if (data.ok) {
+        window.location.reload();
+        return;
+      }
+      quickToast(data.error || 'Failed to link object', 'error');
+    });
+  });
+
+  document.getElementById('view-builder-add-filter')?.addEventListener('click', () => { viewState.filter_rules.push({ column: String(allColumns[0]?.key || ''), op: 'eq', value: '' }); renderViewBuilder(); });
+  document.getElementById('view-builder-add-sort')?.addEventListener('click', () => { viewState.sort_spec.push({ column: String(allColumns[0]?.key || ''), direction: 'asc' }); renderViewBuilder(); });
+  document.getElementById('view-builder-preview')?.addEventListener('click', previewViewBuilder);
+  document.getElementById('view-builder-save')?.addEventListener('click', async () => { const payload = collectViewPayload(); if (!payload.name) { quickToast('View name is required', 'error'); return; } const data = await submitJson(`/api/datasets/{{ dataset.id }}/views`, payload); if (data.ok) { window.location.reload(); return; } quickToast(data.error || 'Failed to save view', 'error'); });
+  document.getElementById('view-builder-duplicate-current')?.addEventListener('click', () => seedViewState({ ...(VIEW_BUILDER.active || {}), name: (VIEW_BUILDER.active?.name || 'Duplicated View') + ' Copy' }));
+  document.querySelectorAll('.dataset-view-recommended-btn').forEach((button) => button.addEventListener('click', () => { let columns = []; let filters = {}; let sortSpec = []; try { columns = JSON.parse(String(button.dataset.columns || '[]')); } catch (_err) {} try { filters = JSON.parse(String(button.dataset.filters || '{}')); } catch (_err) {} try { sortSpec = JSON.parse(String(button.dataset.sort || '[]')); } catch (_err) {} seedViewState({ name: String(button.dataset.name || 'Recommended View'), description: 'Family-aware recommended dataset view.', filters, columns, sort_spec: sortSpec }); }));
+  document.querySelectorAll('.dataset-view-duplicate-btn').forEach((button) => button.addEventListener('click', async () => { const data = await submitJson(`/api/datasets/{{ dataset.id }}/views/${button.dataset.viewId}/duplicate`, { name: `${button.dataset.viewName || 'View'} Copy` }); if (data.ok && data.redirect) { window.location.href = data.redirect; return; } quickToast(data.error || 'Failed to duplicate view', 'error'); }));
+
+  document.getElementById('draft-row-search')?.addEventListener('input', renderDraftTable);
+  document.getElementById('draft-row-reload')?.addEventListener('click', loadDraftRows);
+  document.getElementById('draft-row-add')?.addEventListener('click', addDraftRow);
+  document.getElementById('draft-row-save')?.addEventListener('click', saveDirtyRows);
+  document.getElementById('draft-bulk-paste-btn')?.addEventListener('click', bulkPasteDraftRows);
+
+  renderColumnToggles();
+  renderTable();
+  renderFamilyCharts();
+  renderCharts();
+  seedViewState();
+  renderDraftTable();
+})();
+</script>
+{% endblock %}

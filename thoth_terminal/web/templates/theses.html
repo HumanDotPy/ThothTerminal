@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block content %}
+{% set thesis_ns = namespace(high_need=0, stale=0) %}
+{% for it in items %}
+  {% if it.evidence_need and it.evidence_need.label == 'high' %}
+    {% set thesis_ns.high_need = thesis_ns.high_need + 1 %}
+  {% endif %}
+  {% if it.is_stale %}
+    {% set thesis_ns.stale = thesis_ns.stale + 1 %}
+  {% endif %}
+{% endfor %}
+<section class="workspace-header">
+  <div class="workspace-copy">
+    <div class="workspace-kicker">Claims / Review Queue</div>
+    <h1>Claims registry</h1>
+    <p>Theses are the durable claims you want to revisit with evidence, freshness checks, and explicit review pressure. This page should feel like an active registry, not a static archive.</p>
+  </div>
+  <div class="workspace-summary">
+    <div class="workspace-stat">
+      <span class="workspace-stat-label">Visible theses</span>
+      <span class="workspace-stat-value">{{ items|length }}</span>
+      <span class="workspace-stat-copy">Current result set after status and review filters.</span>
+    </div>
+    <div class="workspace-stat">
+      <span class="workspace-stat-label">Review queue</span>
+      <span class="workspace-stat-value">{{ thesis_ns.high_need }}</span>
+      <span class="workspace-stat-copy">High-need claims asking for more supporting work.</span>
+    </div>
+    <div class="workspace-stat">
+      <span class="workspace-stat-label">Stale</span>
+      <span class="workspace-stat-value">{{ thesis_ns.stale }}</span>
+      <span class="workspace-stat-copy">Claims whose evidence cadence has slipped.</span>
+    </div>
+    <div class="workspace-stat">
+      <span class="workspace-stat-label">New thesis</span>
+      <span class="workspace-stat-value">/theses/new</span>
+      <span class="workspace-stat-copy">Create one directly or seed it from a document.</span>
+    </div>
+  </div>
+</section>
+
+<div class="feed-layout" id="theses-layout">
+  <div class="panel sidebar">
+    <div class="hd">
+      <div class="hd-left">
+        <h2>Registry filters</h2>
+        <span class="pill">{{ items|length }} shown</span>
+      </div>
+      <a class="btn primary" href="/theses/new">New</a>
+    </div>
+    <div class="bd">
+      <div class="search-wrap">
+        <span class="search-icon">QRY</span>
+        <form method="get" action="/theses" id="thesis-search-form" style="width:100%;">
+          <input type="text" name="q" class="search-input" value="{{ filters.q }}" placeholder="Search theses" />
+          {% if filters.status %}<input type="hidden" name="status" value="{{ filters.status }}" />{% endif %}
+          {% if filters.stale %}<input type="hidden" name="stale" value="{{ filters.stale }}" />{% endif %}
+          {% if filters.review %}<input type="hidden" name="review" value="{{ filters.review }}" />{% endif %}
+          {% if filters.include_hidden %}<input type="hidden" name="include_hidden" value="1" />{% endif %}
+        </form>
+        <span class="search-kbd">⌘K</span>
+      </div>
+
+      <div class="filter-section">
+        <span class="filter-label">Status</span>
+        <div class="filter-chips">
+          <a href="/theses?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.stale %}stale={{ filters.stale }}&{% endif %}{% if filters.review %}review={{ filters.review }}&{% endif %}" class="filter-chip {% if not filters.status and not filters.include_hidden %}active{% endif %}">Visible</a>
+          <a href="/theses?include_hidden=1{% if filters.q %}&q={{ filters.q }}{% endif %}{% if filters.stale %}&stale={{ filters.stale }}{% endif %}{% if filters.review %}&review={{ filters.review }}{% endif %}" class="filter-chip {% if filters.include_hidden and not filters.status %}active{% endif %}">All statuses</a>
+          {% for s in statuses %}
+            <a href="/theses?status={{ s }}{% if filters.q %}&q={{ filters.q }}{% endif %}{% if filters.stale %}&stale={{ filters.stale }}{% endif %}{% if filters.review %}&review={{ filters.review }}{% endif %}" class="filter-chip {% if filters.status == s %}active{% endif %}">{{ s }}</a>
+          {% endfor %}
+          {% for s in archive_statuses %}
+            <a href="/theses?status={{ s }}{% if filters.q %}&q={{ filters.q }}{% endif %}{% if filters.stale %}&stale={{ filters.stale }}{% endif %}{% if filters.review %}&review={{ filters.review }}{% endif %}" class="filter-chip {% if filters.status == s %}active{% endif %}">{{ s }}</a>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="filter-section">
+        <span class="filter-label">Review pressure</span>
+        <div class="filter-chips">
+          <a href="/theses?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.status %}status={{ filters.status }}&{% endif %}{% if filters.include_hidden and not filters.status %}include_hidden=1&{% endif %}" class="filter-chip {% if not filters.stale and not filters.review %}active{% endif %}">All</a>
+          <a href="/theses?stale=1{% if filters.q %}&q={{ filters.q }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.include_hidden and not filters.status %}&include_hidden=1{% endif %}" class="filter-chip {% if filters.stale and not filters.review %}active{% endif %}">Stale only</a>
+          <a href="/theses?review=1{% if filters.q %}&q={{ filters.q }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.include_hidden and not filters.status %}&include_hidden=1{% endif %}" class="filter-chip {% if filters.review %}active{% endif %}">Review queue</a>
+        </div>
+      </div>
+
+      <div class="workspace-list-copy">Attach evidence from the feed as soon as a document materially supports, contradicts, or reframes a thesis. Claims should age visibly when that stops happening.</div>
+
+      <hr style="border:0;border-top:1px solid var(--border);margin:16px 0;" />
+
+      <div class="field" data-saved-views="theses">
+        <label>Saved views</label>
+        <div class="btnrow" style="gap:8px;flex-wrap:wrap;">
+          <input type="text" class="search-input" data-saved-views-name="1" placeholder="Name this view" />
+          <button class="btn" type="button" data-saved-views-save>Save view</button>
+        </div>
+        <div class="chiprow" style="margin-top:8px;" data-saved-views-list></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="hd">
+      <div class="hd-left">
+        <h2>Registry</h2>
+        <span class="pill red">research memory</span>
+      </div>
+    </div>
+
+    {% set has_filters = (filters.q or filters.status or filters.stale or filters.review or filters.include_hidden) %}
+    {% if has_filters %}
+      <div class="chiprow" style="padding:0 18px 12px;gap:8px;flex-wrap:wrap;">
+        <span class="pill">Active filters</span>
+        {% if filters.q %}<span class="pill">query: {{ filters.q[:24] }}{% if filters.q|length > 24 %}…{% endif %}</span>{% endif %}
+        {% if filters.status %}<span class="pill">status: {{ filters.status }}</span>{% endif %}
+        {% if filters.include_hidden and not filters.status %}<span class="pill">all statuses</span>{% endif %}
+        {% if filters.stale %}<span class="pill">stale only</span>{% endif %}
+        {% if filters.review %}<span class="pill">review queue</span>{% endif %}
+        <a class="pill" href="/theses">Clear all</a>
+      </div>
+    {% endif %}
+
+    <div class="docs" data-query="{{ filters.q }}">
+      {% for it in items %}
+        {% set th = it.thesis %}
+        <div class="thesis-card {% if it.is_stale %}stale{% endif %}">
+          <div class="thesis-card-top">
+            <div class="thesis-meta">
+              <span class="pill">T{{ th.id }}</span>
+              <span class="pill">{{ th.status }}</span>
+              <span class="pill">importance {{ th.importance }}</span>
+              <span class="pill">need {{ it.evidence_need.score }}</span>
+              {% if th.stale_after_days %}
+                <span class="pill">stale {{ th.stale_after_days }}d</span>
+              {% else %}
+                <span class="pill">no stale timer</span>
+              {% endif %}
+              {% if it.is_stale %}
+                <span class="pill red">stale</span>
+              {% endif %}
+            </div>
+            <div class="thesis-counts">
+              <span class="pill">{{ it.evidence_count }} evidence</span>
+            </div>
+          </div>
+
+          <h3 class="thesis-title"><a href="/theses/{{ th.id }}">{{ th.title }}</a></h3>
+          <div class="thesis-statement">{{ th.statement[:220] }}{% if th.statement|length > 220 %}…{% endif %}</div>
+
+          <div class="thesis-foot">
+            <div class="thesis-foot-left">
+              {% if it.last_evidence_at %}
+                <span class="pill">last evidence</span>
+                <span data-utc="{{ it.last_evidence_at.strftime('%Y-%m-%dT%H:%M:%S') }}">{{ it.last_evidence_at.strftime("%Y-%m-%d %H:%M") }}</span>
+              {% else %}
+                <span class="pill">no evidence yet</span>
+              {% endif %}
+              {% if it.is_stale and it.overdue_days is not none %}
+                <span class="pill red">{% if it.overdue_days > 0 %}overdue {{ it.overdue_days }}d{% else %}due{% endif %}</span>
+              {% elif it.days_until_stale is not none and it.days_until_stale > 0 %}
+                <span class="pill">due in {{ it.days_until_stale }}d</span>
+              {% endif %}
+              {% if it.evidence_need.label == 'high' %}
+                <span class="pill red">high need</span>
+              {% elif it.evidence_need.label == 'medium' %}
+                <span class="pill">medium need</span>
+              {% endif %}
+            </div>
+            <div class="thesis-foot-right">
+              {% if it.entity_chips %}
+                {% for e in it.entity_chips[:6] %}
+                  {% if e.href %}
+                    <a class="pill" href="{{ e.href }}">{{ e.name }} · {{ e.kind }}</a>
+                  {% else %}
+                    <span class="pill">{{ e.name }} · {{ e.kind }}</span>
+                  {% endif %}
+                {% endfor %}
+                {% if it.entity_chips|length > 6 %}<span class="pill">+{{ it.entity_chips|length - 6 }}</span>{% endif %}
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+
+      {% if items|length == 0 %}
+        <div class="empty-callout">
+          <h3>No theses match this slice.</h3>
+          <p>Open the registry back up by clearing the filters, or seed a new thesis from a document when you find a repeatable claim worth tracking.</p>
+          <div class="btnrow" style="justify-content:center;margin-top:16px;">
+            <a class="btn primary" href="/theses/new">Create thesis</a>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="/static/list_view_helpers.js?v={{ settings.static_assets_version }}"></script>
+{% endblock %}

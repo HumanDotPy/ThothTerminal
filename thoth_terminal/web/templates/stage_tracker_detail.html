@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="viz-page">
+  <div class="viz-header">
+    <div class="viz-title-row">
+      <div>
+        <div class="kicker">Stage Dossier</div>
+        <h1>{{ item.company_name }} · {{ item.product_name }}</h1>
+        <p style="color:var(--muted);margin:8px 0 0;max-width:820px;">{{ item.current_candidate.summary if item.current_candidate and item.current_candidate.summary else item.notes or 'No narrative summary yet.' }}</p>
+      </div>
+      <div class="btnrow">
+        <a href="/stage-tracker" class="btn">← Stage Tracker</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid" style="grid-template-columns:1.08fr .92fr;gap:20px;align-items:start;">
+    <div style="display:flex;flex-direction:column;gap:18px;">
+      <div class="panel">
+        <div class="hd"><h2>Current State</h2></div>
+        <div class="bd" style="display:flex;flex-direction:column;gap:14px;">
+          <div class="viz-equities" style="gap:8px;flex-wrap:wrap;">
+            <span class="pill mono">{{ item.status }}</span>
+            <span class="pill mono">{{ item.conflict_state }}</span>
+            <span class="pill mono">{{ item.claim_count }} claims</span>
+            {% if item.highest_evidence_tier %}<span class="pill mono">{{ item.highest_evidence_tier }}</span>{% endif %}
+          </div>
+
+          <div class="grid-2col" style="gap:14px;">
+            <div style="padding:14px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.025);">
+              <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px;">Reviewed Current State</div>
+              {% if item.current_reviewed %}
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <span class="pill mono">{{ item.current_reviewed.stage }}</span>
+                <span class="pill mono">{{ item.current_reviewed.certainty or item.certainty }}</span>
+                {% if item.current_reviewed.evidence_tier %}<span class="pill mono">{{ item.current_reviewed.evidence_tier }}</span>{% endif %}
+              </div>
+              <div style="margin-top:10px;font-size:13px;color:var(--text);">
+                {{ item.current_reviewed.target_date or item.current_reviewed.date_text or 'No reviewed date yet.' }}
+              </div>
+              {% if item.current_reviewed.provenance_summary %}
+              <div style="margin-top:10px;font-size:13px;line-height:1.55;color:var(--muted);">{{ item.current_reviewed.provenance_summary }}</div>
+              {% endif %}
+              {% if item.current_reviewed.summary %}
+              <div style="margin-top:10px;font-size:13px;line-height:1.55;">{{ item.current_reviewed.summary }}</div>
+              {% endif %}
+              {% else %}
+              <div style="color:var(--muted);font-size:12px;">No accepted claim yet.</div>
+              {% endif %}
+            </div>
+
+            <div style="padding:14px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.025);">
+              <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px;">Best Candidate</div>
+              {% if item.current_candidate %}
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <span class="pill mono">{{ item.current_candidate.stage }}</span>
+                <span class="pill mono">{{ item.current_candidate.review_status }}</span>
+                {% if item.current_candidate.evidence_tier %}<span class="pill mono">{{ item.current_candidate.evidence_tier }}</span>{% endif %}
+              </div>
+              <div style="margin-top:10px;font-size:13px;color:var(--text);">
+                {{ item.current_candidate.target_date or item.current_candidate.date_text or 'No candidate date yet.' }}
+              </div>
+              {% if item.current_candidate.provenance_summary %}
+              <div style="margin-top:10px;font-size:13px;line-height:1.55;color:var(--muted);">{{ item.current_candidate.provenance_summary }}</div>
+              {% endif %}
+              {% if item.current_candidate.summary %}
+              <div style="margin-top:10px;font-size:13px;line-height:1.55;">{{ item.current_candidate.summary }}</div>
+              {% endif %}
+              {% else %}
+              <div style="color:var(--muted);font-size:12px;">No active candidate.</div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="grid-2col" style="gap:14px;">
+            <div style="padding:14px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.02);">
+              <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px;">Corroboration</div>
+              <div style="font-size:13px;line-height:1.6;color:var(--muted);">
+                {{ item.claim_summary.accepted }} accepted · {{ item.claim_summary.draft }} draft · {{ item.claim_summary.rejected }} rejected · {{ item.claim_summary.superseded }} superseded
+              </div>
+            </div>
+            <div style="padding:14px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.02);">
+              <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px;">Tracker Identity</div>
+              <div style="font-size:13px;color:var(--muted);line-height:1.6;">
+                {{ item.tracker_key }}<br />
+                last claim {{ item.last_claim_at or item.updated_at or 'unknown' }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hd"><h2>Claim Timeline</h2></div>
+        <div class="bd" style="display:flex;flex-direction:column;gap:12px;">
+          {% for claim in claim_rows %}
+          {% set doc = source_documents.get(claim.source_document_id) if claim.source_document_id else None %}
+          <div style="padding:14px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.02);display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
+              <div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                  <span class="pill mono">{{ claim.stage }}</span>
+                  <span class="pill mono">{{ claim.review_status }}</span>
+                  {% if claim.evidence_tier %}<span class="pill mono">{{ claim.evidence_tier }}</span>{% endif %}
+                  {% if claim.certainty %}<span class="pill mono">{{ claim.certainty }}</span>{% endif %}
+                </div>
+                <div style="margin-top:8px;font-size:13px;color:var(--text);">
+                  {{ claim.target_date or claim.date_text or 'No date text' }}
+                </div>
+              </div>
+              <div style="color:var(--muted);font-size:11px;text-align:right;">
+                created {{ claim.created_at or 'unknown' }}<br />
+                {% if claim.reviewed_at %}reviewed {{ claim.reviewed_at }}{% endif %}
+              </div>
+            </div>
+
+            {% if claim.provenance_summary %}
+            <div style="font-size:13px;color:var(--muted);line-height:1.55;">{{ claim.provenance_summary }}</div>
+            {% endif %}
+            {% if claim.summary %}
+            <div style="font-size:13px;line-height:1.6;">{{ claim.summary }}</div>
+            {% endif %}
+            {% if claim.rationale %}
+            <div style="font-size:12px;line-height:1.55;color:var(--muted);">{{ claim.rationale }}</div>
+            {% endif %}
+
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+              <div style="color:var(--muted);font-size:12px;">
+                {% if doc %}
+                <a href="/docs/{{ doc.id }}">doc {{ doc.id }}</a>
+                {% if doc.source %} · {{ doc.source.name }}{% endif %}
+                {% elif claim.source_document_id %}
+                source doc {{ claim.source_document_id }}
+                {% else %}
+                no linked source doc
+                {% endif %}
+              </div>
+              <form class="stage-claim-review-form" data-claim-id="{{ claim.id }}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <input type="hidden" name="reviewer_note" value="" />
+                <button class="btn" type="submit" data-decision="accept">Accept</button>
+                <button class="btn" type="submit" data-decision="reject">Reject</button>
+                <button class="btn" type="submit" data-decision="supersede">Supersede</button>
+              </form>
+            </div>
+          </div>
+          {% else %}
+          <div style="color:var(--muted);font-size:12px;">No claims yet.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hd"><h2>Audit History</h2></div>
+        <div class="bd" style="display:flex;flex-direction:column;gap:10px;">
+          {% for row in history_rows %}
+          <div style="padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.02);">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
+              <div>
+                <div style="font-weight:600;">{{ row.action }}</div>
+                {% if row.note %}<div style="color:var(--text);font-size:13px;margin-top:4px;">{{ row.note }}</div>{% endif %}
+              </div>
+              <div style="color:var(--muted);font-size:11px;">{{ row.created_at }}</div>
+            </div>
+          </div>
+          {% else %}
+          <div style="color:var(--muted);font-size:12px;">No history rows yet.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;">
+      <div class="panel">
+        <div class="hd"><h2>Add Claim</h2></div>
+        <div class="bd">
+          <form id="stage-claim-create-form" style="display:flex;flex-direction:column;gap:12px;">
+            <div class="grid-2col" style="gap:12px;">
+              <div class="field">
+                <label>Stage</label>
+                <select name="stage">
+                  {% for value in ['r_and_d','sampling','qualification','pre_production','mass_production'] %}
+                  <option value="{{ value }}" {% if item.current_candidate and item.current_candidate.stage == value %}selected{% endif %}>{{ value }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="field">
+                <label>Review status</label>
+                <select name="review_status">
+                  <option value="draft" selected>draft</option>
+                  <option value="accepted">accepted</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid-2col" style="gap:12px;">
+              <div class="field">
+                <label>Target Date</label>
+                <input type="date" name="target_date" />
+              </div>
+              <div class="field">
+                <label>Date Precision</label>
+                <select name="date_precision">
+                  {% for value in ['day','month','quarter','year','text'] %}
+                  <option value="{{ value }}" {% if value == 'text' %}selected{% endif %}>{{ value }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label>Date Text</label>
+              <input type="text" name="date_text" placeholder="2028 at the earliest" />
+            </div>
+            <div class="grid-2col" style="gap:12px;">
+              <div class="field">
+                <label>Certainty</label>
+                <input type="text" name="certainty" value="attributed" />
+              </div>
+              <div class="field">
+                <label>Evidence Tier</label>
+                <input type="text" name="evidence_tier" placeholder="trusted_analyst / sell_side" />
+              </div>
+            </div>
+            <div class="field">
+              <label>Provenance Summary</label>
+              <textarea name="provenance_summary" rows="3" placeholder="Who made the call, under what evidence tier, and why it matters."></textarea>
+            </div>
+            <div class="field">
+              <label>Claim Summary</label>
+              <textarea name="summary" rows="4" placeholder="State the actual stage call in concise analyst language."></textarea>
+            </div>
+            <div class="field">
+              <label>Rationale</label>
+              <textarea name="rationale" rows="3" placeholder="Optional rationale or corroboration note."></textarea>
+            </div>
+            <div class="grid-2col" style="gap:12px;">
+              <div class="field">
+                <label>Source Document ID</label>
+                <input type="number" name="source_document_id" placeholder="358" />
+              </div>
+              <div class="field">
+                <label>Source Date</label>
+                <input type="datetime-local" name="source_date" />
+              </div>
+            </div>
+            <div class="field">
+              <label>History Note</label>
+              <input type="text" name="history_note" placeholder="Added draft claim from translated analyst note" />
+            </div>
+            <div class="btnrow" style="justify-content:flex-end;">
+              <button class="btn primary" type="submit">Create Claim</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hd"><h2>Linked Research</h2></div>
+        <div class="bd" style="display:flex;flex-direction:column;gap:14px;">
+          <div>
+            <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;">Datasets</div>
+            {% for row in linked_datasets %}
+            <div class="link-row"><a href="/visualizations/datasets/{{ row.id }}">{{ row.title }}</a></div>
+            {% else %}
+            <div style="color:var(--muted);font-size:12px;">None linked.</div>
+            {% endfor %}
+          </div>
+          <div>
+            <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;">Supply Chains</div>
+            {% for row in linked_supply_chains %}
+            <div class="link-row"><a href="/visualizations/supply-chains/{{ row.id }}/command-center">{{ row.title }}</a></div>
+            {% else %}
+            <div style="color:var(--muted);font-size:12px;">None linked.</div>
+            {% endfor %}
+          </div>
+          <div>
+            <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;">Notes</div>
+            {% for row in linked_notes %}
+            <div class="link-row"><a href="/notes/{{ row.id }}">{{ row.title }}</a></div>
+            {% else %}
+            <div style="color:var(--muted);font-size:12px;">None linked.</div>
+            {% endfor %}
+          </div>
+          <div>
+            <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;">Theses</div>
+            {% for row in linked_theses %}
+            <div class="link-row"><a href="/theses/{{ row.id }}">{{ row.title }}</a></div>
+            {% else %}
+            <div style="color:var(--muted);font-size:12px;">None linked.</div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  const createForm = document.getElementById('stage-claim-create-form');
+  createForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const fd = new FormData(createForm);
+    const payload = Object.fromEntries(fd.entries());
+    const resp = await fetch('/api/stage-tracker/{{ item.id }}/claims', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      window.location.reload();
+      return;
+    }
+    quickToast(data.error || 'Failed to create claim', 'error');
+  });
+
+  document.querySelectorAll('.stage-claim-review-form').forEach((form) => {
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const claimId = form.dataset.claimId;
+      const decision = event.submitter?.dataset?.decision || '';
+      const payload = {
+        decision,
+        reviewer_note: form.querySelector('input[name="reviewer_note"]')?.value || '',
+      };
+      const resp = await fetch(`/api/stage-tracker/claims/${claimId}/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        window.location.reload();
+        return;
+      }
+      quickToast(data.error || 'Failed to review claim', 'error');
+    });
+  });
+})();
+</script>
+{% endblock %}

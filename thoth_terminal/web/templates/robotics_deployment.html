@@ -1,0 +1,426 @@
+{% extends "base.html" %}
+{% block content %}
+<link rel="stylesheet" href="/static/robotics_deployment_model.css?v={{ settings.static_assets_version }}&catalogue=11" />
+<div class="robotics-model" data-robotics-model>
+  <header class="robotics-model-header">
+    <div>
+      <div class="workspace-kicker">Visualizations / Robotics</div>
+      <h1>Robotics Deployment Model</h1>
+      <p>Model labor parity, customer payback, and solve-for thresholds for a robot in a specific task and region.</p>
+    </div>
+    <div class="btnrow">
+      <a href="/visualizations" class="btn">Charts</a>
+      <a href="/visualizations/datasets?family=robot_deployment_economics" class="btn">Evidence Rail</a>
+      <button type="button" class="btn primary" data-action="reset-model">Reset</button>
+    </div>
+  </header>
+
+  <section class="robotics-catalogue">
+    <div class="robotics-catalogue-panel">
+      <div class="robotics-catalogue-heading">
+        <div>
+          <span class="robotics-section-title">Robot catalogue</span>
+          <h2>Search robot</h2>
+        </div>
+        <button type="button" class="btn primary" data-action="show-add-robot">Add robot</button>
+      </div>
+      <label class="field robotics-search-field">
+        <span>OEM or platform</span>
+        <input type="search" data-catalogue-search="robot" placeholder="Unitree, Figure, Optimus, Digit" />
+      </label>
+      <div class="robotics-catalogue-list" data-catalogue-list="robot"></div>
+    </div>
+
+    <div class="robotics-catalogue-panel">
+      <div class="robotics-catalogue-heading">
+        <div>
+          <span class="robotics-section-title">Task catalogue</span>
+          <h2>Search task</h2>
+        </div>
+        <button type="button" class="btn primary" data-action="show-add-task">Add task</button>
+      </div>
+      <label class="field robotics-search-field">
+        <span>Domain, task, or role</span>
+        <input type="search" data-catalogue-search="task" placeholder="Warehouse, security, linen transport" />
+      </label>
+      <div class="robotics-catalogue-list" data-catalogue-list="task"></div>
+    </div>
+
+    <div class="robotics-catalogue-panel selected">
+      <div class="robotics-catalogue-heading">
+        <div>
+          <span class="robotics-section-title">Selected model</span>
+          <h2 data-selected-title>Unitree G1 / Warehouse</h2>
+        </div>
+      </div>
+      <div class="robotics-selected-grid">
+        <div>
+          <span>Robot</span>
+          <strong data-selected="robot">Unitree G1</strong>
+        </div>
+        <div>
+          <span>Task</span>
+          <strong data-selected="task">Warehouse material handling</strong>
+        </div>
+        <div>
+          <span>ASP</span>
+          <strong data-selected="asp">$35,000</strong>
+        </div>
+        <div>
+          <span>Labor rate</span>
+          <strong data-selected="labor">$30/hr</strong>
+        </div>
+      </div>
+      <div class="robotics-gap-list" data-gap-list></div>
+    </div>
+  </section>
+
+  <section class="robotics-model-layout">
+    <form class="robotics-model-controls" id="robotics-model-form">
+      <div class="robotics-control-section">
+        <div class="robotics-section-title">Robot</div>
+        <div class="robotics-field-grid two">
+          <label class="field">
+            <span>OEM</span>
+            <input name="robot_oem" value="Unitree" />
+          </label>
+          <label class="field">
+            <span>Platform</span>
+            <input name="robot_platform" value="G1" />
+          </label>
+        </div>
+        <div class="robotics-field-grid two">
+          <label class="field">
+            <span>ASP</span>
+            <input name="asp" type="number" min="0" step="100" value="35000" />
+          </label>
+          <label class="field">
+            <span>Useful life</span>
+            <input name="useful_life_years" type="number" min="0.1" step="0.1" value="2" />
+          </label>
+        </div>
+      </div>
+
+      <div class="robotics-control-section">
+        <div class="robotics-section-title">Task</div>
+        <div class="robotics-field-grid two">
+          <label class="field">
+            <span>Domain</span>
+            <input name="domain" value="Warehouse" />
+          </label>
+          <label class="field">
+            <span>Task</span>
+            <input name="task" value="Material handling" />
+          </label>
+        </div>
+        <div class="robotics-field-grid two">
+          <label class="field">
+            <span>Utilization</span>
+            <input name="utilization" type="number" min="0" max="1" step="0.01" value="0.67" />
+          </label>
+          <label class="field">
+            <span>Productivity vs human</span>
+            <input name="productivity_vs_human" type="number" min="0.01" step="0.05" value="1" />
+          </label>
+        </div>
+        <div class="robotics-field-grid two">
+          <label class="field">
+            <span>Task demand coverage</span>
+            <input name="task_demand_coverage" type="number" min="0" max="1" step="0.01" value="1" />
+          </label>
+          <label class="field">
+            <span>Task share of role</span>
+            <input name="task_share_of_role" type="number" min="0" max="1" step="0.01" />
+          </label>
+        </div>
+      </div>
+
+      <div class="robotics-control-section">
+        <div class="robotics-section-title">Region</div>
+        <label class="field">
+          <span>Regional preset</span>
+          <select name="regional_preset" data-region-preset></select>
+        </label>
+        <div class="robotics-field-grid two">
+          <label class="field">
+            <span>Region</span>
+            <input name="region_name" value="United States" />
+          </label>
+          <label class="field">
+            <span>Currency</span>
+            <input name="currency" value="USD" />
+          </label>
+        </div>
+        <div class="robotics-field-grid two">
+          <label class="field">
+            <span>Loaded labor / hr</span>
+            <input name="loaded_labor_cost_per_hour" type="number" min="0" step="0.5" value="30" />
+          </label>
+          <label class="field">
+            <span>Tariff rate</span>
+            <input name="tariff_rate" type="number" min="0" step="0.01" value="0" />
+          </label>
+        </div>
+        <div class="robotics-field-grid two">
+          <label class="field">
+            <span>Wage / hr</span>
+            <input name="wage_per_hour" type="number" min="0" step="0.5" />
+          </label>
+          <label class="field">
+            <span>Payroll tax rate</span>
+            <input name="payroll_tax_rate" type="number" min="0" step="0.01" />
+          </label>
+          <label class="field">
+            <span>Benefits uplift</span>
+            <input name="benefits_uplift_rate" type="number" min="0" step="0.01" />
+          </label>
+          <label class="field">
+            <span>Other labor uplift</span>
+            <input name="other_labor_uplift_rate" type="number" min="0" step="0.01" />
+          </label>
+        </div>
+      </div>
+
+      <div class="robotics-control-section">
+        <div class="robotics-section-title">Intervention</div>
+        <div class="robotics-field-grid two">
+          <label class="field">
+            <span>Minutes / robot hr</span>
+            <input name="intervention_minutes_per_robot_hour" type="number" min="0" step="0.25" value="5" />
+          </label>
+          <label class="field">
+            <span>Intervention labor / hr</span>
+            <input name="intervention_labor_cost_per_hour" type="number" min="0" step="0.5" value="30" />
+          </label>
+        </div>
+      </div>
+
+      <details class="robotics-advanced">
+        <summary>Advanced assumptions</summary>
+        <div class="robotics-field-grid two">
+          <label class="field">
+            <span>Annual maintenance</span>
+            <input name="annual_maintenance_cost" type="number" min="0" step="100" value="0" />
+          </label>
+          <label class="field">
+            <span>Annual software</span>
+            <input name="annual_software_cost" type="number" min="0" step="100" value="0" />
+          </label>
+          <label class="field">
+            <span>Annual field service</span>
+            <input name="annual_field_service_cost" type="number" min="0" step="100" value="0" />
+          </label>
+          <label class="field">
+            <span>Annual repair</span>
+            <input name="annual_repair_cost" type="number" min="0" step="100" value="0" />
+          </label>
+          <label class="field">
+            <span>Repair downtime hrs / yr</span>
+            <input name="repair_downtime_hours_per_year" type="number" min="0" step="1" value="0" />
+          </label>
+          <label class="field">
+            <span>Spare unit buffer</span>
+            <input name="spare_unit_buffer_pct" type="number" min="0" max="1" step="0.01" value="0" />
+          </label>
+          <label class="field">
+            <span>Deployment setup</span>
+            <input name="deployment_setup_cost" type="number" min="0" step="100" value="0" />
+          </label>
+          <label class="field">
+            <span>Shipping / robot</span>
+            <input name="shipping_cost_per_robot" type="number" min="0" step="100" value="0" />
+          </label>
+          <label class="field">
+            <span>Localization / robot</span>
+            <input name="localization_cost_per_robot" type="number" min="0" step="100" value="0" />
+          </label>
+          <label class="field">
+            <span>Battery life hrs</span>
+            <input name="battery_life_hours" type="number" min="0" step="0.25" />
+          </label>
+          <label class="field">
+            <span>Charge time hrs</span>
+            <input name="charge_time_hours" type="number" min="0" step="0.25" />
+          </label>
+          <label class="field checkbox-field">
+            <input name="hot_swappable_battery" type="checkbox" />
+            <span>Hot swappable battery</span>
+          </label>
+          <label class="field">
+            <span>Swap minutes</span>
+            <input name="battery_swap_time_minutes" type="number" min="0" step="0.25" value="0" />
+          </label>
+        </div>
+      </details>
+    </form>
+
+    <main class="robotics-model-main">
+      <section class="robotics-output-strip" aria-live="polite">
+        <div class="robotics-output-primary" data-status-panel>
+          <span class="robotics-output-label">Labor parity</span>
+          <strong data-output="deployable_at_labor_parity">Calculating</strong>
+          <span data-output="cost_advantage_per_human_equivalent_hour">-</span>
+        </div>
+        <div class="robotics-output-metric">
+          <span>Robot cost / human hr</span>
+          <strong data-output="effective_cost_per_human_equivalent_hour">-</strong>
+        </div>
+        <div class="robotics-output-metric">
+          <span>Payback</span>
+          <strong data-output="customer_payback_months">-</strong>
+        </div>
+        <div class="robotics-output-metric">
+          <span>Demand-limited hrs / yr</span>
+          <strong data-output="annual_productive_robot_hours">-</strong>
+        </div>
+      </section>
+
+      <section class="robotics-matrix-panel">
+        <div class="robotics-panel-heading">
+          <div>
+            <h2>Parity Matrix</h2>
+            <p>Cells show robot cost per human-equivalent hour. Green is below loaded labor, amber is near parity, red is above labor.</p>
+          </div>
+          <div class="robotics-matrix-selectors">
+            <label>
+              Rows
+              <select name="row_variable" data-matrix-control>
+                <option value="intervention_minutes_per_robot_hour">Intervention</option>
+                <option value="productivity_vs_human">Productivity</option>
+                <option value="asp">ASP</option>
+              </select>
+            </label>
+            <label>
+              Columns
+              <select name="column_variable" data-matrix-control>
+                <option value="utilization">Utilization</option>
+                <option value="productivity_vs_human">Productivity</option>
+                <option value="loaded_labor_cost_per_hour">Labor rate</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="robotics-matrix-wrap">
+          <table class="robotics-matrix" data-matrix></table>
+        </div>
+      </section>
+
+      <section class="robotics-solve-grid">
+        <div class="robotics-solve-block">
+          <span>Max regional ASP</span>
+          <strong data-solve="max_regional_asp_at_labor_parity">-</strong>
+        </div>
+        <div class="robotics-solve-block">
+          <span>Required productivity</span>
+          <strong data-solve="required_productivity_vs_human_at_labor_parity">-</strong>
+        </div>
+        <div class="robotics-solve-block">
+          <span>Required utilization</span>
+          <strong data-solve="required_utilization_at_labor_parity">-</strong>
+        </div>
+        <div class="robotics-solve-block">
+          <span>Max intervention burden</span>
+          <strong data-solve="max_intervention_minutes_per_robot_hour_at_labor_parity">-</strong>
+        </div>
+      </section>
+
+      <section class="robotics-audit" data-audit>
+        <div class="robotics-panel-heading">
+          <div>
+            <h2>Assumption Audit</h2>
+            <p data-audit-summary>Waiting for model output.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </section>
+
+  <dialog class="robotics-dialog" data-dialog="robot">
+    <form method="dialog" data-catalogue-form="robot">
+      <div class="robotics-dialog-heading">
+        <h2>Add robot</h2>
+        <button type="button" class="btn" data-action="close-dialog">Close</button>
+      </div>
+      <div class="robotics-field-grid two">
+        <label class="field">
+          <span>OEM</span>
+          <input name="oem" required />
+        </label>
+        <label class="field">
+          <span>Platform</span>
+          <input name="platform" required />
+        </label>
+        <label class="field">
+          <span>Type</span>
+          <input name="type" placeholder="Humanoid, AMR, quadruped" />
+        </label>
+        <label class="field">
+          <span>ASP</span>
+          <input name="asp" type="number" min="0" step="100" />
+        </label>
+        <label class="field">
+          <span>Useful life</span>
+          <input name="useful_life_years" type="number" min="0.1" step="0.1" value="2" />
+        </label>
+        <label class="field">
+          <span>Source / note</span>
+          <input name="source" placeholder="Estimate, article, teardown, company claim" />
+        </label>
+      </div>
+      <div class="robotics-dialog-actions">
+        <button type="button" class="btn primary" data-action="save-robot">Add robot</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="robotics-dialog" data-dialog="task">
+    <form method="dialog" data-catalogue-form="task">
+      <div class="robotics-dialog-heading">
+        <h2>Add task benchmark</h2>
+        <button type="button" class="btn" data-action="close-dialog">Close</button>
+      </div>
+      <div class="robotics-field-grid two">
+        <label class="field">
+          <span>Domain</span>
+          <input name="domain" required />
+        </label>
+        <label class="field">
+          <span>Task</span>
+          <input name="task" required />
+        </label>
+        <label class="field">
+          <span>Human role</span>
+          <input name="role" placeholder="Warehouse associate" />
+        </label>
+        <label class="field">
+          <span>Region</span>
+          <input name="region_name" value="United States" />
+        </label>
+        <label class="field">
+          <span>Loaded labor / hr</span>
+          <input name="loaded_labor_cost_per_hour" type="number" min="0" step="0.5" />
+        </label>
+        <label class="field">
+          <span>Utilization</span>
+          <input name="utilization" type="number" min="0" max="1" step="0.01" value="0.67" />
+        </label>
+        <label class="field">
+          <span>Productivity vs human</span>
+          <input name="productivity_vs_human" type="number" min="0.01" step="0.05" value="1" />
+        </label>
+        <label class="field">
+          <span>Intervention min/hr</span>
+          <input name="intervention_minutes_per_robot_hour" type="number" min="0" step="0.25" value="5" />
+        </label>
+      </div>
+      <div class="robotics-dialog-actions">
+        <button type="button" class="btn primary" data-action="save-task">Add task</button>
+      </div>
+    </form>
+  </dialog>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/robotics_deployment_model.js?v={{ settings.static_assets_version }}&catalogue=10"></script>
+{% endblock %}

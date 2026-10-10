@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-section informal-surface worldview-surface">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">World model</p>
+      <h1>{% if detail %}{{ detail.scenario.name }}{% else %}Named worlds{% endif %}</h1>
+      <p class="muted">Premises, estimates, sources, and revisions.</p>
+    </div>
+    {% if detail %}<a class="btn" href="/worlds">&larr; All worlds</a>{% endif %}
+  </div>
+
+  {% if detail %}
+    {% set world = detail.scenario %}
+    <article class="informal-row">
+      <div class="informal-main">
+        <p><span class="chip">{{ detail.subject }}</span>{% if world.audit.world_version %} <span class="chip">Version {{ world.audit.world_version }}</span>{% endif %}{% if world.selected_canon %} <span class="chip">Selected base</span>{% endif %}</p>
+        <p>{{ world.thesis_summary }}</p>
+        <div class="informal-meta"><span>{{ world.scenario_kind|replace('_', ' ')|title }}</span>{% if world.confidence is not none %}<span>Confidence {{ '%.0f'|format(world.confidence * 100) }}%</span>{% endif %}{% if detail.version_count > 1 %}<span>{{ detail.version_count }} versions</span>{% endif %}</div>
+      </div>
+    </article>
+    {% set premises = world.assumptions.get('premises', []) %}
+    {% if premises %}<h2>Premises</h2>
+    <div class="informal-list">
+      {% for premise in premises %}
+      <article class="informal-row"><div class="informal-main">
+        <h3>{{ premise.key }}</h3><p>{{ premise.statement }}</p>
+        {% if premise.uncertainty %}<p class="muted">Uncertainty: {{ premise.uncertainty }}</p>{% endif %}
+        {% if premise.model_refs %}<p class="muted">Model links: {{ premise.model_refs|join(', ') }}</p>{% endif %}
+        <div class="informal-meta">{% for doc_id in premise.get('source_document_ids', []) %}<a href="/docs/{{ doc_id }}">Source #{{ doc_id }}</a>{% endfor %}</div>
+      </div></article>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% if world.key_metrics %}
+    <h2>Model values and signals</h2>
+    <div class="informal-list">{% for key, value in world.key_metrics.items() %}
+      <article class="informal-row"><div class="informal-main"><strong>{{ key|replace('_', ' ')|title|replace('Hbm', 'HBM')|replace('Gb', 'GB') }}</strong>
+        {% if value is mapping %}<p>{{ value.get('value', 'Value pending') }}{% if value.get('unit') %} {{ value.unit }}{% endif %}{% if value.get('period') %} · {{ value.period }}{% endif %}</p>{% if value.get('rationale') %}<p class="muted">{{ value.rationale }}</p>{% endif %}
+        {% else %}<p>{{ value }}</p>{% endif %}
+      </div></article>
+    {% endfor %}</div>
+    {% endif %}
+    {% if not premises and not world.key_metrics %}<p class="worldview-gap">This world has no recorded premises or model values yet.</p>{% endif %}
+    <div class="worldview-heading"><h2>Estimates</h2><details class="worldview-help"><summary aria-label="About estimate matching" title="About estimate matching">i</summary><p>Estimates attached to this research subject. Matching metric names indicate coverage, not agreement. Period, unit, and scope must also align for a numeric comparison.</p></details></div>
+    {% set display_comparisons = reconciliation.world_metric_comparisons|rejectattr('status', 'equalto', 'not_applicable')|list %}
+    {% if display_comparisons %}<div class="informal-list">{% for comparison in display_comparisons %}
+      <article class="informal-row"><div class="informal-main"><strong>{{ comparison.metric_key }}</strong>
+        {% if comparison.status == 'comparable' %}<p>Thoth {{ comparison.world_value }} · {{ comparison.lane|replace('_', ' ') }} median {{ comparison.consensus_value }} {{ comparison.unit }}{% if comparison.currency %} {{ comparison.currency }}{% endif %}</p><div class="informal-meta"><span>Difference {{ comparison.difference }}{% if comparison.difference_fraction is not none %} ({{ '%.1f'|format(comparison.difference_fraction * 100) }}%){% endif %}</span><span>{{ comparison.source_count }} estimate owner{{ '' if comparison.source_count == 1 else 's' }}</span></div>
+        {% else %}<p class="muted">Comparison unavailable <span title="{{ comparison.reason }}" aria-label="{{ comparison.reason }}">ⓘ</span></p>{% endif %}
+      </div></article>
+    {% endfor %}</div>{% endif %}
+    <div class="informal-list">{% for estimate in reconciliation.consensus_rows %}
+      <article class="informal-row"><div class="informal-main">
+        <strong>{{ estimate.metric }}</strong> <span class="chip">{{ estimate.period }}</span>
+        <p>{{ estimate.consensus }}{% if estimate.range and estimate.range != estimate.consensus %} (reported span {{ estimate.range }}){% endif %}</p>
+        <div class="informal-meta"><span>{{ estimate.lane }}</span><span>{{ estimate.source_count }} estimate owner{{ '' if estimate.source_count == 1 else 's' }}</span><span>{{ estimate.product_category }}</span><span>{{ 'Metric present in world' if estimate.represented_in_world else 'No world metric with this name' }}</span></div>
+        {% if estimate.warnings %}<p class="muted">{{ estimate.warnings|join(', ') }}</p>{% endif %}
+      </div></article>
+    {% else %}<div class="empty-state">No numeric estimates are attached to this research subject yet.</div>{% endfor %}</div>
+    {% if reconciliation.evidence_rows %}<details><summary>Recent source observations ({{ reconciliation.consensus_metrics.evidence_rows }}{% if reconciliation.truncated %}+{% endif %})</summary>
+      <div class="informal-list">{% for evidence in reconciliation.evidence_rows %}
+        <article class="informal-row"><div class="informal-main">
+          <strong>{{ evidence.source }}{% if evidence.person %} · {{ evidence.person }}{% endif %}</strong>
+          <p>{{ evidence.metric }} · {{ evidence.period }} · {{ evidence.value }}{% if evidence.reported_range %} ({{ evidence.reported_range }}){% endif %}</p>
+          {% if evidence.summary %}<p>{{ evidence.summary }}</p>{% endif %}
+          <div class="informal-meta"><span>{{ evidence.published_at }}</span>{% if evidence.source_document_href %}<a href="{{ evidence.source_document_href }}">Original stored document</a>{% endif %}<span>{{ 'Current owner estimate' if evidence.aggregate_included else 'Historical or excluded observation' }}</span></div>
+        </div></article>
+      {% endfor %}</div>
+    </details>{% endif %}
+    {% if reconciliation.memory_inputs is not none %}{% set memory_inputs = reconciliation.memory_inputs %}
+      <h2>Memory model inputs</h2>
+      {% set family_labels = {'memory_site_program_ramp': 'fab capacity', 'hbm_stack_conversion': 'stack conversion', 'hbm_supplier_qualification_allocation': 'supplier allocation'} %}
+      {% if memory_inputs.missing_physical_input_families %}<p class="muted">Published inputs needed: {% for family in memory_inputs.missing_physical_input_families %}{{ family_labels.get(family, family|replace('_', ' ')) }}{{ ', ' if not loop.last else '.' }}{% endfor %}</p>{% else %}<p class="muted">The physical input families have published datasets.</p>{% endif %}
+      <details><summary>Input datasets ({{ memory_inputs.total_count }})</summary><div class="informal-list">{% for dataset in memory_inputs.datasets %}
+        <article class="informal-row"><div class="informal-main"><strong>{{ dataset.name }}</strong><div class="informal-meta"><span>{{ dataset.family }}</span><span>{{ 'Published version #' ~ dataset.latest_published_version_id if dataset.latest_published_version_id else 'No published version' }}</span></div></div></article>
+      {% else %}<div class="empty-state">No input datasets are available.</div>{% endfor %}</div></details>
+    {% endif %}
+    {% if product_configurations %}<h2>Product configurations in this world</h2><div class="informal-list">
+      {% for configuration in product_configurations %}<article class="informal-row"><div class="informal-main">
+        <h3><a href="/product-configurations/{{ configuration.key }}">{{ configuration.name }}</a></h3>
+        <div class="informal-meta"><span>{{ configuration.product_key }}</span><span>Version {{ configuration.version }}</span>{% if configuration.period %}<span>{{ configuration.period }}</span>{% endif %}</div>
+      </div></article>{% endfor %}
+    </div>{% endif %}
+    {% if world.open_questions %}<h2>Open questions</h2><ul>{% for item in world.open_questions %}<li>{{ item }}</li>{% endfor %}</ul>{% endif %}
+    {% if world.invalidation_triggers %}<h2>What could change this world</h2><ul>{% for item in world.invalidation_triggers %}<li>{{ item }}</li>{% endfor %}</ul>{% endif %}
+    {% if detail.version_count > 1 %}<h2>Revision history</h2>
+    <div class="informal-list">{% for version in detail.history %}
+      <article class="informal-row"><div class="informal-main">
+        <strong>Version {{ version.audit.world_version or 'legacy' }}</strong>
+        <p>{{ version.audit.revision_summary or version.thesis_summary }}</p>
+        <div class="informal-meta"><span>{{ version.updated_at }}</span><span>{{ version.status }}</span>
+        {% for doc_id in version.audit.get('revision_source_document_ids', []) %}<a href="/docs/{{ doc_id }}">Source #{{ doc_id }}</a>{% endfor %}</div>
+        {% if version.id != world.id %}<details><summary>Prior premises and values</summary>
+          {% for premise in version.assumptions.get('premises', []) %}<p><strong>{{ premise.key }}</strong>: {{ premise.statement }}</p>{% endfor %}
+          {% for key, value in version.key_metrics.items() %}<p><strong>{{ key }}</strong>: {{ value if value is string or value is number else value|tojson }}</p>{% endfor %}
+        </details>{% endif %}
+      </div></article>
+    {% endfor %}</div>{% endif %}
+  {% else %}
+    <form class="filter-bar" method="get" action="/worlds">
+      <input type="search" name="q" placeholder="Search worlds, subjects, or rationales" value="{{ query }}" />
+      <button type="submit">Search</button>
+    </form>
+    <div class="informal-list">{% for item in worlds %}{% set world = item.scenario %}
+      <article class="informal-row"><div class="informal-main">
+        <h2><a href="/worlds/{{ world.subject_id }}/{{ item.world_key }}">{{ world.name }}</a></h2>
+        <p>{{ world.thesis_summary }}</p>
+        <div class="informal-meta"><span>{{ item.subject }}</span><span>{{ world.assumptions.get('premises', [])|length }} premises</span><span>{{ item.version_count }} versions</span>{% if world.selected_canon %}<span>Selected base</span>{% endif %}<time>{{ world.updated_at }}</time></div>
+      </div></article>
+    {% else %}<div class="empty-state">No named worlds yet. Sourced research can establish a world when its premises and alternatives are worth tracking.</div>{% endfor %}</div>
+  {% endif %}
+</section>
+{% endblock %}

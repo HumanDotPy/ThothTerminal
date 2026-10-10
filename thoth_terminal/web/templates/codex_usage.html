@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Codex usage</title></head><body>
+<main>
+<section class="page-section codex-usage-surface">
+  <header class="surface-heading">
+    <div>
+      <p class="eyebrow">Local session accounting</p>
+      <h1>Codex usage</h1>
+      <p class="muted">Your local Codex history, by model and day. Costs estimate API token charges at the published rates below; they exclude tool fees and are not your subscription bill.</p>
+    </div>
+    <div class="surface-heading-actions"><form method="get"><label for="days">History </label><select id="days" name="days">{% for days in [7, 30, 90] %}<option value="{{ days }}" {% if snapshot.window.days == days %}selected{% endif %}>{{ days }} days</option>{% endfor %}</select> <button type="submit">Refresh</button></form><a class="btn" href="/api/codex-usage?days={{ snapshot.window.days }}">JSON snapshot</a></div>
+  </header>
+
+  <div class="codex-usage-meta">
+    <span><b>{{ snapshot.window.days }} days</b> scanned</span>
+    <span><b>{{ snapshot.source.files_scanned }}</b> files</span>
+    <span><b>{{ snapshot.source.events_counted }}</b> deduped token events</span>
+    <span>Generated {{ snapshot.generated_at }}</span>
+  </div>
+
+  <div class="codex-usage-grid">
+    <article class="panel codex-usage-card"><span class="eyebrow">Input tokens</span><strong>{{ "{:,}".format(snapshot.totals.input_tokens) }}</strong><small>Cached input: {{ "{:,}".format(snapshot.totals.cached_input_tokens) }}</small></article>
+    <article class="panel codex-usage-card"><span class="eyebrow">Cache writes</span><strong>{{ "{:,}".format(snapshot.totals.cache_write_input_tokens) }}</strong><small>Cache hit rate is shown per model/day below.</small></article>
+    <article class="panel codex-usage-card"><span class="eyebrow">Output tokens</span><strong>{{ "{:,}".format(snapshot.totals.output_tokens) }}</strong><small>Reasoning subset: {{ "{:,}".format(snapshot.totals.reasoning_output_tokens) }}</small></article>
+    <article class="panel codex-usage-card"><span class="eyebrow">Standard API equivalent{% if not snapshot.totals.pricing_known %} | partial{% endif %}</span><strong>{% if snapshot.totals.standard_api_equivalent_usd is not none %}${{ "%.2f"|format(snapshot.totals.standard_api_equivalent_usd) }}{% else %}--{% endif %}</strong><small>{% if not snapshot.totals.pricing_known %}Excludes models with unknown rates.{% else %}All observed models priced.{% endif %}</small></article>
+  </div>
+
+  <section class="panel codex-usage-panel"><p class="eyebrow">Daily activity | UTC</p><h2>Input and cache reuse</h2>
+    {% set peak = (snapshot.days | map(attribute='input_tokens') | max) if snapshot.days else 1 %}
+    {% for row in snapshot.days %}<div class="usage-bar-row"><span>{{ row.date }}</span><div class="usage-track" title="{{ '{:,}'.format(row.input_tokens) }} input tokens; {{ '%.1f'|format(row.cache_hit_percent) }}% cached"><div class="usage-fill" style="width:{{ 100 * row.input_tokens / (peak or 1) }}%"><div class="usage-cache" style="width:{{ row.cache_hit_percent }}%"></div></div></div><span>{{ '%.1f'|format(row.input_tokens / 1000000) }}M</span></div>{% endfor %}
+    <p class="muted">Green shows cached input; blue shows uncached input, including cache writes.</p>
+  </section>
+
+  <section class="panel codex-usage-panel"><p class="eyebrow">Selected period</p><h2>Models</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Model</th><th>Input</th><th>Output</th><th>Cache hit</th><th>API equivalent</th></tr></thead><tbody>{% for row in snapshot.models %}<tr><td>{{ row.model }}</td><td>{{ '{:,}'.format(row.input_tokens) }}</td><td>{{ '{:,}'.format(row.output_tokens) }}</td><td>{{ '%.1f'|format(row.cache_hit_percent) }}%</td><td>{% if row.standard_api_equivalent_usd is not none %}${{ '%.2f'|format(row.standard_api_equivalent_usd) }}{% else %}Unpriced{% endif %}</td></tr>{% endfor %}</tbody></table></div></section>
+
+  <section class="panel codex-usage-panel">
+    <div class="surface-heading compact"><div><p class="eyebrow">Observed quota</p><h2>Account rate limits</h2></div><span class="muted">Quota percentages are account-level observations, not model usage.</span></div>
+    {% if snapshot.rate_limits %}
+      <div class="table-wrap"><table class="data-table"><thead><tr><th>Limit</th><th>Primary</th><th>Secondary</th><th>Observed</th><th>Age</th></tr></thead><tbody>
+      {% for row in snapshot.rate_limits %}<tr><td>{{ row.limit_id }}</td><td>{{ row.primary.used_percent if row.primary else '--' }}%</td><td>{{ row.secondary.used_percent if row.secondary else '--' }}%</td><td>{{ row.observed_at }}</td><td>{{ "%.0f"|format(row.age_seconds) }}s{% if row.stale %} | stale{% endif %}</td></tr>{% endfor %}
+      </tbody></table></div>
+    {% else %}<p class="muted">No rate-limit observation was found in the selected local files.</p>{% endif %}
+  </section>
+
+  <section class="panel codex-usage-panel">
+    <div class="surface-heading compact"><div><p class="eyebrow">Model/day ledger</p><h2>Usage by model and day</h2></div><span class="muted">Cached input is included in input totals.</span></div>
+    {% if snapshot.by_model_day %}
+      <div class="table-wrap"><table class="data-table"><thead><tr><th>Date</th><th>Model</th><th>Input</th><th>Cached</th><th>Writes</th><th>Output</th><th>Reasoning</th><th>Cache hit</th><th>STANDARD API equivalent</th></tr></thead><tbody>
+      {% for row in snapshot.by_model_day %}<tr><td>{{ row.date }}</td><td>{{ row.model }}{% if row.long_context %}<small> | long context</small>{% endif %}</td><td>{{ "{:,}".format(row.input_tokens) }}</td><td>{{ "{:,}".format(row.cached_input_tokens) }}</td><td>{{ "{:,}".format(row.cache_write_input_tokens) }}</td><td>{{ "{:,}".format(row.output_tokens) }}</td><td>{{ "{:,}".format(row.reasoning_output_tokens) }}</td><td>{{ "%.1f"|format(row.cache_hit_percent) }}%</td><td>{% if row.standard_api_equivalent_usd is not none %}${{ "%.4f"|format(row.standard_api_equivalent_usd) }}{% else %}--{% endif %}</td></tr>{% endfor %}
+      </tbody></table></div>
+    {% else %}<p class="muted">No token events were found in the selected local files.</p>{% endif %}
+  </section>
+
+  {% if snapshot.by_model_effort %}
+  <section class="panel codex-usage-panel">
+    <p class="eyebrow">Delegation accounting</p><h2>Usage by model and effort</h2>
+    <p class="muted">Effort is recorded when session metadata provides it. These counters do not measure task quality or allocate account quota to models.</p>
+    <div class="table-wrap"><table class="data-table"><thead><tr><th>Model</th><th>Effort</th><th>Events</th><th>Input</th><th>Cached</th><th>Output</th><th>Reasoning</th></tr></thead><tbody>
+    {% for row in snapshot.by_model_effort %}<tr><td>{{ row.model }}</td><td>{{ row.reasoning_effort }}</td><td>{{ row.events_counted }}</td><td>{{ "{:,}".format(row.input_tokens) }}</td><td>{{ "{:,}".format(row.cached_input_tokens) }}</td><td>{{ "{:,}".format(row.output_tokens) }}</td><td>{{ "{:,}".format(row.reasoning_output_tokens) }}</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+  {% endif %}
+
+  <footer class="codex-usage-footnote">
+    Pricing snapshot observed {{ snapshot.pricing.observed_at }} from <a href="{{ snapshot.pricing.source_url }}" target="_blank" rel="noreferrer">official API pricing</a>. Long-context pricing is evaluated per token event above {{ snapshot.pricing.long_context_threshold_input_tokens }} input tokens. Reasoning is included in output, and cached input and cache writes are included in input. Historical activity uses this pricing snapshot, not historical invoice rates. Only usage counters and quota observations are exposed; prompts and responses remain local.
+  </footer>
+</section>
+<style>
+  :root{color-scheme:dark;--muted:#a0aec0;--line:#29384b;--accent:#76b7ff}*{box-sizing:border-box}body{margin:0;background:#0b1220;color:#edf3fa;font:14px/1.5 system-ui,sans-serif}main{max-width:1480px;margin:auto;padding:36px 28px}h1{font-size:34px;letter-spacing:-1px;margin:0}h2{font-size:20px;margin:0 0 14px}.eyebrow{color:#89b5e4;text-transform:uppercase;font-size:11px;letter-spacing:.1em;margin:0}.muted{color:var(--muted)}.surface-heading{display:flex;justify-content:space-between;gap:24px}.surface-heading-actions{display:grid;gap:10px;align-content:start;min-width:225px}button,select,.btn{background:#17253a;color:#e9f3ff;border:1px solid #39516c;padding:8px 12px;border-radius:6px}.btn{text-decoration:none;text-align:center}.panel{background:#111d2e;border:1px solid var(--line);border-radius:10px;padding:20px}.usage-bar-row{display:grid;grid-template-columns:90px 1fr 65px;gap:14px;align-items:center;margin:8px 0;font-size:12px;font-variant-numeric:tabular-nums}.usage-track{height:16px;background:#1a2b42;border-radius:3px;overflow:hidden}.usage-fill{height:100%;background:#5795db}.usage-cache{height:100%;background:#55c6a2}@media(max-width:700px){main{padding:20px 12px}.surface-heading{display:block}.surface-heading-actions{margin-top:12px}.usage-bar-row{grid-template-columns:78px 1fr 45px;gap:8px}}
+  .codex-usage-meta,.codex-usage-grid{display:grid;gap:12px;margin:16px 0}.codex-usage-meta{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));color:var(--muted);font-size:12px}.codex-usage-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}.codex-usage-card{display:grid;gap:6px}.codex-usage-card strong{font-size:24px}.codex-usage-card small{color:var(--muted)}.codex-usage-panel{margin-top:16px;padding:16px}.surface-heading.compact{align-items:center}.table-wrap{overflow:auto}.data-table{width:100%;border-collapse:collapse}.data-table th,.data-table td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}.data-table th{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}.codex-usage-footnote{margin:16px 0;color:var(--muted);font-size:12px}.codex-usage-footnote a{color:var(--accent)}
+</style>
+</main></body></html>

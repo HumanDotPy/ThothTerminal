@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="workspace-header">
+  <div class="workspace-copy">
+    <div class="workspace-kicker">Charts / Datasets / Supply Chains</div>
+    <h1>Model surfaces</h1>
+    <p>Visualizations should read like operating instruments for the research workflow: charts, datasets, and supply-chain maps that you can open quickly and reason over without extra dashboard chrome.</p>
+  </div>
+  <div class="workspace-summary">
+    <div class="workspace-stat">
+      <span class="workspace-stat-label">Charts</span>
+      <span class="workspace-stat-value">{{ charts|length }}</span>
+      <span class="workspace-stat-copy">Saved visualization surfaces in this workspace.</span>
+    </div>
+    <div class="workspace-stat">
+      <span class="workspace-stat-label">Category</span>
+      <span class="workspace-stat-value">{{ category if category else 'All' }}</span>
+      <span class="workspace-stat-copy">Use the category rail to narrow the canvas set.</span>
+    </div>
+  </div>
+</section>
+
+<div class="viz-page">
+  <div class="viz-header">
+    <div class="viz-title-row">
+      <h1>Visualizations</h1>
+      <div class="btnrow">
+        <a href="/visualizations/new" class="btn primary">New chart</a>
+        <a href="/visualizations/series" class="btn">Data Series</a>
+        <a href="/visualizations/datasets" class="btn">Datasets</a>
+        <a href="/visualizations/memory-system" class="btn">Memory System</a>
+        <a href="/visualizations/robotics-deployment" class="btn">Robotics Model</a>
+        <a href="/visualizations/supply-chains" class="btn">Supply Chains</a>
+      </div>
+    </div>
+    <div class="viz-filters">
+      <div class="chiprow">
+        <button class="filter-chip {{ 'active' if not category else '' }}" type="button" data-category="">All</button>
+        {% for cat in categories %}
+        <button class="filter-chip {{ 'active' if category == cat else '' }}" type="button" data-category="{{ cat }}">{{ cat|title }}</button>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="viz-grid">
+    {% if charts %}
+      {% for chart in charts %}
+      <div class="viz-card" data-chart-id="{{ chart.id }}" data-category="{{ chart.category }}">
+        <div class="viz-card-header chart-card-header">
+          <div>
+            <h2>{{ chart.title }}</h2>
+            {% if chart.subtitle %}
+            <p class="viz-subtitle">{{ chart.subtitle }}</p>
+            {% endif %}
+          </div>
+          <div class="viz-card-stat" data-chart-stat="{{ chart.id }}"></div>
+        </div>
+        <div class="viz-chart-container" id="chart-{{ chart.id }}" style="height:320px;"></div>
+        {% if chart.description_md %}
+        <div class="viz-description">
+          <p><strong>Monthly Update:</strong> {{ chart.description_md }}</p>
+        </div>
+        {% endif %}
+        {% if chart.related_equities %}
+        <div class="viz-equities">
+          <span class="viz-equities-label">Related Equities:</span>
+          {% for ticker in chart.related_equities.split(',') %}
+          <span class="pill mono">{{ ticker.strip() }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div class="viz-card-actions">
+          <a href="/visualizations/{{ chart.id }}" class="btn">Edit</a>
+          <button type="button" class="btn viz-fullscreen-btn" data-chart-id="{{ chart.id }}">Fullscreen</button>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="viz-empty">
+        <h3>No charts yet.</h3>
+        <p>Create a chart when a recurring metric deserves its own operating surface instead of living only inside notes or reports.</p>
+        <a href="/visualizations/new" class="btn primary">Create chart</a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="viz-fullscreen-overlay" id="viz-fullscreen-overlay" style="display:none;">
+  <div class="viz-fullscreen-content">
+    <div class="viz-fullscreen-header">
+      <h2 id="viz-fullscreen-title"></h2>
+      <button type="button" class="btn" id="viz-fullscreen-close">×</button>
+    </div>
+    <div class="viz-fullscreen-chart" id="viz-fullscreen-chart"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/charting.js?v={{ settings.static_assets_version }}"></script>
+<script src="/static/vendor/echarts.min.js?v={{ settings.static_assets_version }}"></script>
+<script id="charts-data" type="application/json">{{ charts_json|safe }}</script>
+<script src="/static/visualizations.js?v={{ settings.static_assets_version }}"></script>
+{% endblock %}
+
+
+

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="hd">
+    <h2>{{ site.name }}</h2>
+    <div class="btnrow">
+      <a class="btn" href="/institutional/ops">Back</a>
+    </div>
+  </div>
+  <div class="bd">
+    <div style="margin-bottom:12px;color:var(--muted);">
+      {{ site.site_kind }}{% if site.locality %} · {{ site.locality }}{% endif %}{% if site.region %}, {{ site.region }}{% endif %}
+    </div>
+
+    <div class="panel" style="margin-bottom:12px;">
+      <div class="hd"><h2>State Vector</h2></div>
+      <div class="bd">
+        {% if payload.state_vector %}
+          <pre style="white-space:pre-wrap;">{{ payload.state_vector | tojson(indent=2) }}</pre>
+        {% else %}
+          <div style="color:var(--muted);">No state vector yet.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="panel">
+        <div class="hd"><h2>Programs</h2></div>
+        <div class="bd">
+          {% for program in site.programs or [] %}
+            <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+              <a href="/institutional/programs/{{ program.id }}">{{ program.title }}</a>
+              <div style="color:var(--muted);font-size:11px;">{{ program.category }}</div>
+            </div>
+          {% else %}
+            <div style="color:var(--muted);">No programs linked.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hd"><h2>Coverage Gaps</h2></div>
+        <div class="bd">
+          {% for gap in payload.gaps or [] %}
+            <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+              <div>{{ gap.title }}</div>
+              <div style="color:var(--muted);font-size:11px;">{{ gap.gap_kind }} · {{ gap.status }}</div>
+            </div>
+          {% else %}
+            <div style="color:var(--muted);">No site-specific gaps.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:12px;">
+      <div class="hd"><h2>Observations</h2></div>
+      <div class="bd">
+        <pre style="white-space:pre-wrap;">{{ payload.observations | tojson(indent=2) }}</pre>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

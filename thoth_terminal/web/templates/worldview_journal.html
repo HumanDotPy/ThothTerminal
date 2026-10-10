@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-section informal-surface">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">Living research</p>
+      <h1>Worldview Journal</h1>
+      <p class="muted">Sourced explanations that connect new evidence to Thoth's models and open questions.</p>
+    </div>
+  </div>
+  <form class="filter-bar" method="get" action="/worldview-journal">
+    <input type="search" name="q" placeholder="Search research essays" value="{{ query }}" />
+    <button type="submit">Search</button>
+  </form>
+  <div class="informal-list">
+    {% for row in docs %}
+      <article class="informal-row">
+        <div class="informal-state"><span class="chip">{{ row.status }}</span><small>{{ row.word_count }} words</small></div>
+        <div class="informal-main">
+          <h2><a href="/worldview-journal/{{ row.doc_key }}">{{ row.title }}</a></h2>
+          {% if row.summary %}<p>{{ row.summary }}</p>{% endif %}
+          <div class="informal-meta"><span>{{ row.subject or "Cross-theme" }}</span><span>{{ row.events|length }} revisions</span><time>{{ row.updated_at }}</time></div>
+        </div>
+      </article>
+    {% else %}<div class="empty-state">No worldview essays yet. The research agent adds one when a causal explanation is worth preserving.</div>{% endfor %}
+  </div>
+</section>
+{% endblock %}

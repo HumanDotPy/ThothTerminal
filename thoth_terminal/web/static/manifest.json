@@ -1,0 +1,23 @@
+{
+  "name": "Thoth Terminal",
+  "short_name": "Thoth",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#070a0d",
+  "theme_color": "#070a0d",
+  "icons": [
+    {
+      "src": "/static/icons/thoth-terminal-1024.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icons/thoth-terminal-1024.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

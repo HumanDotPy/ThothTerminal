@@ -1,0 +1,560 @@
+{% extends "base.html" %}
+{% block content %}
+{% set agents_section = 'review' %}
+{% include "_agents_nav.html" %}
+{% set metrics = state.get('metrics', {}) %}
+<div class="agent-review-page">
+  {% if notice %}
+    <div class="agent-review-alert ok">{{ notice }}</div>
+  {% endif %}
+  {% if error %}
+    <div class="agent-review-alert bad">{{ error }}</div>
+  {% endif %}
+
+  <section class="agent-review-head">
+    <div>
+      <div class="agent-review-kicker">Ingestion &amp; review</div>
+      <h1>Agentic ingestion</h1>
+      <p>Review ingested evidence and proposed research writes.</p>
+      <p id="intake-bridge-status" role="status">Checking the local-agent bridge…</p>
+      <p><a href="/settings#desktop">Bridge settings</a> · <a href="/ops">Runtime health</a></p>
+    </div>
+    <div class="agent-review-actions">
+      <a class="btn" href="/agent-review">Refresh</a>
+      <a class="btn" href="/ops">Ops</a>
+      <form method="post" action="/agent-review/evals/seed">
+        <button class="btn primary" type="submit">Seed Eval Cases</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="agent-review-metrics" aria-label="Agent review metrics">
+    <div><span>Processed</span><strong>{{ metrics.get('compressions', 0) }}</strong></div>
+    <div><span>Skipped</span><strong>{{ metrics.get('skipped', 0) }}</strong></div>
+    <div><span>Writes</span><strong>{{ metrics.get('durable_writes', 0) }}</strong></div>
+    <div><span>Unresolved</span><strong>{{ metrics.get('unresolved', 0) }}</strong></div>
+    <div>
+      <span>Eval Cases</span>
+      <strong>{{ metrics.get('eval_cases', 0) }}</strong>
+    </div>
+    <div>
+      <span>Eval Pass</span>
+      <strong>
+        {% if metrics.get('eval_pass_rate') is not none %}
+          {{ "%.0f"|format((metrics.get('eval_pass_rate') or 0) * 100) }}%
+        {% else %}
+          n/a
+        {% endif %}
+      </strong>
+    </div>
+  </section>
+
+  <div class="agent-review-grid">
+    <section class="agent-review-workspace">
+      <div class="agent-review-section-title">
+        <h2>Review Queue</h2>
+        <span>{{ state.get('hours', 72) }}h window</span>
+      </div>
+      {% if state.get('items') %}
+        <div class="agent-item-list">
+          {% for item in state.get('items') %}
+            <details class="agent-item" {% if loop.first %}open{% endif %}>
+              <summary class="agent-item-summary">
+                <div class="agent-item-topline">
+                  <a href="{{ item.document_href }}">{{ item.document_title }}</a>
+                  <span class="agent-pill {{ item.recommendation }}">{{ item.recommendation }}</span>
+                  <span class="agent-pill">{{ item.status }}</span>
+                  {% if item.latest_decision %}
+                    <span class="agent-pill reviewed">{{ item.latest_decision.decision }}</span>
+                  {% endif %}
+                </div>
+                <div class="agent-item-meta">
+                  doc #{{ item.document_id }} · {{ item.source_name or 'unknown source' }}
+                  {% if item.updated_at %} · {{ item.updated_at[:19].replace('T', ' ') }}{% endif %}
+                  {% if item.confidence is not none %} · confidence {{ "%.2f"|format(item.confidence) }}{% endif %}
+                </div>
+              </summary>
+              <div class="agent-item-detail">
+              <div class="agent-item-main">
+                <p>{{ item.summary_short or 'No signal extraction summary.' }}</p>
+                {% if item.skip_reason %}
+                  <div class="agent-note-line">Skip reason: {{ item.skip_reason }}</div>
+                {% endif %}
+                <div class="agent-route-strip">
+                  <span>gain {{ item.information_gain or 'n/a' }}</span>
+                  <span>disposition {{ item.document_disposition or 'n/a' }}</span>
+                  <span>summary routes {{ item.route_counts.summary }}</span>
+                  <span>durable holds {{ item.route_counts.hold }}</span>
+                  <span>write routes {{ item.route_counts.write }}</span>
+                  <span>writes {{ item.writes|length }}</span>
+                </div>
+                {% if item.routes %}
+                  <div class="agent-route-list">
+                    {% for route in item.routes[:6] %}
+                      <div>
+                        <b>{{ route.lane }}</b>
+                        {{ route.entity_name }}
+                        {% if route.entity_role %}<span>{{ route.entity_role }}</span>{% endif %}
+                        {% if route.durable_action %}<span>{{ route.durable_action }}</span>{% endif %}
+                        {% if route.information_gain %}<span>{{ route.information_gain }}</span>{% endif %}
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+                {% if item.claims %}
+                  <div class="agent-claim-list">
+                    {% for claim in item.claims[:3] %}
+                      <div><b>{{ claim.entity_name }}</b>: {{ claim.claim_text }}</div>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+              <div class="agent-item-controls">
+                <form method="post" action="/agent-review/decisions">
+                  <input type="hidden" name="target_kind" value="compression" />
+                  <input type="hidden" name="target_id" value="{{ item.id }}" />
+                  <textarea name="note" rows="2" placeholder="Optional review note"></textarea>
+                  <div class="agent-control-grid">
+                    <button class="btn" name="decision" value="approve" type="submit">Approve</button>
+                    <button class="btn" name="decision" value="hold" type="submit">Hold</button>
+                    <button class="btn" name="decision" value="demote" type="submit">Demote</button>
+                    <button class="btn" name="decision" value="quarantine" type="submit">Quarantine</button>
+                    <button class="btn primary" name="decision" value="research_request" type="submit">Research Request</button>
+                    <button class="btn" name="decision" value="noop" type="submit">No-Op</button>
+                  </div>
+                </form>
+                <form class="agent-eval-mini" method="post" action="/agent-review/evals/from-compression">
+                  <input type="hidden" name="compression_id" value="{{ item.id }}" />
+                  <label>
+                    Expected disposition
+                    <select name="expected_disposition">
+                      {% for option in ['skip','summary_only','hold_for_corroboration','durable_candidate'] %}
+                        <option value="{{ option }}" {% if item.document_disposition == option %}selected{% endif %}>{{ option }}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <label>
+                    Expected gain
+                    <select name="expected_information_gain">
+                      {% for option in ['none','low','medium','high'] %}
+                        <option value="{{ option }}" {% if item.information_gain == option %}selected{% endif %}>{{ option }}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <button class="btn" type="submit">Save Eval Case</button>
+                </form>
+              </div>
+              </div>
+            </details>
+          {% endfor %}
+        </div>
+        {% else %}
+          <div class="agent-empty">No local-agent signal extractions in this window.</div>
+        {% endif %}
+        {% set pagination = state.get('pagination') %}
+        {% set pagination_label = 'Local agent review pages' %}
+        {% include "_traditional_pagination.html" %}
+    </section>
+
+    <aside class="agent-review-inspector">
+      <section>
+        <div class="agent-review-section-title">
+          <h2>Eval Harness</h2>
+          <span>regression cases</span>
+        </div>
+        {% if state.get('eval_cases') %}
+          <div class="agent-eval-list">
+            {% for case in state.get('eval_cases') %}
+              <article class="agent-eval-row">
+                <div>
+                  <div class="agent-eval-title">{{ case.title }}</div>
+                  <div class="agent-item-meta">
+                    #{{ case.id }} · {{ case.source_label or case.document_title or 'fixture' }}
+                  </div>
+                  <div class="agent-route-strip compact">
+                    {% for tag in case.tags[:4] %}
+                      <span>{{ tag }}</span>
+                    {% endfor %}
+                  </div>
+                  {% if case.latest_run %}
+                    <div class="agent-eval-score {{ 'ok' if case.latest_run.passed else 'bad' }}">
+                      {{ 'pass' if case.latest_run.passed else 'fail' }}
+                      · {{ "%.0f"|format((case.latest_run.score_value or 0) * 100) }}%
+                      · {{ case.latest_run.source_kind }}
+                    </div>
+                  {% else %}
+                    <div class="agent-eval-score">not run</div>
+                  {% endif %}
+                </div>
+                <form method="post" action="/agent-review/evals/{{ case.id }}/run">
+                  <input type="hidden" name="mode" value="latest_signal_extraction" />
+                  <button class="btn" type="submit" {% if not case.document_id %}disabled{% endif %}>
+                    Score Latest
+                  </button>
+                </form>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="agent-empty">No eval cases yet. Seed the default cases or save a case from a signal extraction.</div>
+        {% endif %}
+      </section>
+
+      <section>
+        <div class="agent-review-section-title">
+          <h2>Unresolved</h2>
+          <span>entities</span>
+        </div>
+        {% if state.get('unresolved') %}
+          <div class="agent-mini-list">
+            {% for row in state.get('unresolved')[:12] %}
+              <article>
+                <div class="agent-eval-title">{{ row.name }}</div>
+                <div class="agent-item-meta">
+                  {{ row.entity_type or 'unknown' }}
+                  {% if row.document_href %} · <a href="{{ row.document_href }}">doc #{{ row.document_id }}</a>{% endif %}
+                  {% if row.confidence is not none %} · {{ "%.2f"|format(row.confidence) }}{% endif %}
+                </div>
+                {% if row.rationale %}<p>{{ row.rationale }}</p>{% endif %}
+                <form method="post" action="/agent-review/decisions">
+                  <input type="hidden" name="target_kind" value="unresolved" />
+                  <input type="hidden" name="target_id" value="{{ row.id }}" />
+                  <div class="agent-inline-buttons">
+                    <button class="btn" name="decision" value="hold" type="submit">Hold</button>
+                    <button class="btn" name="decision" value="demote" type="submit">Demote</button>
+                    <button class="btn primary" name="decision" value="research_request" type="submit">Request</button>
+                  </div>
+                </form>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="agent-empty">No unresolved entities in this window.</div>
+        {% endif %}
+      </section>
+
+      <section>
+        <div class="agent-review-section-title">
+          <h2>Runs</h2>
+          <span>worker trail</span>
+        </div>
+        <div class="agent-route-strip">
+          {% for key, value in state.get('run_counts', {}).items() %}
+            <span>{{ key }} {{ value }}</span>
+          {% endfor %}
+        </div>
+        <div class="agent-mini-list">
+          {% for run in state.get('recent_runs', [])[:8] %}
+            <article>
+              <div class="agent-eval-title">#{{ run.id }} {{ run.run_type }}</div>
+              <div class="agent-item-meta">{{ run.status }} · {{ run.model_name or 'model n/a' }}</div>
+              {% if run.summary %}<p>{{ run.summary }}</p>{% endif %}
+              {% if run.error %}<div class="agent-note-line bad">{{ run.error }}</div>{% endif %}
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<style>
+.agent-review-page{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+.agent-review-alert{
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:12px 14px;
+}
+.agent-review-alert.ok{border-color:rgba(34,197,94,.35);color:#86efac;}
+.agent-review-alert.bad{border-color:rgba(239,68,68,.35);color:#fca5a5;}
+.agent-review-head{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:18px;
+  align-items:end;
+  padding:18px 0 8px;
+}
+.agent-review-kicker,
+.agent-review-section-title span,
+.agent-item-meta,
+.agent-note-line{
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.agent-review-head h1{
+  margin:4px 0 6px;
+  font-family:var(--display);
+  font-size:36px;
+  color:var(--text-bright);
+}
+.agent-review-head p{
+  margin:0;
+  max-width:780px;
+  color:var(--muted);
+  line-height:1.55;
+}
+.agent-review-actions,
+.agent-inline-buttons{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+.agent-review-metrics{
+  display:grid;
+  grid-template-columns:repeat(6,minmax(0,1fr));
+  gap:10px;
+}
+.agent-review-metrics > div{
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:12px;
+  background:rgba(7,10,13,.42);
+}
+.agent-review-metrics span{
+  display:block;
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.agent-review-metrics strong{
+  display:block;
+  margin-top:8px;
+  font-family:var(--display);
+  font-size:24px;
+  color:var(--text-bright);
+}
+.agent-review-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1.35fr) minmax(360px,.65fr);
+  gap:14px;
+  align-items:start;
+}
+.agent-review-workspace,
+.agent-review-inspector section{
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:linear-gradient(180deg, rgba(11,15,20,.72), rgba(7,10,13,.42));
+}
+.agent-review-workspace{
+  padding:14px;
+}
+.agent-review-inspector{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+.agent-review-inspector section{
+  padding:14px;
+}
+.agent-review-section-title{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:center;
+  margin-bottom:12px;
+}
+.agent-review-section-title h2{
+  margin:0;
+  font-family:var(--mono);
+  font-size:12px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--text-bright);
+}
+.agent-item-list,
+.agent-eval-list,
+.agent-mini-list{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.agent-item{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 260px;
+  gap:14px;
+  padding:12px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:8px;
+  background:rgba(0,0,0,.18);
+}
+.agent-item-topline{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+.agent-item-topline a{
+  color:var(--text-bright);
+  font-size:15px;
+  font-weight:700;
+}
+.agent-item p,
+.agent-mini-list p{
+  margin:8px 0 0;
+  color:var(--text);
+  line-height:1.5;
+}
+.agent-note-line{
+  margin-top:8px;
+  padding:8px 10px;
+  border-left:2px solid var(--border-accent);
+  background:rgba(255,255,255,.025);
+  text-transform:none;
+  letter-spacing:0;
+}
+.agent-note-line.bad{border-left-color:rgba(239,68,68,.7);color:#fca5a5;}
+.agent-pill,
+.agent-route-strip span{
+  display:inline-flex;
+  align-items:center;
+  min-height:22px;
+  border:1px solid var(--border);
+  border-radius:999px;
+  padding:3px 8px;
+  font-family:var(--mono);
+  font-size:10px;
+  color:var(--muted);
+  background:rgba(255,255,255,.025);
+}
+.agent-pill.promote,
+.agent-pill.reviewed,
+.agent-eval-score.ok{border-color:rgba(34,197,94,.35);color:#86efac;}
+.agent-pill.hold,
+.agent-pill.review_write,
+.agent-pill.summary{border-color:rgba(250,204,21,.35);color:#fde68a;}
+.agent-pill.demote,
+.agent-pill.quarantined,
+.agent-eval-score.bad{border-color:rgba(239,68,68,.35);color:#fca5a5;}
+.agent-route-strip{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+  margin-top:10px;
+}
+.agent-route-strip.compact{margin-top:6px;}
+.agent-route-list,
+.agent-claim-list{
+  display:grid;
+  gap:6px;
+  margin-top:10px;
+}
+.agent-route-list div,
+.agent-claim-list div,
+.agent-eval-row,
+.agent-mini-list article{
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:8px;
+  padding:8px 10px;
+  background:rgba(255,255,255,.018);
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.45;
+}
+.agent-route-list b,
+.agent-claim-list b{
+  color:var(--accent2);
+  margin-right:6px;
+}
+.agent-route-list span{
+  color:var(--muted);
+  margin-left:6px;
+}
+.agent-item-controls{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.agent-item-controls textarea,
+.agent-eval-mini select{
+  width:100%;
+}
+.agent-control-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:6px;
+  margin-top:8px;
+}
+.agent-eval-mini{
+  display:grid;
+  gap:8px;
+  padding-top:10px;
+  border-top:1px solid rgba(255,255,255,.08);
+}
+.agent-eval-mini label{
+  display:grid;
+  gap:4px;
+  color:var(--muted);
+  font-size:11px;
+}
+.agent-eval-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:10px;
+  align-items:center;
+}
+.agent-eval-title{
+  color:var(--text-bright);
+  font-weight:700;
+  font-size:13px;
+}
+.agent-eval-score{
+  margin-top:8px;
+  font-family:var(--mono);
+  font-size:11px;
+  color:var(--muted);
+}
+.agent-empty{
+  border:1px dashed var(--border);
+  border-radius:8px;
+  padding:18px;
+  color:var(--muted);
+  text-align:center;
+}
+@media (max-width:1100px){
+  .agent-review-grid,
+  .agent-item,
+  .agent-review-head{
+    grid-template-columns:1fr;
+  }
+  .agent-review-actions{
+    justify-content:flex-start;
+  }
+  .agent-review-metrics{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+}
+@media (max-width:720px){
+  .agent-review-metrics{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .agent-control-grid{
+    grid-template-columns:1fr;
+  }
+}
+</style>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const status = document.getElementById('intake-bridge-status');
+  const controller = new AbortController();
+  fetch('/api/agents/intake/status', {signal:controller.signal}).then(async response => {
+    if (!response.ok) throw new Error('Bridge status could not be checked.');
+    const data = await response.json();
+    status.textContent = data.message;
+    status.dataset.state = data.state;
+  }).catch(error => { if (error.name !== 'AbortError') status.textContent = error.message; });
+  window.addEventListener('pagehide', () => controller.abort(), {once:true});
+})();
+</script>
+{% endblock %}

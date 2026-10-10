@@ -1,0 +1,405 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="markets-page">
+  <div class="markets-layout">
+    <div class="panel sidebar">
+      <div class="hd">
+        <h2>Filters</h2>
+      </div>
+      <div class="bd">
+        <div class="field">
+          <label>Time Window</label>
+          <div class="chiprow">
+            <button class="filter-chip {{ 'active' if days == 7 else '' }}" type="button" data-days="7">7 days</button>
+            <button class="filter-chip {{ 'active' if days == 14 else '' }}" type="button" data-days="14">14 days</button>
+            <button class="filter-chip {{ 'active' if days == 30 else '' }}" type="button" data-days="30">30 days</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Tracked Entities</label>
+          <div class="entity-list">
+            {% for entity in top_entities[:15] %}
+              <div class="entity-row">
+                <span class="entity-name">{{ entity.name }}</span>
+                <span class="entity-count">{{ entity.count }}</span>
+              </div>
+            {% endfor %}
+            {% if top_entities|length == 0 %}
+              <div style="color:var(--muted);font-size:11px;">No entity mentions yet.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="hd">
+        <div class="hd-left">
+          <h2>Feed Intelligence</h2>
+          <span class="pill">{{ total_docs }} docs in window</span>
+        </div>
+      </div>
+
+      <div class="bd">
+        <div class="intel-grid">
+          <div class="intel-card">
+            <div class="intel-title">Documents per Day</div>
+            <div class="intel-value">{{ "%.1f"|format(docs_per_day) }}</div>
+            <div class="intel-subtitle">average over {{ days }} days</div>
+          </div>
+
+          <div class="intel-card">
+            <div class="intel-title">Words per Minute</div>
+            <div class="intel-value">{{ "%.0f"|format(wpm) }}</div>
+            <div class="intel-subtitle">ingested content velocity</div>
+          </div>
+
+          <div class="intel-card">
+            <div class="intel-title">Top Source</div>
+            <div class="intel-value source">{{ top_source or '—' }}</div>
+            <div class="intel-subtitle">{{ top_source_count }} docs</div>
+          </div>
+
+          <div class="intel-card">
+            <div class="intel-title">Languages</div>
+            <div class="intel-value">{{ language_count }}</div>
+            <div class="intel-subtitle">{{ top_language or 'en' }} primary</div>
+          </div>
+        </div>
+
+        <hr style="border:0;border-top:1px solid var(--border);margin:20px 0;" />
+
+        <div class="intel-section">
+          <h3>Document Volume by Source</h3>
+          <div class="volume-chart">
+            {% for source in source_volumes[:10] %}
+              <div class="volume-row">
+                <span class="volume-label">{{ source.name }}</span>
+                <div class="volume-bar-container">
+                  <div class="volume-bar" style="width: {{ source.pct }}%;"></div>
+                </div>
+                <span class="volume-count">{{ source.count }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="intel-section">
+          <h3>Domain Distribution</h3>
+          <div class="domain-chips">
+            {% for domain in domain_distribution %}
+              <div class="domain-chip">
+                <span class="domain-name">{{ domain.name }}</span>
+                <span class="domain-count">{{ domain.count }}</span>
+              </div>
+            {% endfor %}
+            {% if domain_distribution|length == 0 %}
+              <div style="color:var(--muted);font-size:11px;">No domain tags yet.</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="intel-section">
+          <h3>Recent Activity Heatmap</h3>
+          <div class="heatmap">
+            {% for day in activity_heatmap %}
+              <div class="heatmap-day" title="{{ day.date }}: {{ day.count }} docs" style="opacity: {{ 0.2 + (day.intensity * 0.8) }};">
+                <span class="heatmap-label">{{ day.weekday }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel sidebar">
+      <div class="hd">
+        <h2>Currency</h2>
+        <span class="pill">{{ fx_date or 'N/A' }}</span>
+      </div>
+      <div class="bd">
+        {% if fx_rates %}
+          <div class="fx-list">
+            {% for pair, rate in fx_rates[:8] %}
+              <div class="fx-row">
+                <span class="fx-pair">{{ pair }}</span>
+                <span class="fx-rate">{{ "%.4f"|format(rate) }}</span>
+              </div>
+            {% endfor %}
+          </div>
+          <a href="/currency" class="btn" style="width:100%;margin-top:12px;">Full Currency View</a>
+        {% else %}
+          <div style="color:var(--muted);font-size:11px;text-align:center;">
+            No FX data available.
+          </div>
+        {% endif %}
+      </div>
+
+      <hr style="border:0;border-top:1px solid var(--border);margin:16px 0;" />
+
+      <div class="hd" style="padding-top:0;">
+        <h2>Real-Time Data</h2>
+      </div>
+      <div class="bd">
+        <div class="notice-box">
+          <div class="notice-icon">📊</div>
+          <div class="notice-text">
+            Real-time market data requires licensed feeds.
+            <br><br>
+            <strong>Coming soon:</strong> Premium tier with live quotes, charts, and alerts.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.markets-page {
+  min-height: 100%;
+}
+
+.markets-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr 220px;
+  gap: 14px;
+}
+
+@media (max-width: 1100px) {
+  .markets-layout {
+    grid-template-columns: 1fr;
+  }
+  .markets-layout .sidebar {
+    display: none;
+  }
+}
+
+.entity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.entity-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.entity-name {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  margin-right: 8px;
+}
+
+.entity-count {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.intel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+}
+
+.intel-card {
+  padding: 16px;
+  background: rgba(7,10,13,.5);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.intel-title {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.intel-value {
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.intel-value.source {
+  font-size: 14px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.intel-subtitle {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.intel-section {
+  margin-bottom: 24px;
+}
+
+.intel-section h3 {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.volume-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.volume-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.volume-label {
+  flex: 0 0 140px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.volume-bar-container {
+  flex: 1;
+  height: 8px;
+  background: rgba(255,255,255,.05);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.volume-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), rgba(255,176,32,.5));
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.volume-count {
+  flex: 0 0 40px;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.domain-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.domain-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(7,10,13,.5);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.domain-name {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+}
+
+.domain-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.heatmap {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.heatmap-day {
+  width: 28px;
+  height: 28px;
+  background: var(--accent);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.heatmap-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: #000;
+  font-weight: 600;
+}
+
+.fx-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fx-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.fx-pair {
+  color: var(--muted);
+}
+
+.fx-rate {
+  color: var(--text);
+}
+
+.notice-box {
+  padding: 14px;
+  background: rgba(255,176,32,.08);
+  border: 1px solid rgba(255,176,32,.2);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.notice-icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.notice-text {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+</style>
+{% endblock %}

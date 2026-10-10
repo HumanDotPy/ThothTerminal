@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  .setup-shell{max-width:1100px;margin:0 auto;padding:14px 0 40px}
+  .setup-hero{display:grid;grid-template-columns:1.2fr .8fr;gap:48px;padding:34px 0 44px;border-bottom:1px solid var(--border)}
+  .setup-hero h1{margin:0 0 12px;font-size:38px;line-height:1.05}
+  .setup-hero p{max-width:650px;color:var(--muted);font-size:15px}
+  .setup-note{align-self:end;padding-left:20px;border-left:2px solid var(--accent)}
+  .pack-list{border-top:1px solid var(--border)}
+  .pack{display:grid;grid-template-columns:90px minmax(230px,.75fr) 1.25fr auto;gap:24px;align-items:start;padding:26px 0;border-bottom:1px solid var(--border)}
+  .pack-index{font-family:var(--mono);color:var(--muted)}
+  .pack h2{margin:0 0 8px;font-size:21px}.pack p{margin:0;color:var(--muted)}
+  .pack ul{margin:0;padding:0;list-style:none}.pack li{padding:5px 0;color:var(--muted);font-size:12px}
+  .pack li::before{content:"↳";margin-right:9px;color:var(--accent)}
+  .advanced{display:flex;justify-content:space-between;gap:30px;align-items:center;padding:34px 0}
+  @media(max-width:800px){.setup-hero{grid-template-columns:1fr}.pack{grid-template-columns:42px 1fr}.pack-sources,.pack form{grid-column:2}.advanced{align-items:flex-start;flex-direction:column}}
+</style>
+<div class="setup-shell">
+  <section class="setup-hero">
+    <div>
+      <div class="eyebrow">First run</div>
+      <h1>Start with sources that work.</h1>
+      <p>Choose one or more small public packs. Thoth will add them idempotently and run a first connection check. You can remove, pause, or customize every source later.</p>
+    </div>
+    <div class="setup-note">
+      <strong>No credentials required</strong>
+      <p>These packs use public RSS feeds. Browser sessions, paid subscriptions, email, and API keys stay optional.</p>
+    </div>
+  </section>
+  <div class="pack-list">
+    {% for pack in packs %}
+    <section class="pack">
+      <div class="pack-index">0{{ loop.index }}</div>
+      <div><h2>{{ pack.name }}</h2><p>{{ pack.description }}</p></div>
+      <ul class="pack-sources">{% for source in pack.sources %}<li>{{ source.name }}</li>{% endfor %}</ul>
+      <form method="post" action="/sources/setup">
+        <input type="hidden" name="pack_id" value="{{ pack.id }}" />
+        <button class="btn primary" type="submit">Add &amp; test</button>
+      </form>
+    </section>
+    {% endfor %}
+  </div>
+  <section class="advanced">
+    <div><strong>Already know what you need?</strong><p style="margin:5px 0 0;color:var(--muted)">Use the full editor for RSS, web lists, filings, browser-backed sources, and data APIs.</p></div>
+    <a class="btn" href="/sources/new">Open advanced source editor</a>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-section roadmap-surface">
+  <header class="surface-heading">
+    <div><p class="eyebrow">Forward projection</p><h1>Roadmaps</h1><p class="muted">Dated milestones, source-owned expectations, and non-consensus claims ordered from today forward.</p></div>
+    <div class="surface-heading-actions"><a class="btn" href="/consensus">Models</a><a class="btn" href="/instruments/requests">Open gaps</a></div>
+  </header>
+  <div class="roadmap-today-anchor" role="note"><strong>Today</strong> <time datetime="{{ today_anchor }}">{{ today_anchor }}</time></div>
+  <form class="filter-bar surface-filter" method="get" action="/roadmaps">
+    <input type="search" name="q" placeholder="Search milestones, companies, technologies" value="{{ filters.q }}" />
+    <select name="view"><option value="">All lenses</option>{% for row in views %}<option value="{{ row.view_key }}" {% if filters.view == row.view_key %}selected{% endif %}>{{ row.title }}</option>{% endfor %}</select>
+    <select name="category"><option value="">All categories</option>{% for row in categories %}<option value="{{ row }}" {% if filters.category == row %}selected{% endif %}>{{ row }}</option>{% endfor %}</select>
+    <select name="period" aria-label="Roadmap time period"><option value="upcoming" {% if filters.period == 'upcoming' %}selected{% endif %}>Upcoming and unscheduled</option><option value="past" {% if filters.period == 'past' %}selected{% endif %}>Past milestones</option><option value="all" {% if filters.period == 'all' %}selected{% endif %}>All milestones</option></select>
+    <button type="submit">Apply</button>
+  </form>
+
+  {% set state = namespace(horizon='') %}
+  <div class="roadmap-timeline">
+    {% for row in entries %}
+      {% if row.ui_horizon != state.horizon %}
+        {% if state.horizon %}</div></section>{% endif %}
+        {% set state.horizon = row.ui_horizon %}
+        <section class="roadmap-horizon {{ 'is-past' if row.ui_horizon == 'Past / needs review' else '' }}">
+          <div class="roadmap-horizon-head"><h2>{{ row.ui_horizon }}</h2><span>{{ row.ui_timing_basis }}</span></div>
+          <div class="roadmap-horizon-list">
+      {% endif %}
+      {% set forecast = forecast_metadata.get(row.id, {}) %}
+      <article class="roadmap-entry">
+        <div class="roadmap-when"><b>{{ row.expected_window or row.target_date or row.target_year or "TBD" }}</b>{% if row.target_quarter %}<span>Q{{ row.target_quarter }}</span>{% endif %}<small>{{ row.ui_timing_basis }}</small></div>
+        <div class="roadmap-core"><h3><a href="/roadmaps/{{ row.id }}">{{ row.title }}</a></h3><p>{{ row.statement }}</p><div class="roadmap-tags">{% for item in row.applies_to[:4] %}<span>{{ item }}</span>{% endfor %}{% for link in row.view_links[:2] %}<span>{{ link.view.title }}</span>{% endfor %}</div></div>
+        <div class="roadmap-source"><b>{{ row.owner or "Owner unresolved" }}</b><span>{{ row.stance or "watch" }} · {{ row.confidence_label or "unrated" }}</span>{% if row.source_url %}<a href="{{ row.source_url }}" target="_blank" rel="noreferrer">Source</a>{% endif %}</div>
+        <div class="roadmap-latest"><div class="roadmap-tags"><span>{{ (forecast.get('outcome') or 'unreviewed') | replace('_', ' ') }}</span>{% if forecast.get('revision_kind') %}<span>{{ forecast.revision_kind | replace('_', ' ') }}</span>{% endif %}</div><small>{{ row.mention_count }} mention{{ '' if row.mention_count == 1 else 's' }}</small><details><summary>Details</summary>{% if forecast.get('explanation') %}<p>{{ forecast.explanation }}</p>{% endif %}{% if forecast.get('change_rationale') %}<p>{{ forecast.change_rationale }}</p>{% endif %}<a href="/roadmaps/{{ row.id }}">Forecast history and evidence</a></details></div>
+      </article>
+    {% else %}<div class="empty-state">No roadmap entries match these filters.</div>{% endfor %}
+    {% if state.horizon %}</div></section>{% endif %}
+  </div>
+</section>
+{% endblock %}

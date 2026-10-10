@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="viz-page dataset-catalog-page">
+  <div class="viz-header">
+    <div class="viz-title-row">
+      <div>
+        <h1>Dataset Workbench</h1>
+        <p style="color:var(--muted);margin:8px 0 0;max-width:780px;">Structured imports, trade tables, earnings actuals, and analyst-curated trackers live here. Datasets are the canonical surface for tables, views, exports, chart bindings, stage tracking, and supply-chain context.</p>
+      </div>
+      <div class="btnrow">
+        <a href="/visualizations/charts" class="btn">← Charts</a>
+        <a href="/visualizations/supply-chains" class="btn">Supply Chains</a>
+        <button type="button" class="btn primary" id="dataset-new-btn">+ New Dataset</button>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:16px;">
+      <div class="bd">
+        <form method="get" action="/visualizations/datasets" class="grid" style="grid-template-columns:1.3fr .9fr .9fr .55fr auto;gap:12px;align-items:end;">
+          <div class="field" style="margin:0;">
+            <label>Search</label>
+            <input type="text" name="q" value="{{ query }}" placeholder="TSMC capex, Taiwan customs, backlog, HBM" />
+          </div>
+          <div class="field" style="margin:0;">
+            <label>Family</label>
+            <select name="family">
+              <option value="">All families</option>
+              {% for value in family_options %}
+              <option value="{{ value }}" {% if family_filter == value %}selected{% endif %}>{{ value }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field" style="margin:0;">
+            <label>Category</label>
+            <select name="category">
+              <option value="">All categories</option>
+              {% for value in category_options %}
+              <option value="{{ value }}" {% if category_filter == value %}selected{% endif %}>{{ value }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field" style="margin:0;">
+            <label>Rows</label>
+            <select name="limit">
+              {% for value in limit_options %}
+              <option value="{{ value }}" {% if limit_filter == value|string %}selected{% endif %}>{{ value }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="btnrow" style="justify-content:flex-end;">
+            <a href="/visualizations/datasets" class="btn">Reset</a>
+            <button type="submit" class="btn primary">Filter</button>
+          </div>
+        </form>
+        <div class="viz-equities" style="gap:8px;flex-wrap:wrap;margin-top:14px;">
+          <span class="pill mono">{{ scope_label }}</span>
+          <span class="pill mono">catalog {{ total_count }}</span>
+          <span class="pill mono">scope {{ scoped_count }}</span>
+          <span class="pill mono">showing {{ items|length }}{% if display_limited %} of {{ deduped_match_count }}{% endif %}</span>
+          {% if duplicate_count %}<span class="pill mono">deduped {{ duplicate_count }}</span>{% endif %}
+          {% if family_filter %}<span class="pill mono">family {{ family_filter }}</span>{% endif %}
+          {% if category_filter %}<span class="pill mono">category {{ category_filter }}</span>{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dataset-index-shell">
+  <aside class="dataset-index-rail">
+  {% if data_rails %}
+  <div class="panel data-rail-panel">
+    <div class="hd">
+      <h2>Data Rails</h2>
+      <div class="btnrow">
+        <a href="/visualizations/datasets?family=trade_customs" class="btn primary">Trade / Customs</a>
+        <a href="/visualizations/datasets?family=ipo_calendar" class="btn">IPO Calendar</a>
+      </div>
+    </div>
+    <div class="bd">
+      <div class="data-rail-grid">
+        {% for rail in data_rails %}
+        <a class="data-rail{% if rail.featured %} featured{% endif %}{% if family_filter == rail.family %} active{% endif %}{% if not rail.active %} empty{% endif %}" href="{{ rail.href }}">
+          <span class="data-rail-main">
+            <span class="data-rail-label">{{ rail.label }}</span>
+            <span class="data-rail-summary">{{ rail.summary }}</span>
+          </span>
+          <span class="data-rail-meta">
+            <span class="pill mono">{{ rail.count }} datasets</span>
+            {% if rail.latest_title %}<span class="data-rail-latest">{{ rail.latest_title }}</span>{% endif %}
+          </span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if family_lanes %}
+  <details class="panel dataset-family-lanes">
+    <summary class="hd"><h2>Family Lanes</h2><span class="pill mono">{{ family_lanes|length }}</span></summary>
+    <div class="bd">
+      <div class="viz-grid">
+        {% for lane in family_lanes %}
+        <div class="viz-card" style="display:flex;flex-direction:column;gap:12px;">
+          <div class="viz-card-header">
+            <h2>{{ lane.meta.label or lane.family }}</h2>
+            <p class="viz-subtitle">{{ lane.meta.summary }}</p>
+          </div>
+          <div class="viz-equities" style="gap:8px;flex-wrap:wrap;">
+            <span class="pill mono">datasets {{ lane.count }}</span>
+            <span class="pill mono">rows {{ lane.row_count }}</span>
+            <span class="pill mono">views {{ lane.view_count }}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            {% for item in lane["items"] %}
+            <div class="link-row">
+              <div>
+                <div><a href="/visualizations/datasets/{{ item.id }}">{{ item.display_title or item.title }}</a></div>
+                <div style="color:var(--muted);font-size:11px;">{{ item.category }}{% if item.source_kind %} · {{ item.source_kind }}{% endif %}</div>
+              </div>
+              <div style="font-family:var(--mono);font-size:11px;">rows {{ item.counts.rows }}</div>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="viz-card-actions">
+            <a href="/visualizations/datasets?family={{ lane.family }}" class="btn">Open Family</a>
+            {% if lane["items"] %}<a href="/visualizations/datasets/{{ lane["items"][0].id }}" class="btn primary">Quick Open</a>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </details>
+  {% endif %}
+  </aside>
+
+  <section class="panel dataset-ledger-panel">
+    <div class="hd dataset-ledger-head">
+      <div>
+      <h2>Dataset Ledger</h2>
+      <div class="dataset-ledger-copy">
+        Family-aware cards remain below for direct workbench access and export shortcuts.{% if display_limited %} Showing the newest {{ display_limit }} matches; use search or category filters to narrow the full {{ deduped_match_count }} matching datasets.{% endif %}
+      </div>
+      </div>
+      <span class="pill mono">{{ items|length }} visible</span>
+    </div>
+  <div class="dataset-ledger" role="list">
+    {% if items %}
+      {% for item in items %}
+      <article class="dataset-ledger-row{% if loop.first %} is-selected{% endif %}" role="listitem" tabindex="0"
+        data-title="{{ (item.display_title or item.title)|e }}"
+        data-family="{{ (item.family_label or item.family)|e }}"
+        data-category="{{ item.category|e }}"
+        data-source="{{ (item.source_kind or 'unspecified')|e }}"
+        data-rows="{{ item.counts.rows }}" data-columns="{{ item.counts.columns }}"
+        data-views="{{ item.counts.views }}" data-links="{{ item.counts.links }}"
+        data-updated="{{ ((item.updated_at or '')[:16]|replace('T',' ')) if item.updated_at else 'unknown' }}"
+        data-description="{{ (item.description or 'No description has been written for this dataset.')|e }}"
+        data-id="{{ item.id }}"
+        data-url="/visualizations/datasets/{{ item.id }}">
+        <div class="dataset-ledger-main">
+          <a href="/visualizations/datasets/{{ item.id }}">{{ item.display_title or item.title }}</a>
+          <span>{{ item.description or item.provenance_summary or 'Structured institutional dataset.' }}</span>
+        </div>
+        <div class="dataset-ledger-cell"><span>Family</span><strong>{{ item.family_label or item.family }}</strong></div>
+        <div class="dataset-ledger-cell"><span>Category</span><strong>{{ item.category }}</strong></div>
+        <div class="dataset-ledger-cell dataset-ledger-counts"><span>Shape</span><strong>{{ item.counts.rows }} × {{ item.counts.columns }}</strong></div>
+        <div class="dataset-ledger-cell"><span>Updated</span><strong>{{ (item.updated_at or '')[:10] if item.updated_at else 'unknown' }}</strong></div>
+        <a class="btn dataset-ledger-open" href="/visualizations/datasets/{{ item.id }}">Open</a>
+      </article>
+      {% endfor %}
+    {% else %}
+      <div class="viz-empty">
+        <h3>No datasets match this view</h3>
+        <p>Adjust the filters or create a dataset for trade imports, capacity trackers, lead-time tables, earnings actuals, or analyst-maintained coverage sheets.</p>
+        <button type="button" class="btn primary" id="dataset-empty-create">+ Create Dataset</button>
+      </div>
+    {% endif %}
+  </div>
+  </section>
+
+  <aside class="panel dataset-inspector" aria-label="Dataset inspector">
+    <div class="hd"><h2>Dataset Inspector</h2><span class="dataset-inspector-index mono">1 / {{ items|length }}</span></div>
+    <div class="bd">
+      {% if items %}
+      {% set first = items[0] %}
+      <div class="kicker">Selected Dataset</div>
+      <h2 id="dataset-inspector-title">{{ first.display_title or first.title }}</h2>
+      <p id="dataset-inspector-description">{{ first.description or 'No description has been written for this dataset.' }}</p>
+      <dl class="dataset-inspector-facts">
+        <div><dt>Family</dt><dd id="dataset-inspector-family">{{ first.family_label or first.family }}</dd></div>
+        <div><dt>Category</dt><dd id="dataset-inspector-category">{{ first.category }}</dd></div>
+        <div><dt>Source</dt><dd id="dataset-inspector-source">{{ first.source_kind or 'unspecified' }}</dd></div>
+        <div><dt>Rows</dt><dd id="dataset-inspector-rows">{{ first.counts.rows }}</dd></div>
+        <div><dt>Columns</dt><dd id="dataset-inspector-columns">{{ first.counts.columns }}</dd></div>
+        <div><dt>Views / Links</dt><dd id="dataset-inspector-links">{{ first.counts.views }} / {{ first.counts.links }}</dd></div>
+        <div><dt>Updated</dt><dd id="dataset-inspector-updated">{{ (first.updated_at or '')[:16]|replace('T',' ') if first.updated_at else 'unknown' }}</dd></div>
+      </dl>
+      <div class="dataset-inspector-actions">
+        <a class="btn primary" id="dataset-inspector-open" href="/visualizations/datasets/{{ first.id }}">Open Workbench</a>
+        <a class="btn" id="dataset-inspector-csv" href="/api/datasets/{{ first.id }}/export?format=csv">CSV</a>
+      </div>
+      {% else %}
+      <p>No dataset is selected.</p>
+      {% endif %}
+    </div>
+  </aside>
+  </div>
+</div>
+
+<div class="modal-overlay" id="dataset-modal" style="display:none;">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>New Dataset</h2>
+      <button type="button" class="btn" id="dataset-close-btn">×</button>
+    </div>
+    <div class="modal-body">
+      <form id="dataset-form">
+        <div class="field">
+          <label>Title</label>
+          <input type="text" name="title" required placeholder="Taiwan Memory Export Table" />
+        </div>
+        <div class="field">
+          <label>Description</label>
+          <textarea name="description" rows="3" placeholder="What this dataset tracks and why it matters."></textarea>
+        </div>
+        <div class="grid-2col" style="gap:12px;">
+          <div class="field">
+            <label>Category</label>
+            <input type="text" name="category" value="general" />
+          </div>
+          <div class="field">
+            <label>Family</label>
+            <input type="text" name="family" value="general" placeholder="trade_customs / earnings_actuals / product_stage_tracker" />
+          </div>
+        </div>
+        <div class="grid-2col" style="gap:12px;">
+          <div class="field">
+            <label>Source Kind</label>
+            <input type="text" name="source_kind" placeholder="trade_customs / analyst / internal" />
+          </div>
+        </div>
+        <div class="btnrow" style="justify-content:flex-end;margin-top:16px;">
+          <button class="btn primary" type="submit">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  const modal = document.getElementById('dataset-modal');
+  const openers = [document.getElementById('dataset-new-btn'), document.getElementById('dataset-empty-create')].filter(Boolean);
+  const closeBtn = document.getElementById('dataset-close-btn');
+  const form = document.getElementById('dataset-form');
+
+  const ledgerRows = Array.from(document.querySelectorAll('.dataset-ledger-row'));
+  const selectLedgerRow = (row, index) => {
+    if (!row) return;
+    ledgerRows.forEach((item) => item.classList.toggle('is-selected', item === row));
+    const setText = (id, value) => { const node = document.getElementById(id); if (node) node.textContent = value; };
+    setText('dataset-inspector-title', row.dataset.title || 'Dataset');
+    setText('dataset-inspector-description', row.dataset.description || 'No description has been written for this dataset.');
+    setText('dataset-inspector-family', row.dataset.family || 'general');
+    setText('dataset-inspector-category', row.dataset.category || 'general');
+    setText('dataset-inspector-source', row.dataset.source || 'unspecified');
+    setText('dataset-inspector-rows', row.dataset.rows || '0');
+    setText('dataset-inspector-columns', row.dataset.columns || '0');
+    setText('dataset-inspector-links', `${row.dataset.views || '0'} / ${row.dataset.links || '0'}`);
+    setText('dataset-inspector-updated', row.dataset.updated || 'unknown');
+    const open = document.getElementById('dataset-inspector-open');
+    const csv = document.getElementById('dataset-inspector-csv');
+    if (open) open.href = row.dataset.url || '#';
+    if (csv) csv.href = `/api/datasets/${row.dataset.id || ''}/export?format=csv`;
+    const counter = document.querySelector('.dataset-inspector-index');
+    if (counter) counter.textContent = `${index + 1} / ${ledgerRows.length}`;
+  };
+  ledgerRows.forEach((row, index) => {
+    row.addEventListener('click', (event) => { if (!event.target.closest('a')) selectLedgerRow(row, index); });
+    row.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectLedgerRow(row, index); } });
+  });
+
+  openers.forEach((btn) => btn.addEventListener('click', () => { modal.style.display = 'flex'; }));
+  closeBtn?.addEventListener('click', () => { modal.style.display = 'none'; });
+  modal?.addEventListener('click', (event) => {
+    if (event.target === modal) modal.style.display = 'none';
+  });
+
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const payload = Object.fromEntries(new FormData(form).entries());
+    const resp = await fetch('/api/datasets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (data.ok && data.redirect) {
+      window.location.href = data.redirect;
+      return;
+    }
+    quickToast(data.error || 'Failed to create dataset', 'error');
+  });
+})();
+</script>
+{% endblock %}

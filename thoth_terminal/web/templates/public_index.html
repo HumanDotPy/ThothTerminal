@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Thoth Research</title>
+  <style>
+    :root{--ink:#111b29;--muted:#59697b;--line:#cad2dc;--paper:#fbfcfd;--wash:#f3f6f8;--link:#0c5da5}
+    *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 Inter,"Segoe UI",system-ui,sans-serif}
+    a{color:inherit}.mast{height:74px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 44px}
+    .brand{font:600 25px/1 Georgia,serif;letter-spacing:.24em;text-decoration:none}.brand span{font:500 12px/1 system-ui,sans-serif;letter-spacing:.28em}
+    .mast nav{display:flex;gap:28px;color:var(--muted);font-size:12px}.mast nav a{text-decoration:none}.mast nav a:hover{color:var(--link)}
+    .layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;min-height:calc(100vh - 74px)}
+    main{min-width:0;padding:32px 42px 54px}.intro{max-width:760px}.kicker{color:var(--link);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+    h1{margin:5px 0 5px;font:600 36px/1.1 Georgia,serif;letter-spacing:0}.intro p{margin:0;color:var(--muted);font-size:13px}
+    .filters{display:grid;grid-template-columns:minmax(260px,1fr) 190px 190px auto;gap:10px;margin:28px 0 18px}
+    input,select,button{height:40px;border:1px solid var(--line);border-radius:2px;background:#fff;color:var(--ink);padding:0 12px;font:13px inherit}
+    input:focus,select:focus,button:focus{outline:2px solid #8db8df;outline-offset:1px}.count{display:flex;justify-content:space-between;margin-bottom:7px;color:var(--muted);font-size:12px}
+    .table{border-top:1px solid var(--ink)}.head,.report{display:grid;grid-template-columns:minmax(280px,1.4fr) 150px 170px 70px minmax(260px,1fr);gap:18px;align-items:center}
+    .head{min-height:38px;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase}.report{min-height:76px;border-top:1px solid var(--line);text-decoration:none}
+    .report:hover{background:var(--wash)}.title strong{display:block;font:600 16px/1.25 Georgia,serif}.title small,.dates small{display:block;margin-top:4px;color:var(--muted);font-size:11px}
+    .type{justify-self:start;padding:3px 7px;border:1px solid var(--line);border-radius:2px;font-size:10px}.dates,.version,.summary{font-size:12px}.summary{color:#344456}
+    .empty{padding:42px 0;border-top:1px solid var(--line);color:var(--muted)}
+    .pager{display:flex;align-items:center;gap:5px;margin-top:18px}.pager button{min-width:34px;height:34px;padding:0 8px}.pager button[aria-current="page"]{border-color:var(--ink);background:var(--ink);color:#fff}.pager button:disabled{opacity:.35}.pager span{padding:0 4px;color:var(--muted)}
+    aside{border-left:1px solid var(--line);padding:35px 30px;background:#fff}.aside-section{padding:0 0 26px;margin-bottom:26px;border-bottom:1px solid var(--line)}
+    .aside-section:last-child{border-bottom:0}.aside-section h2{margin:0 0 12px;font-size:12px;letter-spacing:.08em;text-transform:uppercase}.aside-section p,.aside-section li{color:var(--muted);font-size:12px}
+    .aside-section ul{margin:0;padding-left:18px}.stats{display:grid;grid-template-columns:1fr auto;gap:7px;font-size:12px}.stats span:nth-child(odd){color:var(--muted)}
+    [hidden]{display:none!important}
+    @media(max-width:1100px){.layout{grid-template-columns:1fr}.layout aside{border-left:0;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(3,1fr);gap:24px}.aside-section{border:0;margin:0}.head,.report{grid-template-columns:minmax(240px,1.4fr) 130px 150px 60px minmax(220px,1fr)}}
+    @media(max-width:760px){.mast{height:62px;padding:0 16px}.mast nav{display:none}.brand{font-size:19px}.layout{display:block}main{padding:24px 16px}.filters{grid-template-columns:1fr}.head{display:none}.report{display:block;padding:16px 0}.report>*{margin-top:8px}.report .title{margin-top:0}.layout aside{display:block;padding:25px 16px}}
+  </style>
+</head>
+<body>
+  <header class="mast"><a class="brand" href="/">THOTH <span>RESEARCH</span></a><nav><a href="/">The product</a><a href="https://agenticsystemsgroup.com/">Agentic Systems Group</a><a href="https://github.com/HumanDotPy/ThothTerminal">GitHub ↗</a></nav></header>
+  <div class="layout">
+    <main id="library">
+      <div class="intro"><div class="kicker">Thoth Terminal</div><h1>Published research</h1><p>Reports with their sources, publication dates, and versions. Browse the work or learn about the <a href="/">research workspace behind it</a>.</p></div>
+      <div class="filters">
+        <input id="public-search" type="search" placeholder="Search publications, topics, or titles" aria-label="Search publications" />
+        <select id="public-topic" aria-label="Filter by topic"><option value="">All topics</option>{% for value in topics %}<option value="{{ value|lower }}">{{ value }}</option>{% endfor %}</select>
+        <select id="public-type" aria-label="Filter by report type"><option value="">All report types</option>{% for value in report_types %}<option value="{{ value|lower }}">{{ value }}</option>{% endfor %}</select>
+        <button id="public-reset" type="button">Reset</button>
+      </div>
+      <div class="count"><span><strong id="public-count">{{ publications|length }}</strong> publications</span><span>Newest first</span></div>
+      <div class="table">
+        <div class="head"><span>Title</span><span>Type</span><span>Published / as of</span><span>Version</span><span>Summary</span></div>
+        {% for row in publications %}
+        <a class="report" href="/public/reports/{{ row.slug }}/reader" data-search="{{ (row.title ~ ' ' ~ row.topic ~ ' ' ~ row.report_type ~ ' ' ~ row.summary)|lower }}" data-topic="{{ row.topic|lower }}" data-type="{{ row.report_type|lower }}">
+          <span class="title"><strong>{{ row.title }}</strong><small>{{ row.topic }}</small></span>
+          <span class="type">{{ row.report_type }}</span>
+          <span class="dates">{{ row.published_at.strftime('%b %d, %Y') if row.published_at else 'Published' }}<small>As of {{ row.as_of_at.strftime('%b %d, %Y') if row.as_of_at else 'n/a' }}</small></span>
+          <span class="version">v{{ row.version }}</span><span class="summary">{{ row.summary }}</span>
+        </a>
+        {% else %}<div class="empty">No public reports are published yet.</div>{% endfor %}
+      </div>
+      <nav class="pager" id="public-pager" aria-label="Publication pages"></nav>
+    </main>
+    <aside>
+      <section class="aside-section" id="methodology"><h2>Methodology</h2><p>Thoth research is source-backed, versioned, and published only after an explicit release step. Public readers show the selected published artifact, not internal working state.</p></section>
+      <section class="aside-section" id="access"><h2>Access & use</h2><p>No broker connection, local file access, private research object, or authenticated terminal operation is exposed by this surface.</p></section>
+      <section class="aside-section"><h2>Library statistics</h2><div class="stats"><span>Publications</span><strong>{{ publications|length }}</strong><span>Topics</span><strong>{{ topics|length }}</strong><span>Report types</span><strong>{{ report_types|length }}</strong></div></section>
+    </aside>
+  </div>
+  <script>
+    (()=>{const q=document.getElementById('public-search'),topic=document.getElementById('public-topic'),type=document.getElementById('public-type'),rows=[...document.querySelectorAll('.report')],count=document.getElementById('public-count'),pager=document.getElementById('public-pager');const pageSize=20;let page=1;const matching=()=>{const query=q.value.trim().toLowerCase();return rows.filter(row=>(!query||row.dataset.search.includes(query))&&(!topic.value||row.dataset.topic===topic.value)&&(!type.value||row.dataset.type===type.value))};const button=(label,target,disabled,current=false)=>{const el=document.createElement('button');el.type='button';el.textContent=label;el.disabled=disabled;if(current)el.setAttribute('aria-current','page');el.addEventListener('click',()=>{page=target;render()});return el};const render=()=>{const filtered=matching(),pages=Math.max(1,Math.ceil(filtered.length/pageSize));page=Math.min(page,pages);rows.forEach(row=>row.hidden=true);filtered.slice((page-1)*pageSize,page*pageSize).forEach(row=>row.hidden=false);count.textContent=String(filtered.length);pager.innerHTML='';pager.append(button('Prev',page-1,page===1));const candidates=[1,page-2,page-1,page,page+1,page+2,pages].filter((value,index,self)=>value>=1&&value<=pages&&self.indexOf(value)===index).sort((a,b)=>a-b);let prior=0;candidates.forEach(value=>{if(prior&&value-prior>1){const gap=document.createElement('span');gap.textContent='…';pager.append(gap)}pager.append(button(String(value),value,false,value===page));prior=value});pager.append(button('Next',page+1,page===pages));pager.hidden=filtered.length<=pageSize};const resetPage=()=>{page=1;render()};q.addEventListener('input',resetPage);topic.addEventListener('change',resetPage);type.addEventListener('change',resetPage);document.getElementById('public-reset').addEventListener('click',()=>{q.value='';topic.value='';type.value='';resetPage()});render()})();
+  </script>
+</body>
+</html>

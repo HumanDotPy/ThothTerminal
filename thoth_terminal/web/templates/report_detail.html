@@ -1,0 +1,646 @@
+{% extends "base.html" %}
+{% block content %}
+{% set payload = report_content or preview_payload %}
+{% set memory_quality = report_version.memory_quality if report_version else report_summary.memory_quality %}
+{% set memory_review = report_version.memory_review if report_version else report_summary.memory_review %}
+{% set memory_decision = memory_quality.latest_decision if memory_quality else none %}
+<div class="company-page">
+  <div class="panel">
+    <div class="hd">
+      <div>
+        <h2>{{ report_summary.display_name }}</h2>
+        <div class="company-subtitle">{{ report_summary.title }}</div>
+      </div>
+      <div class="btnrow">
+        <a class="btn" href="/reports">Back</a>
+        {% if report_version %}
+        <a class="btn" href="/reports/{{ subject_slug }}?version_id={{ report_version.id }}&live=1{% if depth_days %}&depth_days={{ depth_days }}{% endif %}">Live Refresh</a>
+        {% endif %}
+        <a class="btn" href="/reports/{{ subject_slug }}/print{% if report_version %}?version_id={{ report_version.id }}{% elif depth_days %}?depth_days={{ depth_days }}{% endif %}" target="_blank" rel="noopener noreferrer">Print</a>
+      </div>
+    </div>
+    <div class="bd">
+      <div class="meta" style="margin-bottom:12px;">
+        {% if payload and payload.subject.kind %}<span class="pill">{{ payload.subject.kind }}</span>{% endif %}
+        {% if report_summary.primary_ticker %}<span class="pill">{{ report_summary.primary_ticker }}</span>{% endif %}
+        {% if report_version %}<span class="pill">v{{ report_version.version }}</span>{% endif %}
+        {% if memory_quality %}<span class="pill">{{ memory_quality.label }}</span>{% endif %}
+        {% if memory_quality and memory_quality.needs_review %}<span class="pill">needs review</span>{% endif %}
+        {% if payload and payload.window_days %}<span class="pill">{{ payload.window_days }}d window</span>{% endif %}
+        {% if live_context %}<span class="pill">live context</span>{% endif %}
+        {% if report_summary.latest_published_at %}<span class="pill" data-utc="{{ report_summary.latest_published_at }}">{{ report_summary.latest_published_at }}</span>{% endif %}
+      </div>
+
+      <div class="btnrow" style="margin-bottom:12px; flex-wrap:wrap;">
+        <form method="post" action="/reports/{{ subject_slug }}/build">
+          {% if depth_days %}<input type="hidden" name="depth_days" value="{{ depth_days }}" />{% endif %}
+          <button class="btn" type="submit">{{ 'Rebuild' if report_version else 'Build Report' }}</button>
+        </form>
+        <form method="post" action="/reports/{{ subject_slug }}/build">
+          <input type="hidden" name="refresh" value="true" />
+          {% if depth_days %}<input type="hidden" name="depth_days" value="{{ depth_days }}" />{% endif %}
+          <button class="btn" type="submit">Force Refresh</button>
+        </form>
+        {% if report_version %}
+        <form method="post" action="/reports/{{ subject_slug }}/ai-clean">
+          <input type="hidden" name="version_id" value="{{ report_version.id }}" />
+          <button class="btn" type="submit">AI Clean</button>
+        </form>
+        {% endif %}
+        {% if memory_review and memory_review.needs_follow_up %}
+        <form method="post" action="/reports/{{ subject_slug }}/memory-review/request">
+          {% if report_version %}<input type="hidden" name="version_id" value="{{ report_version.id }}" />{% endif %}
+          <button class="btn" type="submit">Create Review Request</button>
+        </form>
+        {% endif %}
+        <form method="get" action="/reports/{{ subject_slug }}">
+          <input type="number" name="depth_days" min="30" max="3650" step="30" value="{{ depth_days or (payload.window_days if payload else 730) }}" style="width:110px;" />
+          <button class="btn" type="submit">Preview Depth</button>
+        </form>
+      </div>
+
+      {% if report_version %}
+      <div class="company-stats">
+        <div class="stat-card">
+          <div class="stat-label">Version</div>
+          <div class="stat-value">{{ report_version.version }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">As Of</div>
+          <div class="stat-value" style="font-size:14px;" data-utc="{{ report_version.as_of_at }}">{{ report_version.as_of_at }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Status</div>
+          <div class="stat-value" style="font-size:14px;">{{ report_version.status }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Coverage Gaps</div>
+          <div class="stat-value">{{ (report_version.coverage_json.gaps or [])|length if report_version.coverage_json else 0 }}</div>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="report-detail-grid">
+        <div class="settings-preview">
+          <h3>Report Registry</h3>
+          <p>{{ report_summary.summary or 'No summary recorded yet.' }}</p>
+          <div class="stack-meta">
+            <span>{{ report_summary.report_type_label }}</span>
+            <span>{{ report_summary.status }}</span>
+            {% if report_summary.imported %}<span>imported</span>{% endif %}
+            {% if report_summary.freshness and report_summary.freshness.state %}<span>{{ report_summary.freshness.state }}</span>{% endif %}
+            {% if report_summary.latest_as_of_at %}<span data-utc="{{ report_summary.latest_as_of_at }}">{{ report_summary.latest_as_of_at }}</span>{% endif %}
+          </div>
+          {% if report_summary.topics or report_summary.tags or report_summary.materials or report_summary.technologies %}
+          <div class="stack-meta" style="margin-top:10px;">
+            {% for value in (report_summary.topics or [])[:6] %}<span>{{ value }}</span>{% endfor %}
+            {% for value in (report_summary.materials or [])[:5] %}<span>{{ value }}</span>{% endfor %}
+            {% for value in (report_summary.technologies or [])[:5] %}<span>{{ value }}</span>{% endfor %}
+            {% for value in (report_summary.tags or [])[:5] %}<span>{{ value }}</span>{% endfor %}
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="settings-preview">
+          <h3>Source Artifacts</h3>
+          {% if report_version and report_version.artifacts %}
+            <div class="stack-list compact-stack">
+            {% for artifact in report_version.artifacts %}
+              <div class="stack-row compact-row">
+                <div class="stack-row-main">
+                  <div class="stack-title">{{ artifact.label or artifact.artifact_type }}</div>
+                  <div class="stack-meta">
+                    <span>{{ artifact.artifact_type }}</span>
+                    {% if artifact.content_type %}<span>{{ artifact.content_type }}</span>{% endif %}
+                    {% if artifact.variant %}<span>{{ artifact.variant }}</span>{% endif %}
+                  </div>
+                </div>
+                <div class="stack-row-side">
+                  <a class="btn" href="/reports/{{ subject_slug }}/reader?version_id={{ report_version.id }}&artifact_id={{ artifact.id }}">Read</a>
+                  <a class="btn" href="/reports/{{ subject_slug }}/artifacts/{{ artifact.id }}/raw?version_id={{ report_version.id }}" target="_blank" rel="noopener noreferrer">Open</a>
+                </div>
+              </div>
+            {% endfor %}
+            </div>
+          {% else %}
+            <p>No source artifacts are attached yet.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="settings-preview" style="margin-top:14px;">
+        <h3>Linked Objects</h3>
+        {% set linked = report_summary.linked_objects or {} %}
+        {% if linked %}
+          <div class="stack-meta">
+            {% for key, values in linked.items() %}
+              {% for value in values[:8] %}
+                <span>{{ key }}: {{ value }}</span>
+              {% endfor %}
+            {% endfor %}
+          </div>
+        {% else %}
+          <p>Theses, notes, supply chains, datasets, companies, bottleneck models, and knowledge assets can be linked here as report context matures.</p>
+        {% endif %}
+      </div>
+
+      <div class="report-detail-grid" style="margin-top:14px;">
+        <div class="settings-preview">
+          <h3>Manual Addenda</h3>
+          {% if report_summary.manual_addenda %}
+            <div class="stack-list compact-stack">
+              {% for addendum in report_summary.manual_addenda %}
+              <div class="stack-row compact-row">
+                <div class="stack-row-main">
+                  <div class="stack-title">{{ addendum.title }}</div>
+                  {% if addendum.summary %}<div class="muted">{{ addendum.summary }}</div>{% endif %}
+                  <div class="stack-meta">
+                    {% if addendum.actor %}<span>{{ addendum.actor }}</span>{% endif %}
+                    {% if addendum.created_at %}<span data-utc="{{ addendum.created_at }}">{{ addendum.created_at }}</span>{% endif %}
+                    {% for tag in (addendum.tags or [])[:4] %}<span>{{ tag }}</span>{% endfor %}
+                  </div>
+                </div>
+                <div class="stack-row-side">
+                  {% if addendum.artifact_id and report_version %}
+                  <a class="btn" href="/reports/{{ subject_slug }}/reader?version_id={{ report_version.id }}&artifact_id={{ addendum.artifact_id }}">Read</a>
+                  {% endif %}
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p>No manual addenda yet. Use this layer for small corrections, added context, and human notes without replacing the original report artifact.</p>
+          {% endif %}
+        </div>
+        <div class="settings-preview">
+          <h3>Add Manual Layer</h3>
+          {% if report_version %}
+          <form method="post" action="/reports/{{ subject_slug }}/manual-addendum" class="manual-addendum-form">
+            <input type="hidden" name="version_id" value="{{ report_version.id }}" />
+            <div class="form-grid">
+              <label>Title
+                <input type="text" name="title" placeholder="Clarification on substrate cost assumptions" />
+              </label>
+              <label>Tags
+                <input type="text" name="tags" placeholder="correction, cost model" />
+              </label>
+            </div>
+            <label>Summary
+              <input type="text" name="summary" placeholder="One-line note for the report registry" />
+            </label>
+            <label>Markdown
+              <textarea name="body_md" rows="7" required placeholder="Add the correction, added context, or follow-up note here."></textarea>
+            </label>
+            <div class="btnrow" style="justify-content:flex-end;margin-top:10px;">
+              <button class="btn primary" type="submit">Add Addendum</button>
+            </div>
+          </form>
+          {% else %}
+          <p>Build or import a report before adding manual layers.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if memory_quality %}
+      <div class="stack-row" style="margin-top:14px;border-color:{% if memory_quality.needs_review %}rgba(244,177,106,.35){% else %}rgba(255,255,255,.08){% endif %};background:{% if memory_quality.needs_review %}rgba(244,177,106,.05){% else %}rgba(255,255,255,.02){% endif %};">
+        <div>
+          <div class="stack-title">Report Memory Quality</div>
+          <div class="muted" style="margin-top:6px;">
+            {{ memory_quality.label }} - {{ memory_quality.content_chars }} chars{% if memory_quality.structured_payload %} - structured payload{% else %} - unstructured payload{% endif %}{% if memory_quality.agent_direct_write %} - direct local-agent write{% endif %}
+            {% if memory_review and memory_review.needs_follow_up %}<br />{{ memory_review.label }}: {{ memory_review.summary }}{% endif %}
+          </div>
+        </div>
+        <div class="stack-meta">
+          <span>{{ memory_quality.state }}</span>
+          {% if memory_review and memory_review.action %}<span>{{ memory_review.action }}</span>{% endif %}
+          {% if memory_quality.needs_review %}<span>Needs review</span>{% else %}<span>Reviewed shape</span>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if memory_decision %}
+      <div class="stack-row" style="margin-top:14px;">
+        <div>
+          <div class="stack-title">Report Memory Decision</div>
+          <div class="muted" style="margin-top:6px;">
+            {{ memory_decision.decision }} by {{ memory_decision.actor or 'codex' }}{% if memory_decision.decided_at %} at <span data-utc="{{ memory_decision.decided_at }}">{{ memory_decision.decided_at }}</span>{% endif %}
+            {% if memory_decision.reason %}<br />{{ memory_decision.reason }}{% endif %}
+          </div>
+          {% if memory_decision.body_md %}
+          <div class="muted" style="margin-top:10px;white-space:pre-wrap;">{{ memory_decision.body_md }}</div>
+          {% endif %}
+          {% if memory_decision.evidence %}
+          <div class="stack-meta" style="margin-top:10px;">
+            {% for row in memory_decision.evidence[:6] %}
+              <span>{{ row }}</span>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+        <div class="stack-meta">
+          <span>{{ memory_decision.decision }}</span>
+          {% if memory_decision.parent_version_id %}<span>parent v{{ memory_decision.parent_version_id }}</span>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if report_version %}
+      <form method="post" action="/reports/{{ subject_slug }}/memory-review/apply" class="memory-decision-form">
+        <input type="hidden" name="version_id" value="{{ report_version.id }}" />
+        <div class="form-grid">
+          <textarea name="reason" rows="2" placeholder="Decision rationale"></textarea>
+          <textarea name="body_md" rows="3" placeholder="Addendum markdown"></textarea>
+          <textarea name="evidence_text" rows="3" placeholder="Evidence links or object ids, one per line"></textarea>
+        </div>
+        <div class="btnrow" style="margin-top:10px; flex-wrap:wrap;">
+          <button class="btn" type="submit" name="decision" value="accept">Accept Memory</button>
+          <button class="btn" type="submit" name="decision" value="addendum">Write Addendum</button>
+          <button class="btn" type="submit" name="decision" value="quarantine">Quarantine</button>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="panel">
+      <div class="hd"><h2>Identity / Freshness</h2></div>
+      <div class="bd">
+        {% if payload %}
+        <div class="stack-list">
+          <div class="stack-row"><div class="stack-title">Subject type</div><div class="stack-meta"><span>{{ payload.identity_freshness.kind }}</span></div></div>
+          {% if payload.identity_freshness.description %}<div class="stack-row"><div class="stack-title">Description</div><div class="stack-meta"><span>{{ payload.identity_freshness.description }}</span></div></div>{% endif %}
+          {% if payload.identity_freshness.primary_ticker %}<div class="stack-row"><div class="stack-title">Primary ticker</div><div class="stack-meta"><span>{{ payload.identity_freshness.primary_ticker }}</span></div></div>{% endif %}
+          {% if payload.identity_freshness.tickers %}<div class="stack-row"><div class="stack-title">Tickers</div><div class="stack-meta"><span>{{ payload.identity_freshness.tickers|join(', ') }}</span></div></div>{% endif %}
+          {% if payload.identity_freshness.latest_report_published_at %}<div class="stack-row"><div class="stack-title">Latest published</div><div class="stack-meta"><span data-utc="{{ payload.identity_freshness.latest_report_published_at }}">{{ payload.identity_freshness.latest_report_published_at }}</span></div></div>{% endif %}
+          {% if payload.identity_freshness.next_earnings %}<div class="stack-row"><div class="stack-title">Next earnings</div><div class="stack-meta"><span>{{ payload.identity_freshness.next_earnings.scheduled_date }}</span><span>{{ payload.identity_freshness.next_earnings.date_provenance }}</span></div></div>{% endif %}
+        </div>
+        {% else %}
+        <div class="empty-copy">No report data yet.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="hd"><h2>Coverage Panel</h2></div>
+      <div class="bd">
+        {% if payload and payload.coverage_panel.metrics %}
+          <div class="stack-list">
+            {% for row in payload.coverage_panel.metrics %}
+              <div class="stack-row">
+                <div class="stack-title">{{ row.label }}</div>
+                <div class="stack-meta"><span>{{ row.value }}</span></div>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+        {% if payload and payload.coverage_panel.gaps %}
+          <div class="section-title" style="margin-top:12px;">Gaps</div>
+          <div class="stack-list">
+            {% for row in payload.coverage_panel.gaps %}
+              <div class="stack-row"><div class="stack-title">{{ row }}</div></div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="panel">
+      <div class="hd"><h2>Published Primers</h2></div>
+      <div class="bd">
+        {% if payload and payload.published_primers %}
+          <div class="stack-list">
+            {% for row in payload.published_primers %}
+              <div class="stack-row">
+                <div class="stack-title"><a href="{{ row.href }}">{{ row.title }}</a></div>
+                <div class="stack-meta">
+                  <span>{{ row.subject_display_name }}</span>
+                  {% if row.relation_kind %}<span>{{ row.relation_kind }}</span>{% endif %}
+                  <span>v{{ row.version }}</span>
+                  {% if row.as_of_at %}<span data-utc="{{ row.as_of_at }}">{{ row.as_of_at }}</span>{% endif %}
+                </div>
+                {% if row.summary %}<div class="muted" style="margin-top:6px;">{{ row.summary }}</div>{% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-copy">No published primers linked yet.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="hd"><h2>Published Teardowns</h2></div>
+      <div class="bd">
+        {% if payload and payload.published_teardowns %}
+          <div class="stack-list">
+            {% for row in payload.published_teardowns %}
+              <div class="stack-row">
+                <div class="stack-title"><a href="{{ row.href }}">{{ row.title }}</a></div>
+                <div class="stack-meta">
+                  <span>{{ row.subject_display_name }}</span>
+                  {% if row.relation_kind %}<span>{{ row.relation_kind }}</span>{% endif %}
+                  <span>v{{ row.version }}</span>
+                  {% if row.as_of_at %}<span data-utc="{{ row.as_of_at }}">{{ row.as_of_at }}</span>{% endif %}
+                </div>
+                {% if row.summary %}<div class="muted" style="margin-top:6px;">{{ row.summary }}</div>{% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-copy">No published teardowns linked yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="panel">
+      <div class="hd"><h2>Subject Facts</h2></div>
+      <div class="bd">
+        {% if payload %}
+          <div class="stack-list">
+            {% if payload.subject_facts.definition %}
+              <div class="stack-row stack-row-prose">
+                <div>
+                  <div class="stack-title">Definition</div>
+                  <div class="stack-prose">{{ payload.subject_facts.definition }}</div>
+                </div>
+              </div>
+            {% endif %}
+            {% if payload.subject_facts.sector %}<div class="stack-row"><div class="stack-title">Sector</div><div class="stack-meta"><span>{{ payload.subject_facts.sector }}</span></div></div>{% endif %}
+            {% if payload.subject_facts.industry %}<div class="stack-row"><div class="stack-title">Industry</div><div class="stack-meta"><span>{{ payload.subject_facts.industry }}</span></div></div>{% endif %}
+            {% if payload.subject_facts.metrics %}<div class="stack-row"><div class="stack-title">Metrics</div><div class="stack-meta"><span>{{ payload.subject_facts.metrics|join(', ') }}</span></div></div>{% endif %}
+          </div>
+          {% if payload.subject_facts.financial_history %}
+          <div class="section-title" style="margin-top:12px;">Financial History</div>
+          <div class="stack-list">
+            {% for row in payload.subject_facts.financial_history[:24] %}
+              <div class="stack-row">
+                <div class="stack-title">{{ row.metric_label }}</div>
+                <div class="stack-meta"><span>{{ row.period_label or row.as_of_date }}</span><span>{{ row.display_value if row.display_value is not none else (row.value_number if row.value_number is not none else row.value_text) }}</span></div>
+              </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+          {% if payload.subject_facts.guidance_history %}
+          <div class="section-title" style="margin-top:12px;">Guidance History</div>
+          <div class="stack-list">
+            {% for row in payload.subject_facts.guidance_history[:24] %}
+              <div class="stack-row">
+                <div class="stack-title">{{ row.metric_label }}</div>
+                <div class="stack-meta"><span>{{ row.period_label or row.as_of_date }}</span><span>{{ row.display_value if row.display_value is not none else (row.value_number if row.value_number is not none else row.value_text) }}</span></div>
+              </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+          {% if payload.subject_facts.taxonomy %}
+          <div class="section-title" style="margin-top:12px;">Taxonomy</div>
+          <div class="stack-list">
+            {% for row in payload.subject_facts.taxonomy %}
+              <div class="stack-row"><div class="stack-title"><a href="{{ row.href }}">{{ row.display_name }}</a></div><div class="stack-meta"><span>{{ row.kind }}</span><span>{{ row.relation_kind }}</span></div></div>
+            {% endfor %}
+          </div>
+          {% endif %}
+          {% if payload.subject_facts.related_subjects %}
+          <div class="section-title" style="margin-top:12px;">Related Subjects</div>
+          <div class="stack-list">
+            {% for row in payload.subject_facts.related_subjects %}
+              <div class="stack-row"><div class="stack-title"><a href="{{ row.href }}">{{ row.display_name }}</a></div><div class="stack-meta"><span>{{ row.kind }}</span><span>{{ row.relation_kind }}</span></div></div>
+            {% endfor %}
+          </div>
+          {% endif %}
+          {% if payload.subject_facts.related_companies or payload.subject_facts.exposed_companies %}
+          <div class="section-title" style="margin-top:12px;">Company Context</div>
+          <div class="stack-list">
+            {% for row in payload.subject_facts.related_companies or payload.subject_facts.exposed_companies %}
+              <div class="stack-row"><div class="stack-title"><a href="{{ row.href }}">{{ row.display_name }}</a></div><div class="stack-meta"><span>{{ row.relation_kind }}</span></div></div>
+            {% endfor %}
+          </div>
+          {% endif %}
+        {% else %}
+        <div class="empty-copy">No report data yet.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="hd"><h2>Version History</h2></div>
+      <div class="bd">
+        {% if versions %}
+          <div class="stack-list">
+            {% for row in versions %}
+              <div class="stack-row">
+                <div class="stack-title"><a href="/reports/{{ subject_slug }}?version_id={{ row.id }}">Version {{ row.version }}</a></div>
+                <div class="stack-meta">
+                  <span>{{ row.status }}</span>
+                  {% if row.published_at %}<span data-utc="{{ row.published_at }}">{{ row.published_at }}</span>{% endif %}
+                  {% if row.trigger_kind %}<span>{{ row.trigger_kind }}</span>{% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-copy">No published versions yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="panel">
+      <div class="hd"><h2>Thesis Ledger</h2></div>
+      <div class="bd">
+        {% if payload and payload.thesis_ledger %}
+          <div class="stack-list">
+            {% for row in payload.thesis_ledger %}
+              <div class="stack-row">
+                <div class="stack-title"><a href="{{ row.href }}">{{ row.title }}</a></div>
+                <div class="stack-meta"><span>{{ row.status }}</span><span>{{ row.importance }}</span><span data-utc="{{ row.updated_at }}">{{ row.updated_at }}</span></div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-copy">No theses linked.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="hd"><h2>Note Ledger</h2></div>
+      <div class="bd">
+        {% if payload and payload.note_ledger %}
+          <div class="stack-list">
+            {% for row in payload.note_ledger %}
+              <div class="stack-row">
+                <div class="stack-title"><a href="{{ row.href }}">{{ row.title }}</a></div>
+                <div class="stack-meta"><span>{{ row.note_type }}</span><span>{{ row.status }}</span><span data-utc="{{ row.updated_at }}">{{ row.updated_at }}</span></div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-copy">No notes linked.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="panel">
+      <div class="hd"><h2>Primary Source Timeline</h2></div>
+      <div class="bd">
+        {% if payload and payload.primary_source_timeline.timeline %}
+          <div class="stack-list">
+            {% for row in payload.primary_source_timeline.timeline %}
+              <div class="stack-row">
+                <div class="stack-title"><a href="{{ row.url }}" target="_blank" rel="noopener noreferrer">{{ row.title }}</a></div>
+                <div class="stack-meta"><span>{{ row.rail }}</span><span>{{ row.label }}</span><span data-utc="{{ row.published_at }}">{{ row.published_at }}</span></div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-copy">No primary source timeline yet.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="hd"><h2>Transcript Archive + Summaries</h2></div>
+      <div class="bd">
+        {% if payload and payload.transcript_archive_summaries.rows %}
+          <div class="stack-list">
+            {% for row in payload.transcript_archive_summaries.rows %}
+              <div class="stack-row">
+                <div class="stack-title"><a href="{{ row.url }}" target="_blank" rel="noopener noreferrer">{{ row.period_label or row.title }}</a></div>
+                <div class="stack-meta"><span>{{ row.source_kind }}</span><span data-utc="{{ row.published_at }}">{{ row.published_at }}</span></div>
+                {% if row.summary_payload and row.summary_payload.overview %}
+                  <div class="muted" style="margin-top:6px;">{{ row.summary_payload.overview }}</div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-copy">No transcripts linked.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="panel">
+      <div class="hd"><h2>Supply Chain / Peer Context</h2></div>
+      <div class="bd">
+        {% if payload and payload.supply_chain_peer_context.chains %}
+          <div class="stack-list">
+            {% for row in payload.supply_chain_peer_context.chains %}
+              <div class="stack-row">
+                <div class="stack-title"><a href="{{ row.href }}">{{ row.title }}</a></div>
+                <div class="stack-meta"><span>{{ row.category }}</span><span>{{ row.counts.nodes }} nodes</span><span>{{ row.counts.edges }} edges</span></div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-copy">No linked supply chains.</div>
+        {% endif %}
+        {% if payload and payload.supply_chain_peer_context.neighbors %}
+          <div class="section-title" style="margin-top:12px;">Explicit Neighbors</div>
+          <div class="stack-list">
+            {% for row in payload.supply_chain_peer_context.neighbors %}
+              <div class="stack-row"><div class="stack-title"><a href="{{ row.href }}">{{ row.title }}</a></div><div class="stack-meta"><span>{{ row.category }}</span></div></div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="hd"><h2>Linked Datasets / Stage Trackers</h2></div>
+      <div class="bd">
+        {% if payload and payload.linked_datasets_stage_trackers.stage_entries %}
+          <div class="section-title">Stage Entries</div>
+          <div class="stack-list">
+            {% for row in payload.linked_datasets_stage_trackers.stage_entries %}
+              <div class="stack-row">
+                <div class="stack-title"><a href="{{ row.href }}">{{ row.company_name }} / {{ row.product_name }}</a></div>
+                <div class="stack-meta"><span>{{ row.stage }}</span><span>{{ row.status }}</span><span>{{ row.target_date }}</span></div>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+        {% if payload and payload.linked_datasets_stage_trackers.datasets %}
+          <div class="section-title" style="margin-top:12px;">Datasets</div>
+          <div class="stack-list">
+            {% for row in payload.linked_datasets_stage_trackers.datasets %}
+              <div class="stack-row">
+                <div class="stack-title"><a href="{{ row.href }}">{{ row.title }}</a></div>
+                <div class="stack-meta"><span>{{ row.family }}</span><span data-utc="{{ row.updated_at }}">{{ row.updated_at }}</span></div>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+        {% if not payload or ((payload.linked_datasets_stage_trackers.stage_entries or [])|length == 0 and (payload.linked_datasets_stage_trackers.datasets or [])|length == 0) %}
+          <div class="empty-copy">No linked datasets or stage trackers.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="panel">
+      <div class="hd"><h2>High-Confidence Mention Appendix</h2></div>
+      <div class="bd">
+        {% if payload and payload.high_confidence_mention_appendix.rows %}
+          <div class="stack-list">
+            {% for row in payload.high_confidence_mention_appendix.rows %}
+              <div class="stack-row">
+                <div class="stack-title">{% if row.href %}<a href="{{ row.href }}">{{ row.title }}</a>{% elif row.url %}<a href="{{ row.url }}" target="_blank" rel="noopener noreferrer">{{ row.title }}</a>{% else %}{{ row.title }}{% endif %}</div>
+                <div class="stack-meta"><span>{{ row.kind }}</span><span>{{ row.provenance_label }}</span><span>{{ row.confidence }}</span></div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-copy">No mention appendix rows.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="hd"><h2>Artifacts</h2></div>
+      <div class="bd">
+        {% if report_version and report_version.artifacts %}
+          <div class="stack-list">
+            {% for row in report_version.artifacts %}
+              <div class="stack-row">
+                <div class="stack-title"><a href="{{ row.object_url }}" target="_blank" rel="noopener noreferrer">{{ row.label or (row.artifact_type ~ ' / ' ~ row.variant) }}</a></div>
+                <div class="stack-meta">
+                  <span>{{ row.artifact_type }}</span>
+                  <span>{{ row.variant }}</span>
+                  {% if row.created_at %}<span data-utc="{{ row.created_at }}">{{ row.created_at }}</span>{% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-copy">No persisted artifacts yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.company-page { display:flex; flex-direction:column; gap:14px; }
+.company-subtitle { font-family: var(--mono); font-size:12px; color: var(--muted); margin-top:4px; }
+.company-stats { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px; margin-bottom:14px; }
+.stat-card { border:1px solid var(--border); border-radius:10px; padding:10px 12px; background:rgba(7,10,13,.38); }
+.stat-label { font-family: var(--mono); font-size:10px; color: var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+.stat-value { font-family: var(--mono); font-size:22px; margin-top:6px; }
+.two-col { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:14px; }
+.section-title { margin-bottom:8px; font-family: var(--mono); font-size:11px; color: var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+.memory-decision-form { margin-top:14px; padding-top:14px; border-top:1px solid var(--border); }
+.form-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:10px; }
+.form-grid textarea { width:100%; min-width:0; resize:vertical; }
+</style>
+{% endblock %}

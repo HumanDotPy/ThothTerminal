@@ -1,0 +1,1257 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="settings-shell">
+  <section class="workspace-header">
+    <div class="workspace-copy">
+      <div class="workspace-kicker">Shell Controls / Runtime Preferences</div>
+      <h1>Terminal preferences</h1>
+      <p>Use this page to tune the shell itself, not just backend features. Tone, intensity, and density are local front-end controls so you can decide how hard the terminal pushes the retro command-center language.</p>
+    </div>
+    <div class="workspace-summary">
+      <div class="workspace-stat">
+        <span class="workspace-stat-label">Visual tone</span>
+        <span class="workspace-stat-value" id="settings-tone-readout">measured</span>
+        <span class="workspace-stat-copy">Subtle by default, more Evangelion-coded if you want it.</span>
+      </div>
+      <div class="workspace-stat">
+        <span class="workspace-stat-label">Density</span>
+        <span class="workspace-stat-value" id="settings-density-readout">balanced</span>
+        <span class="workspace-stat-copy">Controls how compact the shared shell feels.</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="settings-layout">
+  <div class="settings-nav">
+    <a class="settings-nav-item active" href="#display" data-settings-tab="display">Display</a>
+    <a class="settings-nav-item" href="#ai" data-settings-tab="ai">AI / LLM</a>
+    <a class="settings-nav-item" href="#integrations" data-settings-tab="integrations">Integrations</a>
+    <a class="settings-nav-item" href="#agent" data-settings-tab="agent">Agent</a>
+    <a class="settings-nav-item" href="#markets" data-settings-tab="markets">Markets</a>
+    {% if desktop_enabled %}
+    <a class="settings-nav-item" href="#desktop" data-settings-tab="desktop">Desktop</a>
+    {% endif %}
+    {% if not dev_mode %}
+    <a class="settings-nav-item" href="#profile" data-settings-tab="profile">Profile</a>
+    {% endif %}
+    <a class="settings-nav-item" href="#advanced" data-settings-tab="advanced">Advanced</a>
+  </div>
+
+  <div class="settings-content">
+    {% if google_notice %}
+      <div class="panel" style="border-color:rgba(34,197,94,.35);">
+        <div class="bd" style="color:#86efac;">{{ google_notice }}</div>
+      </div>
+    {% endif %}
+    {% if google_error %}
+      <div class="panel" style="border-color:rgba(239,68,68,.35);">
+        <div class="bd" style="color:#fca5a5;">{{ google_error }}</div>
+      </div>
+    {% endif %}
+
+    <!-- Display Settings -->
+    <div class="panel settings-section" data-settings-section="display">
+      <div class="hd">
+        <h2>Display Settings</h2>
+        <span class="pill">Preferences</span>
+      </div>
+      <div class="bd">
+        <div class="settings-preview">
+          <h3>Front-end shell controls</h3>
+          <p>These three controls are stored locally in this browser and apply immediately. They do not require a backend save or restart.</p>
+          <div class="settings-control-grid">
+            <div class="field" style="margin-bottom:0;">
+              <label>Visual tone</label>
+              <select id="ui-tone-select">
+                <option value="measured">Measured</option>
+                <option value="evangelion">Evangelion</option>
+              </select>
+            </div>
+            <div class="field" style="margin-bottom:0;">
+              <label>Signal intensity</label>
+              <select id="ui-intensity-select">
+                <option value="quiet">Quiet</option>
+                <option value="signal">Signal</option>
+                <option value="alarm">Alarm</option>
+              </select>
+            </div>
+            <div class="field" style="margin-bottom:0;">
+              <label>Workspace density</label>
+              <select id="ui-density-select">
+                <option value="balanced">Balanced</option>
+                <option value="dense">Dense</option>
+              </select>
+            </div>
+          </div>
+          <div class="settings-note" id="ui-prefs-status">Saved locally in this browser.</div>
+        </div>
+
+        <div class="field">
+          <label>Earnings calendar</label>
+          <div class="btnrow" style="align-items:center;gap:12px;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;">
+              <input type="checkbox" data-earnings-rail-toggle {% if earnings_rail_enabled %}checked{% endif %} />
+              <span>Show on Feed</span>
+            </label>
+            <span style="color:var(--muted);font-size:11px;">Appears during earnings season.</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Markets tape</label>
+          <div class="btnrow" style="align-items:center;gap:12px;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;">
+              <input type="checkbox" id="markets-tape-toggle" {% if markets_tape_enabled %}checked{% endif %} />
+              <span>Show on Markets page</span>
+            </label>
+            <span style="color:var(--muted);font-size:11px;">Real-time ticker tape with watchlist quotes.</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Ticker display</label>
+          <select id="ticker-display-toggle" style="max-width:220px;">
+            <option value="local" {% if ticker_display_mode == 'local' %}selected{% endif %}>Local-first</option>
+            <option value="adr" {% if ticker_display_mode == 'adr' %}selected{% endif %}>ADR-first</option>
+          </select>
+          <span style="color:var(--muted);font-size:11px;margin-top:4px;">Used in supply-chain hover cards, exposure summaries, and node dossiers.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI / LLM Settings -->
+    <div class="panel settings-section" data-settings-section="ai" style="display:none;">
+      <div class="hd">
+        <h2>AI / LLM Settings</h2>
+        <span class="pill">API Configuration</span>
+      </div>
+      <div class="bd">
+        <div class="field">
+          <label>AI Provider</label>
+          <select id="ai-provider" style="max-width:200px;">
+            <option value="openai" {% if ai_provider == 'openai' %}selected{% endif %}>OpenAI</option>
+            <option value="anthropic" {% if ai_provider == 'anthropic' %}selected{% endif %}>Anthropic</option>
+            <option value="openrouter" {% if ai_provider == 'openrouter' %}selected{% endif %}>OpenRouter</option>
+            <option value="deepseek" {% if ai_provider == 'deepseek' %}selected{% endif %}>DeepSeek</option>
+            <option value="local" {% if ai_provider == 'local' %}selected{% endif %}>Local (Ollama)</option>
+          </select>
+        </div>
+
+        <div class="ai-provider-section" data-ai-provider="openai" {% if ai_provider != 'openai' %}style="display:none;"{% endif %}>
+          <div class="field">
+            <label>OpenAI API Key</label>
+            <div class="btnrow" style="gap:8px;">
+              <input type="password" id="openai-key" placeholder="sk-..." style="flex:1;max-width:400px;" value="" />
+              {% if has_openai_key %}
+                <span class="pill ok">Configured</span>
+              {% else %}
+                <span class="pill">Not set</span>
+              {% endif %}
+            </div>
+            <span style="color:var(--muted);font-size:11px;margin-top:4px;">
+              Get your key at <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--accent2);">platform.openai.com</a>
+            </span>
+          </div>
+          <div class="field">
+            <label>OpenAI Model</label>
+            <select id="openai-model" style="max-width:200px;">
+              <option value="gpt-4o" {% if openai_model == 'gpt-4o' %}selected{% endif %}>GPT-4o</option>
+              <option value="gpt-4o-mini" {% if openai_model == 'gpt-4o-mini' %}selected{% endif %}>GPT-4o Mini</option>
+              <option value="gpt-4-turbo" {% if openai_model == 'gpt-4-turbo' %}selected{% endif %}>GPT-4 Turbo</option>
+              <option value="o1" {% if openai_model == 'o1' %}selected{% endif %}>o1</option>
+              <option value="o1-mini" {% if openai_model == 'o1-mini' %}selected{% endif %}>o1-mini</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="ai-provider-section" data-ai-provider="anthropic" {% if ai_provider != 'anthropic' %}style="display:none;"{% endif %}>
+          <div class="field">
+            <label>Anthropic API Key</label>
+            <div class="btnrow" style="gap:8px;">
+              <input type="password" id="anthropic-key" placeholder="sk-ant-..." style="flex:1;max-width:400px;" value="" />
+              {% if has_anthropic_key %}
+                <span class="pill ok">Configured</span>
+              {% else %}
+                <span class="pill">Not set</span>
+              {% endif %}
+            </div>
+            <span style="color:var(--muted);font-size:11px;margin-top:4px;">
+              Get your key at <a href="https://console.anthropic.com/" target="_blank" style="color:var(--accent2);">console.anthropic.com</a>
+            </span>
+          </div>
+          <div class="field">
+            <label>Anthropic Model</label>
+            <select id="anthropic-model" style="max-width:280px;">
+              <option value="claude-3-5-sonnet-20241022" {% if anthropic_model == 'claude-3-5-sonnet-20241022' %}selected{% endif %}>Claude 3.5 Sonnet</option>
+              <option value="claude-3-opus-20240229" {% if anthropic_model == 'claude-3-opus-20240229' %}selected{% endif %}>Claude 3 Opus</option>
+              <option value="claude-3-5-haiku-20241022" {% if anthropic_model == 'claude-3-5-haiku-20241022' %}selected{% endif %}>Claude 3.5 Haiku</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="ai-provider-section" data-ai-provider="openrouter" {% if ai_provider != 'openrouter' %}style="display:none;"{% endif %}>
+          <div class="field">
+            <label>OpenRouter API Key</label>
+            <div class="btnrow" style="gap:8px;">
+              <input type="password" id="openrouter-key" placeholder="sk-or-..." style="flex:1;max-width:400px;" value="" />
+              {% if has_openrouter_key %}
+                <span class="pill ok">Configured</span>
+              {% else %}
+                <span class="pill">Not set</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="field">
+            <label>OpenRouter Model</label>
+            <select id="openrouter-model" style="max-width:320px;">
+              <option value="openrouter/free" {% if openrouter_model == 'openrouter/free' %}selected{% endif %}>Free router</option>
+              <option value="qwen/qwen3-coder:free" {% if openrouter_model == 'qwen/qwen3-coder:free' %}selected{% endif %}>Qwen3 Coder free</option>
+              <option value="deepseek/deepseek-v3.1-nex-n1:free" {% if openrouter_model == 'deepseek/deepseek-v3.1-nex-n1:free' %}selected{% endif %}>DeepSeek V3.1 free</option>
+              <option value="moonshotai/kimi-k2.5:free" {% if openrouter_model == 'moonshotai/kimi-k2.5:free' %}selected{% endif %}>Kimi K2.5 free</option>
+              <option value="openai/gpt-oss-120b:free" {% if openrouter_model == 'openai/gpt-oss-120b:free' %}selected{% endif %}>GPT OSS 120B free</option>
+            </select>
+          </div>
+          <div class="field">
+            <label style="display:flex;align-items:center;gap:8px;">
+              <input type="checkbox" id="openrouter-prefer-free" {% if openrouter_prefer_free_models %}checked{% endif %} />
+              Prefer free OpenRouter route
+            </label>
+            <code style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:8px;background:rgba(0,0,0,.2);border-radius:8px;display:block;">{{ openrouter_free_model or 'openrouter/free' }}</code>
+            <code style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:8px;background:rgba(0,0,0,.2);border-radius:8px;display:block;margin-top:6px;">{{ openrouter_free_fallback_models or 'No fallback list configured' }}</code>
+          </div>
+        </div>
+
+        <div class="ai-provider-section" data-ai-provider="deepseek" {% if ai_provider != 'deepseek' %}style="display:none;"{% endif %}>
+          <div class="field">
+            <label>DeepSeek API Key</label>
+            <div class="btnrow" style="gap:8px;">
+              <input type="password" id="deepseek-key" placeholder="sk-..." style="flex:1;max-width:400px;" value="" />
+              {% if has_deepseek_key %}
+                <span class="pill ok">Configured</span>
+              {% else %}
+                <span class="pill">Not set</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="field">
+            <label>DeepSeek Model</label>
+            <select id="deepseek-model" style="max-width:260px;">
+              <option value="deepseek-v4-flash" {% if deepseek_model == 'deepseek-v4-flash' %}selected{% endif %}>DeepSeek V4 Flash</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="ai-provider-section" data-ai-provider="local" {% if ai_provider != 'local' %}style="display:none;"{% endif %}>
+          <div class="field">
+            <label>Local LLM Endpoint</label>
+            <input type="text" id="local-endpoint" placeholder="http://localhost:11434" style="max-width:400px;" />
+            <span style="color:var(--muted);font-size:11px;margin-top:4px;">
+              Compatible with Ollama, LM Studio, vLLM, and other OpenAI-compatible endpoints. Runtime launch helpers live under <code>thoth local-model ...</code>.
+            </span>
+          </div>
+        </div>
+
+        {% set osx = openshell_status or {} %}
+        <div class="field">
+          <label>OpenShell Sandbox</label>
+          <div class="btnrow" style="align-items:center;gap:8px;flex-wrap:wrap;">
+            <span class="pill {% if osx.ready %}ok{% endif %}">
+              {% if osx.ready %}Ready{% elif osx.installed %}Installed{% else %}Missing{% endif %}
+            </span>
+            <span style="color:var(--muted);font-size:11px;">
+              {{ osx.version or 'version n/a' }}{% if osx.mode %} / {{ osx.mode }}{% endif %}
+              {% if osx.status %} / {{ osx.status|replace('_', ' ') }}{% endif %}
+            </span>
+          </div>
+          {% if osx.detail %}
+            <span style="color:var(--muted);font-size:11px;margin-top:4px;">{{ osx.detail }}</span>
+          {% endif %}
+          {% if osx.command %}
+            <code style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:8px;background:rgba(0,0,0,.2);border-radius:8px;display:block;margin-top:8px;">{{ osx.command }}</code>
+          {% endif %}
+        </div>
+
+        <div class="btnrow" style="margin-top:16px;">
+          <button class="btn primary" type="button" id="save-ai-settings">Save AI Settings</button>
+          <button class="btn" type="button" id="test-ai-connection">Test Connection</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Integrations -->
+    <div class="panel settings-section" data-settings-section="integrations" style="display:none;">
+      <div class="hd">
+        <h2>Google Integrations</h2>
+        <span class="pill">Gmail + Drive</span>
+      </div>
+      <div class="bd">
+        {% set gs = google_status or {} %}
+        <div class="field">
+          <label>Status</label>
+          <div class="btnrow" style="align-items:center;gap:8px;flex-wrap:wrap;">
+            <span class="pill {% if gs.connected %}ok{% endif %}" id="google-status-pill">
+              {% if gs.connected %}Connected{% else %}Disconnected{% endif %}
+            </span>
+            <span style="color:var(--muted);font-size:11px;" id="google-status-summary">
+              Token: {{ gs.token_path or 'n/a' }}{% if gs.expiry %} • Expiry: {{ gs.expiry }}{% endif %}
+            </span>
+          </div>
+          {% if gs.error %}
+            <span style="color:#fca5a5;font-size:11px;margin-top:4px;">{{ gs.error }}</span>
+          {% endif %}
+        </div>
+
+        <div class="field">
+          <label>Scopes</label>
+          <code style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:8px;background:rgba(0,0,0,.2);border-radius:8px;display:block;">
+            {{ (gs.scopes or [])|join(', ') if gs.scopes else 'No token scopes recorded yet' }}
+          </code>
+        </div>
+
+        <div class="btnrow" style="flex-wrap:wrap;">
+          <form method="post" action="/settings/google/connect" style="display:inline;">
+            <button class="btn primary" type="submit">Connect Google</button>
+          </form>
+          <form method="post" action="/settings/google/disconnect" style="display:inline;">
+            <button class="btn" type="submit">Disconnect</button>
+          </form>
+          <button class="btn" type="button" id="test-google-gmail">Test Gmail</button>
+          <button class="btn" type="button" id="test-google-drive">Test Drive</button>
+          <button class="btn" type="button" id="refresh-google-status">Refresh Status</button>
+        </div>
+
+        <pre id="google-test-output" style="margin-top:12px;white-space:pre-wrap;font-size:11px;color:var(--muted);background:rgba(0,0,0,.2);padding:10px;border-radius:10px;min-height:52px;">Ready.</pre>
+      </div>
+    </div>
+
+    <div class="panel settings-section" data-settings-section="integrations" style="display:none;">
+      <div class="hd">
+        <h2>IBKR Read-Only Portfolio Link</h2>
+        {% set ib = ibkr_status or {} %}
+        <span class="pill {% if ib.get('connected') %}ok{% endif %}">
+          {{ 'Connected' if ib.get('connected') else ('Auth Required' if ib.get('auth_required') else ('Enabled' if ib.get('enabled') else 'Disabled')) }}
+        </span>
+      </div>
+      <div class="bd">
+        <div class="field">
+          <label>Status</label>
+          <div class="btnrow" style="align-items:center;gap:8px;flex-wrap:wrap;">
+            <span class="pill">{{ ib.get('mode', 'disabled') }}</span>
+            <span style="color:var(--muted);font-size:11px;">{{ ib.get('message') or ib.get('gateway_base_url') or 'Client Portal Gateway not enabled yet.' }}</span>
+          </div>
+        </div>
+        <form method="post" action="/settings/ibkr/update">
+          <div class="settings-control-grid">
+            <label class="field">
+              <span>Enable live IBKR</span>
+              <input type="checkbox" name="enable_ibkr" value="true" {% if settings.enable_ibkr %}checked{% endif %} />
+            </label>
+            <label class="field">
+              <span>Use mock portfolio data</span>
+              <input type="checkbox" name="ibkr_mock_enabled" value="true" {% if settings.ibkr_mock_enabled %}checked{% endif %} />
+            </label>
+            <label class="field">
+              <span>Client Portal Gateway URL</span>
+              <input type="text" name="ibkr_gateway_base_url" value="{{ settings.ibkr_gateway_base_url }}" />
+            </label>
+            <label class="field">
+              <span>Default Account ID</span>
+              <input type="text" name="ibkr_default_account_id" value="{{ settings.ibkr_default_account_id or '' }}" />
+            </label>
+          </div>
+          <div class="field">
+            <label>Symbol to conid JSON</label>
+            <textarea name="ibkr_symbol_conids_json" rows="4" spellcheck="false">{{ settings.ibkr_symbol_conids_json or '' }}</textarea>
+          </div>
+          <div class="btnrow" style="flex-wrap:wrap;">
+            <button class="btn primary" type="submit">Save IBKR Settings</button>
+            <button class="btn" type="button" data-ibkr-status="ibkr-connection-status">Check Status</button>
+            <a class="btn" href="/ibkr/auth">Authenticate IBKR</a>
+          </div>
+          <p id="ibkr-connection-status" role="status" aria-live="polite" hidden></p>
+          <span style="color:var(--muted);font-size:11px;">
+            Read-only terminal endpoints only. Trading, cancel, exercise, and raw passthrough routes are intentionally absent.
+          </span>
+        </form>
+        {% if desktop_enabled %}
+        <div class="field" style="margin-top:16px;">
+          <label>Saved sign-in</label>
+          <p style="color:var(--muted);font-size:12px;">Enter credentials in the native desktop dialog. Windows Credential Manager stores them for your Windows user. You still approve IB Key/2FA. IBKR allows one brokerage session: signing in here, including on launch if enabled, can disconnect another IBKR trading session.</p>
+          <div class="btnrow" style="flex-wrap:wrap;">
+            <button class="btn primary" type="button" id="ibkr-sign-in">Sign in</button>
+            <button class="btn" type="button" id="ibkr-manage-credentials">Manage saved credentials</button>
+          </div>
+          <label style="margin-top:12px;display:block;">
+            <input type="checkbox" id="ibkr-sign-in-on-launch" {% if desktop_status.get('preferences', {}).get('ibkr_sign_in_on_launch') %}checked{% endif %} />
+            Sign in when Thoth launches
+          </label>
+          <button class="btn" type="button" id="ibkr-save-sign-in-preference" style="margin-top:8px;">Save launch preference</button>
+          <p id="ibkr-sign-in-status" role="status" aria-live="polite" style="color:var(--muted);font-size:12px;">{{ desktop_status.get('ibkr_sign_in', {}).get('message', 'Credentials have not been configured.') }}</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="panel settings-section" data-settings-section="integrations" style="display:none;">
+      <div class="hd">
+        <h2>Official Rail API Keys</h2>
+        <span class="pill {% if (api_key_health or {}).get('ok', true) %}ok{% endif %}">Expiry Watch</span>
+      </div>
+      <div class="bd">
+        {% for row in (api_key_health or {}).get('statuses', []) %}
+          <div class="field">
+            <label>{{ row.label }}</label>
+            <div class="btnrow" style="align-items:center;gap:8px;flex-wrap:wrap;">
+              <span class="pill {% if row.status == 'valid' %}ok{% endif %}">{{ row.status }}</span>
+              <span style="color:var(--muted);font-size:11px;">{{ row.message }}</span>
+            </div>
+          </div>
+        {% endfor %}
+        <span style="color:var(--muted);font-size:11px;">
+          Expiry dates are set with <code>THOTH_*_EXPIRES_AT</code> env vars. Secrets are not displayed here.
+        </span>
+      </div>
+    </div>
+
+    <!-- Agent Compression -->
+    {% include "_harness_settings.html" %}
+    <div class="panel settings-section" data-settings-section="advanced" style="display:none;">
+      <div class="hd">
+        <h2>Agent Compression</h2>
+        <span class="pill">Context + Jobs</span>
+      </div>
+      <div class="bd">
+        {% set ag_raw = agent_guild_settings_raw or {} %}
+        {% set ag_eff = agent_guild_settings_effective or {} %}
+        <div class="field">
+          <label>Global defaults (env/config)</label>
+          <code style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:8px;background:rgba(0,0,0,.2);border-radius:8px;display:block;">
+            daily_master={{ agent_daily_master_enabled }} at {{ agent_daily_master_hhmm }} {{ agent_daily_master_tz }}
+            • lookback={{ agent_context_default_lookback_hours }}h
+            • max_items={{ agent_context_max_items_per_section }}
+            • max_prompt_chars={{ agent_context_max_prompt_chars }}
+            • guild={{ discord_guild_id or 'unset' }}
+          </code>
+        </div>
+
+        <div class="field">
+          <label>Per-guild effective defaults (DB-backed)</label>
+          <code style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:8px;background:rgba(0,0,0,.2);border-radius:8px;display:block;">
+            daily_master={{ ag_eff.get('daily_master_enabled', false) }} at {{ ag_eff.get('daily_master_hhmm', '18:10') }} {{ ag_eff.get('daily_master_tz', 'America/New_York') }}
+            • lookback={{ ag_eff.get('context_default_lookback_hours', 24) }}h
+            • max_items={{ ag_eff.get('context_max_items_per_section', 25) }}
+            • max_prompt_chars={{ ag_eff.get('context_max_prompt_chars', 24000) }}
+            • post_to_outbox={{ ag_eff.get('default_post_to_outbox', false) }}
+            • sections={{ (ag_eff.get('default_include_sections', []) or [])|join(',') if (ag_eff.get('default_include_sections', []) or []) else '(all)' }}
+          </code>
+        </div>
+
+        <form method="post" action="/settings/agent/preferences" style="margin-bottom:16px;">
+          <div class="field">
+            <label>Per-guild compression preferences (stored in `discord_guild_settings.agent_settings_json`)</label>
+            <span style="color:var(--muted);font-size:11px;margin-top:4px;">Used by MCP enqueue/context tools and agent compression defaults when parameters are omitted.</span>
+          </div>
+          <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:12px;">
+            <div class="field">
+              <label>Daily master enabled</label>
+              <select name="daily_master_enabled">
+                <option value="true" {% if ag_eff.get('daily_master_enabled', true) %}selected{% endif %}>true</option>
+                <option value="false" {% if not ag_eff.get('daily_master_enabled', true) %}selected{% endif %}>false</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Daily master time (HH:MM)</label>
+              <input type="text" name="daily_master_hhmm" value="{{ ag_eff.get('daily_master_hhmm', '18:10') }}" placeholder="18:10" />
+            </div>
+            <div class="field">
+              <label>Daily master timezone</label>
+              <input type="text" name="daily_master_tz" value="{{ ag_eff.get('daily_master_tz', 'America/New_York') }}" placeholder="America/New_York" />
+            </div>
+          </div>
+          <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:12px;">
+            <div class="field">
+              <label>Default lookback hours</label>
+              <input type="number" name="context_default_lookback_hours" min="1" max="720" value="{{ ag_eff.get('context_default_lookback_hours', 24) }}" />
+            </div>
+            <div class="field">
+              <label>Max items / section</label>
+              <input type="number" name="context_max_items_per_section" min="1" max="200" value="{{ ag_eff.get('context_max_items_per_section', 25) }}" />
+            </div>
+            <div class="field">
+              <label>Max prompt chars</label>
+              <input type="number" name="context_max_prompt_chars" min="2000" max="200000" value="{{ ag_eff.get('context_max_prompt_chars', 24000) }}" />
+            </div>
+          </div>
+          <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="field">
+              <label>Default include sections (csv, blank = all)</label>
+              <input type="text" name="default_include_sections" value="{{ (ag_eff.get('default_include_sections', []) or [])|join(',') }}" placeholder="documents,notes,discord_sources,transcripts" />
+            </div>
+            <div class="field">
+              <label>Default post to desk outbox</label>
+              <select name="default_post_to_outbox">
+                <option value="true" {% if ag_eff.get('default_post_to_outbox', false) %}selected{% endif %}>true</option>
+                <option value="false" {% if not ag_eff.get('default_post_to_outbox', false) %}selected{% endif %}>false</option>
+              </select>
+            </div>
+          </div>
+          <div class="btnrow">
+            <button class="btn primary" type="submit">Save Per-Guild Agent Settings</button>
+          </div>
+        </form>
+
+        <details style="margin-bottom:16px;">
+          <summary style="cursor:pointer;color:var(--muted);font-size:12px;">Show raw stored JSON</summary>
+          <pre style="margin-top:8px;white-space:pre-wrap;font-size:11px;color:var(--muted);background:rgba(0,0,0,.2);padding:10px;border-radius:10px;">{{ ag_raw }}</pre>
+        </details>
+
+        <form method="post" action="/settings/agent/compress">
+          <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:12px;">
+            <div class="field">
+              <label>Mode</label>
+              <select name="mode">
+                <option value="daily_master">daily_master</option>
+                <option value="topic">topic</option>
+                <option value="decision_brief">decision_brief</option>
+                <option value="custom">custom</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Lookback hours</label>
+              <input type="number" name="lookback_hours" min="1" max="168" value="{{ ag_eff.get('context_default_lookback_hours', agent_context_default_lookback_hours) }}" />
+            </div>
+            <div class="field">
+              <label>Post to desk outbox</label>
+              <select name="post_to_outbox">
+                <option value="false" {% if not ag_eff.get('default_post_to_outbox', false) %}selected{% endif %}>false</option>
+                <option value="true" {% if ag_eff.get('default_post_to_outbox', false) %}selected{% endif %}>true</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label>Focus query (optional)</label>
+            <input type="text" name="focus_query" placeholder="e.g. semis capex vs HBM demand" />
+          </div>
+          <div class="btnrow">
+            <button class="btn primary" type="submit">Enqueue Compression</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Markets Settings -->
+    <div class="panel settings-section" data-settings-section="markets" style="display:none;">
+      <div class="hd">
+        <h2>Markets Settings</h2>
+        <span class="pill">Quotes & Data</span>
+      </div>
+      <div class="bd">
+        <div class="field">
+          <label>Markets feature</label>
+          <div class="btnrow" style="align-items:center;gap:12px;">
+            <label style="display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;">
+              <input type="checkbox" {% if markets_enabled %}checked{% endif %} disabled />
+              <span>Enable Markets tab</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Data Provider</label>
+          <select disabled style="max-width:200px;">
+            <option selected>Yahoo Finance (free)</option>
+            <option>Polygon.io</option>
+            <option>Alpha Vantage</option>
+          </select>
+          <span style="color:var(--muted);font-size:11px;margin-top:4px;">Premium providers coming soon</span>
+        </div>
+
+        <div class="field">
+          <label>Default Watchlist</label>
+          <textarea id="default-watchlist" rows="3" style="font-family:var(--mono);font-size:12px;">SPY, QQQ, NVDA, TSM, AVGO, AMD, INTC, MU, AMAT, LRCX, ASML, KLAC</textarea>
+          <span style="color:var(--muted);font-size:11px;margin-top:4px;">Comma-separated symbols</span>
+        </div>
+
+        <div class="field">
+          <label>Refresh interval</label>
+          <select style="max-width:200px;">
+            <option value="30">30 seconds</option>
+            <option value="60" selected>1 minute</option>
+            <option value="300">5 minutes</option>
+            <option value="900">15 minutes</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile (hidden in dev mode) -->
+    {% if not dev_mode %}
+    <div class="panel settings-section" data-settings-section="profile" style="display:none;">
+      <div class="hd">
+        <h2>Profile</h2>
+        <span class="pill">Account</span>
+      </div>
+      <div class="bd">
+        <div class="field">
+          <label>Email</label>
+          <input type="email" placeholder="your@email.com" style="max-width:300px;" />
+        </div>
+        <div class="field">
+          <label>Subscription</label>
+          <div class="subscription-card">
+            <div class="sub-tier">Free</div>
+            <div class="sub-features">
+              <span>✓ Local database</span>
+              <span>✓ Bring your own API keys</span>
+              <span>✓ All connectors</span>
+            </div>
+            <button class="btn primary" type="button">Upgrade</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if desktop_enabled %}
+    {% set desktop_prefs = (desktop_status or {}).get('preferences', {}) %}
+    {% set desktop_paths = (desktop_status or {}).get('paths', {}) %}
+    {% set desktop_services = (desktop_status or {}).get('services', {}) %}
+    {% set desktop_updater = (desktop_status or {}).get('updater', {}) %}
+    {% set desktop_crash_reports = (desktop_status or {}).get('crash_reports', {}) %}
+    <div class="panel settings-section" data-settings-section="desktop" style="display:none;">
+      <div class="hd">
+        <h2>Desktop Shell</h2>
+        <span class="pill ok">Native</span>
+      </div>
+      <div class="bd">
+        <div class="field">
+          <label>Status</label>
+          <div class="btnrow" style="align-items:center;gap:8px;flex-wrap:wrap;">
+            <span class="pill ok" id="desktop-status-pill">Connected</span>
+            <span style="color:var(--muted);font-size:11px;" id="desktop-status-summary">
+              {{ (desktop_status or {}).get('base_url', 'Desktop shell attached') }}
+            </span>
+          </div>
+        </div>
+
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="field">
+            <label style="display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;">
+              <input type="checkbox" id="desktop-launch-login" {% if (desktop_status or {}).get('launch_at_login_enabled') or desktop_prefs.get('launch_at_login') %}checked{% endif %} />
+              <span>Launch when I sign in</span>
+            </label>
+            <span style="color:var(--muted);font-size:11px;margin-top:4px;">Writes a startup entry on supported desktop platforms.</span>
+          </div>
+          <div class="field">
+            <label style="display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;">
+              <input type="checkbox" id="desktop-close-to-tray" {% if desktop_prefs.get('close_to_tray', true) %}checked{% endif %} />
+              <span>Close window to tray</span>
+            </label>
+            <span style="color:var(--muted);font-size:11px;margin-top:4px;">Keeps the web server and worker running when the window closes.</span>
+          </div>
+          <div class="field">
+            <label style="display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;">
+              <input type="checkbox" id="desktop-start-minimized" {% if desktop_prefs.get('start_minimized') %}checked{% endif %} />
+              <span>Start minimized to tray</span>
+            </label>
+            <span style="color:var(--muted);font-size:11px;margin-top:4px;">Useful with login launch on Windows and macOS.</span>
+          </div>
+          <div class="field">
+            <label style="display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;">
+              <input type="checkbox" id="desktop-start-worker" {% if desktop_prefs.get('start_worker_on_launch', true) %}checked{% endif %} />
+              <span>Run worker on launch</span>
+            </label>
+            <span style="color:var(--muted);font-size:11px;margin-top:4px;">Keeps background jobs, reports, and scheduler ticks moving.</span>
+          </div>
+          <div class="field">
+            <label style="display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;">
+              <input type="checkbox" id="desktop-use-local-ingestion" {% if desktop_prefs.get('use_local_models_for_ingestion', true) %}checked{% endif %} />
+              <span>Use local models for ingestion</span>
+            </label>
+            <span style="color:var(--muted);font-size:11px;margin-top:4px;">Allow local text, vision, and OCR workers to process source documents. Applies immediately and persists across restarts. Cloud research and background jobs keep running.</span>
+          </div>
+          <div class="field">
+            <label style="display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;">
+              <input type="checkbox" id="desktop-open-external-links" {% if desktop_prefs.get('open_external_links_in_browser', true) %}checked{% endif %} />
+              <span>Open external links in browser</span>
+            </label>
+            <span style="color:var(--muted);font-size:11px;margin-top:4px;">Keeps third-party websites in your default browser instead of inside the app shell.</span>
+          </div>
+          <div class="field">
+            <label>Services</label>
+            <code id="desktop-services-summary" style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:8px;background:rgba(0,0,0,.2);border-radius:8px;display:block;">
+              web={{ desktop_services.get('web_running', false) }} • worker={{ desktop_services.get('worker_running', false) }}
+            </code>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Storage</label>
+          <code id="desktop-path-summary" style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:8px;background:rgba(0,0,0,.2);border-radius:8px;display:block;">
+            db={{ desktop_paths.get('db_path', settings.db_path) }}
+            • data={{ desktop_paths.get('data_dir', settings.data_dir) }}
+            • logs={{ desktop_paths.get('logs_dir', settings.runtime_state_dir) }}
+          </code>
+        </div>
+
+        <div class="field">
+          <label>Local updates</label>
+          <code id="desktop-update-summary" style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:8px;background:rgba(0,0,0,.2);border-radius:8px;display:block;">
+            state={{ desktop_updater.get('state', 'idle') }}
+            {% if desktop_updater.get('branch') %}• branch={{ desktop_updater.get('branch') }}{% endif %}
+            {% if desktop_updater.get('behind') %}• behind={{ desktop_updater.get('behind') }}{% endif %}
+            {% if desktop_updater.get('restart_available') %}• restart_available=true{% endif %}
+          </code>
+        </div>
+
+        <div class="field">
+          <label>Crash reports</label>
+          <code id="desktop-crash-summary" style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:8px;background:rgba(0,0,0,.2);border-radius:8px;display:block;">
+            reports={{ desktop_crash_reports.get('report_count', 0) }}
+            {% if desktop_crash_reports.get('latest') %}• latest={{ desktop_crash_reports.get('latest', {}).get('kind') }}{% endif %}
+          </code>
+        </div>
+
+        <div class="btnrow" style="flex-wrap:wrap;">
+          <button class="btn primary" type="button" id="desktop-save-preferences">Save Desktop Settings</button>
+          <button class="btn" type="button" id="desktop-check-update">Check Updates</button>
+          <button class="btn" type="button" id="desktop-update-now">Update and Restart</button>
+          <button class="btn" type="button" id="desktop-restart-now">Restart Thoth</button>
+          <button class="btn" type="button" id="desktop-repair-integration">Repair Desktop Integration</button>
+          <button class="btn" type="button" id="desktop-open-data">Open Data Folder</button>
+          <button class="btn" type="button" id="desktop-open-logs">Open Logs</button>
+          <button class="btn" type="button" id="desktop-open-crashes">Open Crash Reports</button>
+          <button class="btn" type="button" id="desktop-create-support-bundle">Create Support Bundle</button>
+          <button class="btn" type="button" id="desktop-reveal-window">Reveal Window</button>
+        </div>
+
+        <pre id="desktop-action-output" style="margin-top:12px;white-space:pre-wrap;font-size:11px;color:var(--muted);background:rgba(0,0,0,.2);padding:10px;border-radius:10px;min-height:52px;">Desktop shell attached.</pre>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Advanced Settings -->
+    <div class="panel settings-section" data-settings-section="advanced" style="display:none;">
+      <div class="hd">
+        <h2>Advanced</h2>
+        <span class="pill">Developer</span>
+      </div>
+      <div class="bd">
+        <div class="field">
+          <label>Developer mode</label>
+          <div class="btnrow" style="align-items:center;gap:12px;">
+            <label style="display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;">
+              <input type="checkbox" {% if dev_mode %}checked{% endif %} disabled />
+              <span>Enabled</span>
+            </label>
+            <span style="color:var(--muted);font-size:11px;">Hides profile/subscription UI. Set via THOTH_DEV_MODE env var.</span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Database path</label>
+          <code style="font-family:var(--mono);font-size:12px;color:var(--muted);padding:8px;background:rgba(0,0,0,.2);border-radius:8px;display:block;">
+            {{ settings.db_path }}
+          </code>
+        </div>
+
+        <div class="field">
+          <label>Export data</label>
+          <div class="btnrow">
+            <button class="btn" type="button">Export Database</button>
+            <button class="btn" type="button">Export Settings</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Danger zone</label>
+          <div class="btnrow">
+            <button class="btn" type="button" style="border-color:rgba(239,68,68,.5);color:#ef4444;">Clear Cache</button>
+            <button class="btn" type="button" style="border-color:rgba(239,68,68,.5);color:#ef4444;">Reset Notifications</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<style>
+.settings-content{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+.subscription-card{
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:14px;
+  background:rgba(7,10,13,.5);
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  max-width:280px;
+}
+.sub-tier{
+  font-family:var(--mono);
+  font-size:16px;
+  font-weight:700;
+}
+.sub-features{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  font-size:12px;
+  color:var(--muted);
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/ibkr_status.js?v={{ settings.static_assets_version }}"></script>
+<script>
+(function() {
+  // Settings tab navigation
+  const navItems = document.querySelectorAll('[data-settings-tab]');
+  const sections = document.querySelectorAll('[data-settings-section]');
+
+  function activateSettingsTab(tab) {
+    if (![...navItems].some(n => n.dataset.settingsTab === tab)) tab = 'display';
+    navItems.forEach(n => n.classList.toggle('active', n.dataset.settingsTab === tab));
+    sections.forEach(s => { s.style.display = s.dataset.settingsSection === tab ? 'block' : 'none'; });
+  }
+  function settingsTabFromHash() {
+    const hash = location.hash.slice(1);
+    return hash === 'agent-automation' ? 'agent' : hash;
+  }
+  activateSettingsTab(settingsTabFromHash() || 'display');
+  window.addEventListener('hashchange', () => activateSettingsTab(settingsTabFromHash()));
+  navItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      const tab = item.dataset.settingsTab;
+      location.hash = tab;
+      activateSettingsTab(tab);
+    });
+  });
+
+  // AI provider toggle
+  const aiProvider = document.getElementById('ai-provider');
+  if (aiProvider) {
+    aiProvider.addEventListener('change', () => {
+      document.querySelectorAll('[data-ai-provider]').forEach(section => {
+        section.style.display = section.dataset.aiProvider === aiProvider.value ? 'block' : 'none';
+      });
+    });
+  }
+
+  // Markets tape toggle
+  const tapeToggle = document.getElementById('markets-tape-toggle');
+  if (tapeToggle) {
+    tapeToggle.addEventListener('change', () => {
+      const val = tapeToggle.checked ? '1' : '0';
+      document.cookie = `thoth_markets_tape=${val}; Path=/; Max-Age=31536000`;
+    });
+  }
+
+  const tickerDisplayToggle = document.getElementById('ticker-display-toggle');
+  if (tickerDisplayToggle) {
+    tickerDisplayToggle.addEventListener('change', () => {
+      const val = tickerDisplayToggle.value === 'adr' ? 'adr' : 'local';
+      document.cookie = `thoth_ticker_display=${val}; Path=/; Max-Age=31536000`;
+    });
+  }
+
+  const uiToneSelect = document.getElementById('ui-tone-select');
+  const uiIntensitySelect = document.getElementById('ui-intensity-select');
+  const uiDensitySelect = document.getElementById('ui-density-select');
+  const uiPrefsStatus = document.getElementById('ui-prefs-status');
+  const toneReadout = document.getElementById('settings-tone-readout');
+  const densityReadout = document.getElementById('settings-density-readout');
+  const uiPrefsApi = window.THOTH_UI_PREFS;
+
+  function syncUiPrefsReadout(prefs) {
+    if (toneReadout) toneReadout.textContent = prefs.tone || 'measured';
+    if (densityReadout) densityReadout.textContent = prefs.density || 'balanced';
+  }
+
+  function bindUiPrefs() {
+    if (!uiPrefsApi || !uiToneSelect || !uiIntensitySelect || !uiDensitySelect) return;
+    const prefs = uiPrefsApi.read();
+    uiToneSelect.value = prefs.tone;
+    uiIntensitySelect.value = prefs.intensity;
+    uiDensitySelect.value = prefs.density;
+    syncUiPrefsReadout(prefs);
+
+    [uiToneSelect, uiIntensitySelect, uiDensitySelect].forEach((el) => {
+      el.addEventListener('change', () => {
+        const next = uiPrefsApi.write({
+          tone: uiToneSelect.value,
+          intensity: uiIntensitySelect.value,
+          density: uiDensitySelect.value,
+        });
+        syncUiPrefsReadout(next);
+        if (uiPrefsStatus) {
+          uiPrefsStatus.textContent = `Saved locally: ${next.tone} / ${next.intensity} / ${next.density}`;
+        }
+        if (window.quickToast) window.quickToast('Display prefs updated.');
+      });
+    });
+  }
+
+  bindUiPrefs();
+
+  // Save AI settings (placeholder)
+  const saveAI = document.getElementById('save-ai-settings');
+  if (saveAI) {
+    saveAI.addEventListener('click', () => {
+      if (window.quickToast) window.quickToast('AI provider settings still use environment variables.');
+    });
+  }
+
+  // Test AI connection (placeholder)
+  const testAI = document.getElementById('test-ai-connection');
+  if (testAI) {
+    testAI.addEventListener('click', async () => {
+      if (window.quickToast) window.quickToast('AI connection test is not wired yet.');
+    });
+  }
+
+  const googleOut = document.getElementById('google-test-output');
+  const googleStatusPill = document.getElementById('google-status-pill');
+  const googleStatusSummary = document.getElementById('google-status-summary');
+  const desktopInitialStatus = {{ (desktop_status or {})|tojson }};
+
+  async function refreshGoogleStatus() {
+    if (!googleOut) return;
+    googleOut.textContent = 'Refreshing status...';
+    try {
+      const resp = await fetch('/api/settings/google/status');
+      const data = await resp.json();
+      googleOut.textContent = JSON.stringify(data, null, 2);
+      if (data && data.ok && data.status && googleStatusPill) {
+        const connected = !!data.status.connected;
+        googleStatusPill.textContent = connected ? 'Connected' : 'Disconnected';
+        googleStatusPill.classList.toggle('ok', connected);
+        if (googleStatusSummary) {
+          const parts = [];
+          if (data.status.token_path) parts.push(`Token: ${data.status.token_path}`);
+          if (data.status.expiry) parts.push(`Expiry: ${data.status.expiry}`);
+          googleStatusSummary.textContent = parts.join(' • ') || 'No token status available';
+        }
+      }
+    } catch (err) {
+      googleOut.textContent = String(err);
+    }
+  }
+
+  async function testGoogleService(service) {
+    if (!googleOut) return;
+    googleOut.textContent = `Testing ${service}...`;
+    try {
+      const form = new FormData();
+      form.set('service', service);
+      const resp = await fetch('/api/settings/google/test', { method: 'POST', body: form });
+      const data = await resp.json();
+      googleOut.textContent = JSON.stringify(data, null, 2);
+    } catch (err) {
+      googleOut.textContent = String(err);
+    }
+  }
+
+  const btnRefreshGoogle = document.getElementById('refresh-google-status');
+  if (btnRefreshGoogle) {
+    btnRefreshGoogle.addEventListener('click', () => { refreshGoogleStatus(); });
+  }
+  const btnTestGmail = document.getElementById('test-google-gmail');
+  if (btnTestGmail) {
+    btnTestGmail.addEventListener('click', () => { testGoogleService('gmail'); });
+  }
+  const btnTestDrive = document.getElementById('test-google-drive');
+  if (btnTestDrive) {
+    btnTestDrive.addEventListener('click', () => { testGoogleService('drive'); });
+  }
+
+  const desktopOut = document.getElementById('desktop-action-output');
+  const desktopStatusPill = document.getElementById('desktop-status-pill');
+  const desktopStatusSummary = document.getElementById('desktop-status-summary');
+  const desktopServicesSummary = document.getElementById('desktop-services-summary');
+  const desktopPathSummary = document.getElementById('desktop-path-summary');
+  const desktopUpdateSummary = document.getElementById('desktop-update-summary');
+  const desktopCrashSummary = document.getElementById('desktop-crash-summary');
+  const desktopLaunchLogin = document.getElementById('desktop-launch-login');
+  const desktopCloseToTray = document.getElementById('desktop-close-to-tray');
+  const desktopStartMinimized = document.getElementById('desktop-start-minimized');
+  const desktopStartWorker = document.getElementById('desktop-start-worker');
+  const desktopUseLocalIngestion = document.getElementById('desktop-use-local-ingestion');
+  const desktopOpenExternalLinks = document.getElementById('desktop-open-external-links');
+  let desktopStatusPollTimer = null;
+  const ibkrLaunchSignIn = document.getElementById('ibkr-sign-in-on-launch');
+  const ibkrSignInStatus = document.getElementById('ibkr-sign-in-status');
+  let ibkrStatusTimer = null;
+  let ibkrUiActive = true;
+
+  function renderDesktopStatus(payload) {
+    if (!payload || !desktopStatusPill) return;
+    const paths = payload.paths || {};
+    const services = payload.services || {};
+    const prefs = payload.preferences || {};
+    if (ibkrLaunchSignIn) ibkrLaunchSignIn.checked = !!prefs.ibkr_sign_in_on_launch;
+    if (ibkrSignInStatus && payload.ibkr_sign_in) {
+      ibkrSignInStatus.textContent = `${payload.ibkr_sign_in.credentials_saved ? 'Credentials saved. ' : 'No saved credentials. '}${payload.ibkr_sign_in.message || ''}`;
+    }
+    if (desktopLaunchLogin) {
+      desktopLaunchLogin.checked = !!payload.launch_at_login_enabled;
+      desktopLaunchLogin.disabled = payload.launch_at_login_supported === false;
+    }
+    if (desktopCloseToTray) desktopCloseToTray.checked = !!prefs.close_to_tray;
+    if (desktopStartMinimized) desktopStartMinimized.checked = !!prefs.start_minimized;
+    if (desktopStartWorker) desktopStartWorker.checked = !!prefs.start_worker_on_launch;
+    if (desktopUseLocalIngestion) desktopUseLocalIngestion.checked = prefs.use_local_models_for_ingestion !== false;
+    if (desktopOpenExternalLinks) desktopOpenExternalLinks.checked = !!prefs.open_external_links_in_browser;
+    desktopStatusPill.textContent = services.web_running ? 'Connected' : 'Starting';
+    desktopStatusPill.classList.toggle('ok', !!services.web_running);
+    if (desktopStatusSummary) {
+      const summary = [];
+      if (payload.base_url) summary.push(payload.base_url);
+      if (payload.window && payload.window.visible === false) summary.push('window hidden');
+      if (payload.autostart_error) summary.push(payload.autostart_error);
+      desktopStatusSummary.textContent = summary.join(' • ') || 'Desktop shell attached';
+    }
+    if (desktopServicesSummary) {
+      desktopServicesSummary.textContent = `web=${!!services.web_running} • worker=${!!services.worker_running}`;
+    }
+    if (desktopPathSummary) {
+      desktopPathSummary.textContent = `db=${paths.db_path || ''} • data=${paths.data_dir || ''} • logs=${paths.logs_dir || ''}`;
+    }
+    if (desktopUpdateSummary) {
+      const updater = payload.updater || {};
+      const parts = [`state=${updater.state || 'idle'}`];
+      if (updater.branch) parts.push(`branch=${updater.branch}`);
+      if (updater.upstream) parts.push(`upstream=${updater.upstream}`);
+      if (Number(updater.behind || 0)) parts.push(`behind=${updater.behind}`);
+      if (Number(updater.dirty_count || 0)) parts.push(`local_changes=${updater.dirty_count}`);
+      if (updater.restart_available) parts.push(`restart_available=true`);
+      if (Number(updater.source_change_count || 0)) parts.push(`runtime_source_changes=${updater.source_change_count}`);
+      if (updater.message) parts.push(updater.message);
+      if (updater.restart_reason) parts.push(updater.restart_reason);
+      if (updater.blocked_reason) parts.push(`blocked=${updater.blocked_reason}`);
+      if (updater.error) parts.push(`error=${updater.error}`);
+      desktopUpdateSummary.textContent = parts.join(' • ');
+    }
+    if (desktopCrashSummary) {
+      const crashes = payload.crash_reports || {};
+      const latest = crashes.latest || {};
+      const session = crashes.session || {};
+      const parts = [`reports=${Number(crashes.report_count || 0)}`];
+      if (latest.kind) parts.push(`latest=${latest.kind}`);
+      if (latest.created_at) parts.push(latest.created_at);
+      if (session.status) parts.push(`session=${session.status}`);
+      desktopCrashSummary.textContent = parts.join(' • ');
+    }
+  }
+
+  async function refreshDesktopStatus() {
+    if (!desktopStatusPill) return;
+    try {
+      const resp = await fetch('/api/desktop/status');
+      const data = await resp.json();
+      if (!resp.ok || !data.ok || !data.desktop) {
+        throw new Error(data.error || `HTTP ${resp.status}`);
+      }
+      renderDesktopStatus(data.desktop);
+      if (desktopOut) desktopOut.textContent = JSON.stringify(data.desktop, null, 2);
+      return data.desktop;
+    } catch (err) {
+      if (desktopOut) desktopOut.textContent = String(err);
+      return null;
+    }
+  }
+
+  function pollDesktopStatusUntilIdle() {
+    if (desktopStatusPollTimer) window.clearTimeout(desktopStatusPollTimer);
+    desktopStatusPollTimer = window.setTimeout(async () => {
+      const payload = await refreshDesktopStatus();
+      const updater = (payload && payload.updater) || {};
+      if (updater.running) pollDesktopStatusUntilIdle();
+    }, 1500);
+  }
+
+  async function saveDesktopPreferences() {
+    if (!desktopStatusPill) return;
+    const payload = {
+      launch_at_login: !!(desktopLaunchLogin && desktopLaunchLogin.checked),
+      close_to_tray: !!(desktopCloseToTray && desktopCloseToTray.checked),
+      start_minimized: !!(desktopStartMinimized && desktopStartMinimized.checked),
+      start_worker_on_launch: !!(desktopStartWorker && desktopStartWorker.checked),
+      use_local_models_for_ingestion: !!(desktopUseLocalIngestion && desktopUseLocalIngestion.checked),
+      open_external_links_in_browser: !!(desktopOpenExternalLinks && desktopOpenExternalLinks.checked),
+    };
+    if (desktopOut) desktopOut.textContent = 'Saving desktop preferences...';
+    try {
+      const resp = await fetch('/api/desktop/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok || !data.desktop) {
+        throw new Error(data.error || `HTTP ${resp.status}`);
+      }
+      renderDesktopStatus(data.desktop);
+      if (desktopOut) desktopOut.textContent = JSON.stringify(data.desktop, null, 2);
+      if (window.quickToast) window.quickToast('Desktop preferences saved.');
+    } catch (err) {
+      if (desktopOut) desktopOut.textContent = String(err);
+      if (window.quickToast) window.quickToast(String(err));
+    }
+  }
+
+  async function runDesktopAction(action) {
+    if (!desktopStatusPill) return;
+    if (desktopOut) desktopOut.textContent = `Running ${action}...`;
+    try {
+      const resp = await fetch('/api/desktop/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        throw new Error(data.error || `HTTP ${resp.status}`);
+      }
+      if (data.desktop) {
+        renderDesktopStatus(data.desktop);
+        if (desktopOut) desktopOut.textContent = JSON.stringify(data.desktop, null, 2);
+        if (data.desktop.updater && data.desktop.updater.running) pollDesktopStatusUntilIdle();
+        return data.desktop;
+      } else {
+        return await refreshDesktopStatus();
+      }
+    } catch (err) {
+      if (desktopOut) desktopOut.textContent = String(err);
+      return null;
+    }
+  }
+
+  const desktopSaveBtn = document.getElementById('desktop-save-preferences');
+  async function startIbkrAction(action) {
+    const signIn = document.getElementById('ibkr-sign-in');
+    const manage = document.getElementById('ibkr-manage-credentials');
+    if (signIn) signIn.disabled = true;
+    if (manage) manage.disabled = true;
+    if (ibkrSignInStatus) ibkrSignInStatus.textContent = 'Opening the desktop sign-in controls...';
+    const started = await runDesktopAction(action);
+    if (!ibkrUiActive) return;
+    if (ibkrStatusTimer) clearTimeout(ibkrStatusTimer);
+    const deadline = Date.now() + 240000;
+    async function poll() {
+      if (!ibkrUiActive) return;
+      const desktop = await refreshDesktopStatus();
+      if (!ibkrUiActive) return;
+      const state = desktop && desktop.ibkr_sign_in && desktop.ibkr_sign_in.state;
+      if (Date.now() < deadline && state && ['starting', 'awaiting_trust', 'loading', 'awaiting_approval', 'managing_credentials'].includes(state)) {
+        ibkrStatusTimer = setTimeout(poll, 2000);
+      } else {
+        if (signIn) signIn.disabled = false;
+        if (manage) manage.disabled = false;
+        ibkrStatusTimer = null;
+      }
+    }
+    if (started) ibkrStatusTimer = setTimeout(poll, 500);
+    else {
+      if (signIn) signIn.disabled = false;
+      if (manage) manage.disabled = false;
+      if (ibkrSignInStatus) ibkrSignInStatus.textContent = 'The desktop controls could not open. Use Authenticate IBKR or Open Gateway.';
+    }
+  }
+  const ibkrSignInButton = document.getElementById('ibkr-sign-in');
+  if (ibkrSignInButton) ibkrSignInButton.addEventListener('click', () => startIbkrAction('sign_in_ibkr'));
+  const ibkrManageButton = document.getElementById('ibkr-manage-credentials');
+  if (ibkrManageButton) ibkrManageButton.addEventListener('click', () => startIbkrAction('manage_ibkr_credentials'));
+  const ibkrSavePreferenceButton = document.getElementById('ibkr-save-sign-in-preference');
+  if (ibkrSavePreferenceButton) ibkrSavePreferenceButton.addEventListener('click', async () => {
+    try {
+      const response = await fetch('/api/desktop/preferences', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ibkr_sign_in_on_launch: !!ibkrLaunchSignIn.checked }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || `HTTP ${response.status}`);
+      renderDesktopStatus(data.desktop);
+      ibkrSignInStatus.textContent = 'Launch preference saved. Enable live IBKR and save credentials to use it.';
+    } catch (error) { ibkrSignInStatus.textContent = String(error); }
+  });
+  window.addEventListener('pagehide', () => {
+    ibkrUiActive = false;
+    if (ibkrStatusTimer) clearTimeout(ibkrStatusTimer);
+  });
+  window.addEventListener('pageshow', event => {
+    ibkrUiActive = true;
+    if (event.persisted) {
+      if (ibkrSignInButton) ibkrSignInButton.disabled = false;
+      if (ibkrManageButton) ibkrManageButton.disabled = false;
+      refreshDesktopStatus();
+    }
+  });
+  if (desktopSaveBtn) {
+    desktopSaveBtn.addEventListener('click', saveDesktopPreferences);
+  }
+  const desktopOpenDataBtn = document.getElementById('desktop-open-data');
+  if (desktopOpenDataBtn) {
+    desktopOpenDataBtn.addEventListener('click', () => { runDesktopAction('open_data_dir'); });
+  }
+  const desktopOpenLogsBtn = document.getElementById('desktop-open-logs');
+  if (desktopOpenLogsBtn) {
+    desktopOpenLogsBtn.addEventListener('click', () => { runDesktopAction('open_logs_dir'); });
+  }
+  const desktopOpenCrashesBtn = document.getElementById('desktop-open-crashes');
+  if (desktopOpenCrashesBtn) {
+    desktopOpenCrashesBtn.addEventListener('click', () => { runDesktopAction('open_crash_reports_dir'); });
+  }
+  const desktopCreateSupportBundleBtn = document.getElementById('desktop-create-support-bundle');
+  if (desktopCreateSupportBundleBtn) {
+    desktopCreateSupportBundleBtn.addEventListener('click', () => { runDesktopAction('create_support_bundle'); });
+  }
+  const desktopCheckUpdateBtn = document.getElementById('desktop-check-update');
+  if (desktopCheckUpdateBtn) {
+    desktopCheckUpdateBtn.addEventListener('click', async () => {
+      const desktop = await runDesktopAction('check_update');
+      if (window.THOTH_DESKTOP_UPDATER && desktop && desktop.updater) {
+        window.THOTH_DESKTOP_UPDATER.render(desktop.updater, { force: true });
+      }
+    });
+  }
+  const desktopUpdateNowBtn = document.getElementById('desktop-update-now');
+  if (desktopUpdateNowBtn) {
+    desktopUpdateNowBtn.addEventListener('click', async () => {
+      const ok = window.confirm('Update and restart Thoth Terminal now?');
+      if (!ok) return;
+      await runDesktopAction('apply_update_restart');
+    });
+  }
+  const desktopRestartNowBtn = document.getElementById('desktop-restart-now');
+  if (desktopRestartNowBtn) {
+    desktopRestartNowBtn.addEventListener('click', async () => {
+      const ok = window.confirm('Restart Thoth Terminal now?');
+      if (!ok) return;
+      await runDesktopAction('restart_desktop');
+    });
+  }
+  const desktopRepairBtn = document.getElementById('desktop-repair-integration');
+  if (desktopRepairBtn) {
+    desktopRepairBtn.addEventListener('click', async () => {
+      await runDesktopAction('repair_desktop_integration');
+    });
+  }
+  const desktopRevealBtn = document.getElementById('desktop-reveal-window');
+  if (desktopRevealBtn) {
+    desktopRevealBtn.addEventListener('click', () => { runDesktopAction('show_window'); });
+  }
+  if (desktopStatusPill) {
+    renderDesktopStatus(desktopInitialStatus || {});
+    refreshDesktopStatus();
+  }
+})();
+</script>
+{% endblock %}

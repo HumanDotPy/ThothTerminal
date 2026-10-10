@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="workspace-header">
+  <div class="workspace-copy">
+    <div class="workspace-kicker">Dependencies / Capacity / Bottlenecks</div>
+    <h1>Supply-chain maps</h1>
+    <p>These maps should feel like operational network models, not just generic saved visualizations. Use them to track layered dependencies, chokepoints, leverage, and command-center handoffs.</p>
+  </div>
+  <div class="workspace-summary">
+    <div class="workspace-stat">
+      <span class="workspace-stat-label">Active chains</span>
+      <span class="workspace-stat-value">{{ items|length if items else 0 }}</span>
+      <span class="workspace-stat-copy">Saved supply-chain models available to open.</span>
+    </div>
+    <div class="workspace-stat">
+      <span class="workspace-stat-label">Templates</span>
+      <span class="workspace-stat-value">VR200</span>
+      <span class="workspace-stat-copy">Start with a seeded chain or build one from scratch.</span>
+    </div>
+  </div>
+</section>
+
+<div class="supply-page">
+  <div class="supply-header">
+    <div class="supply-header-text">
+      <h1>Supply Chains</h1>
+      <p>Model layered dependencies, capacity constraints, and leverage points across any product stack.</p>
+    </div>
+    <div class="btnrow">
+      <a href="/visualizations/charts" class="btn">← Charts</a>
+      <a href="/visualizations/datasets" class="btn">Dataset Workbench</a>
+      <a href="/visualizations/supply-chains/new?template=vr200" class="btn">VR200 template</a>
+      <a href="/visualizations/supply-chains/new" class="btn primary">New supply chain</a>
+    </div>
+  </div>
+
+  <div class="supply-grid">
+    {% if items and items|length > 0 %}
+      {% for item in items %}
+        {% set chain = item.chain %}
+        <div class="supply-card">
+          <div class="supply-card-top">
+            <div>
+              <h2>{{ chain.title }}</h2>
+              {% if chain.description %}
+                <p>{{ chain.description }}</p>
+              {% else %}
+                <p class="muted">No description yet. Add constraints, bottlenecks, and supplier detail.</p>
+              {% endif %}
+            </div>
+            <span class="pill">{{ chain.category }}</span>
+          </div>
+          <div class="supply-card-meta">
+            <span class="pill">layers {{ item.stats.layers }}</span>
+            <span class="pill">nodes {{ item.stats.nodes }}</span>
+            <span class="pill">edges {{ item.stats.edges }}</span>
+            <span class="pill">updated {{ chain.updated_at.strftime('%Y-%m-%d') }}</span>
+            {% if item.draft %}
+              <span class="pill">draft {{ (item.draft.updated_at or '')[:10] }}</span>
+            {% endif %}
+            {% if item.published %}
+              <span class="pill">published v{{ item.published.version }}</span>
+            {% else %}
+              <span class="pill">unpublished</span>
+            {% endif %}
+          </div>
+          <div class="btnrow">
+            <a class="btn" href="/visualizations/supply-chains/{{ chain.id }}/command-center">Command Center</a>
+            <a class="btn" href="/visualizations/supply-chains/{{ chain.id }}">Studio</a>
+            <button class="btn" type="button" data-duplicate-chain="{{ chain.id }}">Duplicate</button>
+            <button class="btn danger" type="button" data-delete-chain="{{ chain.id }}">Delete</button>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="supply-empty">
+        <h3>No supply chains yet.</h3>
+        <p>Build your first layered chain for semiconductors, robotics, or any complex system where bottlenecks and supplier dependencies matter.</p>
+        <a href="/visualizations/supply-chains/new" class="btn primary">Create supply chain</a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  document.querySelectorAll('[data-duplicate-chain]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const chainId = btn.dataset.duplicateChain;
+      if (!chainId) return;
+      try {
+        const resp = await fetch(`/api/supply-chains/${chainId}/duplicate`, { method: 'POST' });
+        const data = await resp.json();
+        if (data.ok && data.redirect) {
+          window.location.href = data.redirect;
+        } else {
+          quickToast(data.error || 'Failed to duplicate');
+        }
+      } catch (_e) {
+        quickToast('Failed to duplicate');
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-delete-chain]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const chainId = btn.dataset.deleteChain;
+      if (!chainId) return;
+      const ok = window.confirm('Delete this supply chain? This cannot be undone.');
+      if (!ok) return;
+      try {
+        const resp = await fetch(`/api/supply-chains/${chainId}/delete`, { method: 'POST' });
+        const data = await resp.json();
+        if (data.ok) {
+          window.location.reload();
+        } else {
+          quickToast(data.error || 'Failed to delete');
+        }
+      } catch (_e) {
+        quickToast('Failed to delete');
+      }
+    });
+  });
+})();
+</script>
+{% endblock %}

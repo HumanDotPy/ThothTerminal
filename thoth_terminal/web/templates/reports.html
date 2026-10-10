@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% block content %}
+{% set memory_ns = namespace(needs_review=0, structured=0, imported=0) %}
+{% for row in rows %}
+  {% if row.memory_quality and row.memory_quality.needs_review %}{% set memory_ns.needs_review = memory_ns.needs_review + 1 %}{% endif %}
+  {% if row.memory_quality and row.memory_quality.state == 'structured' %}{% set memory_ns.structured = memory_ns.structured + 1 %}{% endif %}
+  {% if row.imported %}{% set memory_ns.imported = memory_ns.imported + 1 %}{% endif %}
+{% endfor %}
+<div class="reports-shell">
+  <section class="workspace-header">
+    <div class="workspace-copy">
+      <div class="workspace-kicker">Reports / Durable Research Artifacts</div>
+      <h1>Reports</h1>
+      <p>Long-form deep dives, primers, sector studies, cost analyses, imported PDFs, and Markdown research live here as reports. Theses stay atomic; reports are the durable source artifacts that support them.</p>
+    </div>
+    <div class="workspace-summary">
+      <div class="workspace-stat">
+        <span class="workspace-stat-label">Visible reports</span>
+        <span class="workspace-stat-value">{{ rows|length }}</span>
+        <span class="workspace-stat-copy">Current library slice.</span>
+      </div>
+      <div class="workspace-stat">
+        <span class="workspace-stat-label">Imported</span>
+        <span class="workspace-stat-value">{{ memory_ns.imported }}</span>
+        <span class="workspace-stat-copy">PDF and Markdown reports in this result set.</span>
+      </div>
+      <div class="workspace-stat">
+        <span class="workspace-stat-label">Memory review</span>
+        <span class="workspace-stat-value">{{ memory_ns.needs_review }}</span>
+        <span class="workspace-stat-copy">{{ memory_ns.structured }} structured report memories.</span>
+      </div>
+    </div>
+  </section>
+
+  <details class="panel terminal-page-panel report-import-panel">
+    <summary>Import PDF / Markdown</summary>
+    <div class="report-import-body">
+    <div class="hd">
+      <div class="hd-left">
+        <h2>Import Report</h2>
+        <span class="pill red">pdf / markdown</span>
+      </div>
+    </div>
+    <div class="bd">
+      <form method="post" action="/reports/import" enctype="multipart/form-data" class="report-upload-grid">
+        <div class="field">
+          <label>PDF or Markdown</label>
+          <input type="file" name="file" accept=".pdf,.md,.markdown,application/pdf,text/markdown" required />
+        </div>
+        <div class="field">
+          <label>Title</label>
+          <input type="text" name="title" placeholder="Optics Materials Report" />
+        </div>
+        <div class="field">
+          <label>Report type</label>
+          <select name="report_type">
+            {% for item in report_types %}
+            <option value="{{ item.value }}" {% if item.value == 'imported_report' %}selected{% endif %}>{{ item.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>Topics</label>
+          <input type="text" name="topics" placeholder="GaN-on-Si, SiPh, TFLN" />
+        </div>
+        <div class="field">
+          <label>Tags</label>
+          <input type="text" name="tags" placeholder="optics, materials, deep-dive" />
+        </div>
+        <div class="field">
+          <label>Companies</label>
+          <input type="text" name="companies" placeholder="Coherent, Lumentum, TSMC" />
+        </div>
+        <div class="field">
+          <label>Supply chains</label>
+          <input type="text" name="supply_chains" placeholder="AI optics, advanced packaging" />
+        </div>
+        <div class="field">
+          <label>Materials</label>
+          <input type="text" name="materials" placeholder="InP, TFLN, glass substrates" />
+        </div>
+        <div class="field">
+          <label>Technologies</label>
+          <input type="text" name="technologies" placeholder="silicon photonics, EMLs" />
+        </div>
+        <div class="field">
+          <label>Source URL</label>
+          <input type="url" name="source_url" placeholder="https://..." />
+        </div>
+        <div class="field report-upload-summary">
+          <label>Summary</label>
+          <textarea name="summary" rows="3" placeholder="Short description or provenance note"></textarea>
+        </div>
+        <div class="btnrow report-upload-actions">
+          <button class="btn primary" type="submit">Upload Report</button>
+        </div>
+      </form>
+    </div>
+    </div>
+  </details>
+
+  <div class="panel terminal-page-panel">
+    <div class="hd">
+      <div class="hd-left">
+        <h2>Report Library</h2>
+        <span class="pill red">registry</span>
+      </div>
+      <div class="btnrow">
+        <a class="btn" href="/knowledge?kind=primer">Primer Drafts</a>
+        <a class="btn" href="/knowledge">Knowledge Assets</a>
+      </div>
+    </div>
+    <div class="bd">
+      <form method="get" action="/reports" class="report-filter-grid">
+        <div class="field">
+          <label>Search</label>
+          <input type="text" name="q" value="{{ filters.q }}" placeholder="HBM, optics, glass substrates" />
+        </div>
+        <div class="field">
+          <label>Type</label>
+          <select name="report_type">
+            <option value="">All types</option>
+            {% for item in report_types %}
+            <option value="{{ item.value }}" {% if filters.report_type == item.value %}selected{% endif %}>{{ item.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>Topic</label>
+          <input type="text" name="topic" value="{{ filters.topic }}" placeholder="CoWoS, optics, substrates" />
+        </div>
+        <div class="field">
+          <label>Company</label>
+          <input type="text" name="company" value="{{ filters.company }}" placeholder="TSMC, AMD, Lumentum" />
+        </div>
+        <div class="field">
+          <label>Supply chain</label>
+          <input type="text" name="supply_chain" value="{{ filters.supply_chain }}" placeholder="AI optics" />
+        </div>
+        <div class="field">
+          <label>Material</label>
+          <input type="text" name="material" value="{{ filters.material }}" placeholder="TFLN, glass" />
+        </div>
+        <div class="field">
+          <label>Technology</label>
+          <input type="text" name="technology" value="{{ filters.technology }}" placeholder="silicon photonics" />
+        </div>
+        <div class="field">
+          <label>Freshness</label>
+          <select name="freshness">
+            <option value="">Any</option>
+            {% for state in ['fresh', 'stale', 'unpublished'] %}
+            <option value="{{ state }}" {% if filters.freshness == state %}selected{% endif %}>{{ state }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>Rows</label>
+          <select name="limit">
+            {% for value in limit_options %}
+            <option value="{{ value }}" {% if filters.limit == value|string %}selected{% endif %}>{{ value }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="btnrow report-filter-actions">
+          <button class="btn primary" type="submit">Filter</button>
+          <a class="btn" href="/reports">Clear</a>
+        </div>
+      </form>
+
+      {% if rows %}
+        <div class="stack-list">
+          {% for row in rows %}
+            {% set memory = row.memory_quality or {} %}
+            {% set freshness = row.freshness or {} %}
+            <div class="stack-row report-library-row">
+              <div class="stack-row-main">
+                <div class="stack-title"><a href="{{ row.href }}">{{ row.display_name }}</a></div>
+                {% if row.summary %}<div class="muted">{{ row.summary }}</div>{% endif %}
+                <div class="stack-meta">
+                  <span>{{ row.report_type_label }}</span>
+                  <span>{{ row.status }}</span>
+                  {% if row.imported %}<span>imported</span>{% endif %}
+                  {% if row.primary_ticker %}<span>${{ row.primary_ticker }}</span>{% endif %}
+                  {% if row.latest_version %}<span>v{{ row.latest_version }}</span>{% endif %}
+                  {% if freshness.state %}<span>{{ freshness.state }}</span>{% endif %}
+                  {% if row.latest_published_at %}<span data-utc="{{ row.latest_published_at }}">{{ row.latest_published_at }}</span>{% endif %}
+                  {% if memory.label %}<span>{{ memory.label }}</span>{% endif %}
+                </div>
+                {% if row.topics or row.materials or row.technologies or row.tags %}
+                <div class="stack-meta report-chip-line">
+                  {% for value in (row.topics or [])[:5] %}<span>{{ value }}</span>{% endfor %}
+                  {% for value in (row.materials or [])[:4] %}<span>{{ value }}</span>{% endfor %}
+                  {% for value in (row.technologies or [])[:4] %}<span>{{ value }}</span>{% endfor %}
+                  {% for value in (row.tags or [])[:4] %}<span>{{ value }}</span>{% endfor %}
+                </div>
+                {% endif %}
+              </div>
+              <div class="stack-row-side">
+                <a class="btn" href="{{ row.href }}">Open</a>
+                {% if row.latest_published_version_id %}
+                <a class="btn" href="{{ row.href }}/reader?version_id={{ row.latest_published_version_id }}">Read</a>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-callout">
+          <h3>No reports match this slice.</h3>
+          <p>Import a PDF or Markdown report above, or broaden the filters to inspect generated company and subject reports.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

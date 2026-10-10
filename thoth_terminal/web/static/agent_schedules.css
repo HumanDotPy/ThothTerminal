@@ -1,0 +1,12 @@
+.agent-schedules .panel { margin-bottom: 18px; }
+.agent-schedules .schedule-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.agent-schedules .schedule-card { min-width: 0; border: 1px solid var(--border, #334155); border-radius: 8px; padding: 16px; }
+.agent-schedules .schedule-card legend { padding: 0 6px; font-weight: 650; }
+.agent-schedules .schedule-card label { display: grid; gap: 6px; margin: 12px 0; }
+.agent-schedules .schedule-card input:not([type=checkbox]) { width: 100%; box-sizing: border-box; }
+.agent-schedules .schedule-switch { display: flex !important; gap: 8px !important; align-items: center; }
+.agent-schedules .schedule-switch input { flex-shrink: 0; }
+.agent-schedules .schedule-save { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 18px; }
+.agent-schedules [data-state=error] { color: #fca5a5; }
+.agent-schedules [data-state=success] { color: #86efac; }
+@media (max-width: 1000px) { .agent-schedules .schedule-grid { grid-template-columns: 1fr; } }

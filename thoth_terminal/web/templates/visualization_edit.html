@@ -1,0 +1,414 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="viz-page">
+  <div class="viz-header">
+    <div class="viz-title-row">
+      <h1>{{ "Edit Chart" if chart else "New Chart" }}</h1>
+      <div class="btnrow">
+        <a href="/visualizations/charts" class="btn">← Back to Charts</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="viz-editor">
+    <div class="viz-editor-preview">
+      <h3>Live Preview</h3>
+      <div class="viz-editor-chart" id="preview-chart"></div>
+    </div>
+
+    <div class="viz-editor-sidebar">
+      <div class="panel">
+        <div class="hd"><h2>Chart Details</h2></div>
+        <div class="bd">
+          <form id="chart-form" method="POST" action="{{ '/api/visualizations/' ~ chart.id if chart else '/api/visualizations' }}">
+            <div class="field">
+              <label>Title</label>
+              <input type="text" name="title" value="{{ chart.title if chart else '' }}" required placeholder="Taiwan DRAM Inventory" />
+            </div>
+            <div class="field">
+              <label>Subtitle</label>
+              <input type="text" name="subtitle" value="{{ chart.subtitle if chart else '' }}" placeholder="Volume and Value trends" />
+            </div>
+            <div class="field">
+              <label>Category</label>
+              <select name="category">
+                <option value="general" {{ 'selected' if not chart or chart.category == 'general' else '' }}>General</option>
+                <option value="memory" {{ 'selected' if chart and chart.category == 'memory' else '' }}>Memory</option>
+                <option value="wfe" {{ 'selected' if chart and chart.category == 'wfe' else '' }}>WFE Imports</option>
+                <option value="smartphones" {{ 'selected' if chart and chart.category == 'smartphones' else '' }}>Smartphones</option>
+                <option value="ai" {{ 'selected' if chart and chart.category == 'ai' else '' }}>AI/Compute</option>
+                <option value="foundry" {{ 'selected' if chart and chart.category == 'foundry' else '' }}>Foundry</option>
+                <option value="packaging" {{ 'selected' if chart and chart.category == 'packaging' else '' }}>Packaging</option>
+                <option value="macro" {{ 'selected' if chart and chart.category == 'macro' else '' }}>Macro</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Chart Style</label>
+              <select name="chart_style">
+                <option value="combo" {{ 'selected' if not chart or chart.chart_style == 'combo' else '' }}>Combo (Bar + Line)</option>
+                <option value="stacked_bar" {{ 'selected' if chart and chart.chart_style == 'stacked_bar' else '' }}>Stacked Bar</option>
+                <option value="line" {{ 'selected' if chart and chart.chart_style == 'line' else '' }}>Line Only</option>
+                <option value="area" {{ 'selected' if chart and chart.chart_style == 'area' else '' }}>Area</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Monthly Update (Description)</label>
+              <textarea name="description_md" rows="3" placeholder="Korea Memory Exports were up +41% YoY...">{{ chart.description_md if chart else '' }}</textarea>
+            </div>
+            <div class="field">
+              <label>Related Equities</label>
+              <input type="text" name="related_equities" value="{{ chart.related_equities if chart else '' }}" placeholder="$MU, $SEC, $000660.KRX" />
+            </div>
+            <div class="btnrow">
+              <button type="submit" class="btn primary">{{ "Save Changes" if chart else "Create Chart" }}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      {% if chart %}
+      <div class="panel">
+        <div class="hd">
+          <h2>Data Series</h2>
+          <button type="button" class="btn" id="add-series-btn">+ Add Series</button>
+        </div>
+        <div class="bd">
+          <div class="viz-series-list" id="series-list">
+            {% for cs in chart_series %}
+            <div class="viz-series-item" data-link-id="{{ cs.id }}">
+              <div class="viz-series-color" style="background:{{ cs.color or cs.data_series.color or '#ffb020' }}"></div>
+              <span class="viz-series-name">{{ cs.data_series.name }}</span>
+              <span class="viz-series-axis">{{ "Right" if cs.y_axis_index == 1 else "Left" }}</span>
+              <button type="button" class="btn danger" data-remove-series="{{ cs.id }}">×</button>
+            </div>
+            {% else %}
+            <p class="muted" style="font-size:12px;color:var(--muted);">No series added yet. Add data series to see them in the chart.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hd">
+          <h2>Dataset Views</h2>
+          <button type="button" class="btn" id="add-dataset-view-btn">+ Add Dataset View</button>
+        </div>
+        <div class="bd">
+          <div class="viz-series-list">
+            {% for dv in chart_dataset_views %}
+            <div class="viz-series-item" data-link-id="{{ dv.id }}">
+              <div class="viz-series-color" style="background:{{ dv.color or '#47a3ff' }}"></div>
+              <span class="viz-series-name">{{ dv.series_name or dv.dataset_view.name }}</span>
+              <span class="viz-series-axis">{{ dv.x_key }} → {{ dv.y_key }}</span>
+              <button type="button" class="btn danger" data-remove-dataset-view="{{ dv.id }}">×</button>
+            </div>
+            {% else %}
+            <p class="muted" style="font-size:12px;color:var(--muted);">No dataset views bound yet.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      {% if chart_dataset_context %}
+      <div class="panel">
+        <div class="hd"><h2>Dataset Context</h2></div>
+        <div class="bd" style="display:flex;flex-direction:column;gap:16px;">
+          {% for item in chart_dataset_context %}
+          <div style="padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.02);">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px;">
+              <div>
+                <div><a href="/visualizations/datasets/{{ item.dataset.id }}">{{ item.dataset.title }}</a></div>
+                <div style="color:var(--muted);font-size:11px;">{{ item.view.name }} · {{ item.summary.family }} · {{ item.summary.category }}</div>
+              </div>
+              <div style="color:var(--muted);font-size:11px;">{{ item.summary.evidence_tier_summary or 'evidence unknown' }}</div>
+            </div>
+            {% if item.summary.provenance_summary %}
+            <div style="color:var(--text);font-size:12px;line-height:1.45;margin-bottom:8px;">{{ item.summary.provenance_summary }}</div>
+            {% endif %}
+            <div class="table-preview">
+              <table class="table-preview-table">
+                <thead>
+                  <tr>
+                    {% for key in item.rows[0]["values"].keys() if item.rows %}
+                    <th>{{ key }}</th>
+                    {% endfor %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in item.rows %}
+                  <tr>
+                    {% for val in row["values"].values() %}
+                    <td>{{ val }}</td>
+                    {% endfor %}
+                  </tr>
+                  {% endfor %}
+                  {% if not item.rows %}
+                  <tr><td style="color:var(--muted);">No preview rows.</td></tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% endif %}
+
+      <div class="panel" id="add-series-panel" style="display:none;">
+        <div class="hd"><h2>Add Data Series</h2></div>
+        <div class="bd">
+          <form id="add-series-form" method="POST" action="/api/visualizations/{{ chart.id if chart else 0 }}/series">
+            <div class="field">
+              <label>Select Series</label>
+              <select name="series_id" required>
+                <option value="">-- Select --</option>
+                {% for s in all_series %}
+                <option value="{{ s.id }}">{{ s.name }} ({{ s.unit }})</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="field">
+              <label>Y-Axis</label>
+              <select name="y_axis_index">
+                <option value="0">Left Axis</option>
+                <option value="1">Right Axis</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Display Type</label>
+              <select name="display_type">
+                <option value="bar">Bar</option>
+                <option value="line">Line</option>
+                <option value="area">Area</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Stack Group (optional)</label>
+              <input type="text" name="stack_group" placeholder="e.g., countries" />
+            </div>
+            <div class="field">
+              <label>Color Override</label>
+              <input type="color" name="color" value="#ffb020" />
+            </div>
+            <div class="btnrow">
+              <button type="submit" class="btn primary">Add Series</button>
+              <button type="button" class="btn" id="cancel-add-series">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="panel" id="add-dataset-view-panel" style="display:none;">
+        <div class="hd"><h2>Add Dataset View</h2></div>
+        <div class="bd">
+          <form id="add-dataset-view-form" method="POST" action="/api/visualizations/{{ chart.id if chart else 0 }}/dataset-view">
+            <div class="field">
+              <label>Select Dataset View</label>
+              <select name="dataset_view_id" required>
+                <option value="">-- Select --</option>
+                {% for view in all_dataset_views %}
+                <option value="{{ view.id }}">{{ view.dataset.title if view.dataset else 'Dataset' }} · {{ view.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="grid-2col" style="gap:12px;">
+              <div class="field">
+                <label>X Key</label>
+                <input type="text" name="x_key" value="period_date" required />
+              </div>
+              <div class="field">
+                <label>Y Key</label>
+                <input type="text" name="y_key" value="value" required />
+              </div>
+            </div>
+            <div class="field">
+              <label>Series Name</label>
+              <input type="text" name="series_name" placeholder="Optional override" />
+            </div>
+            <div class="grid-2col" style="gap:12px;">
+              <div class="field">
+                <label>Y-Axis</label>
+                <select name="y_axis_index">
+                  <option value="0">Left Axis</option>
+                  <option value="1">Right Axis</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Display Type</label>
+                <select name="display_type">
+                  <option value="line">Line</option>
+                  <option value="bar">Bar</option>
+                  <option value="area">Area</option>
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label>Color Override</label>
+              <input type="color" name="color" value="#47a3ff" />
+            </div>
+            <div class="btnrow">
+              <button type="submit" class="btn primary">Add Dataset View</button>
+              <button type="button" class="btn" id="cancel-add-dataset-view">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/charting.js?v={{ settings.static_assets_version }}"></script>
+<script src="/static/vendor/echarts.min.js?v={{ settings.static_assets_version }}"></script>
+<script>
+(function() {
+  const chartForm = document.getElementById('chart-form');
+  const addSeriesBtn = document.getElementById('add-series-btn');
+  const addSeriesPanel = document.getElementById('add-series-panel');
+  const cancelAddSeries = document.getElementById('cancel-add-series');
+  const addSeriesForm = document.getElementById('add-series-form');
+  const addDatasetViewBtn = document.getElementById('add-dataset-view-btn');
+  const addDatasetViewPanel = document.getElementById('add-dataset-view-panel');
+  const cancelAddDatasetView = document.getElementById('cancel-add-dataset-view');
+  const addDatasetViewForm = document.getElementById('add-dataset-view-form');
+  const previewChart = document.getElementById('preview-chart');
+
+  // Toggle add series panel
+  if (addSeriesBtn) {
+    addSeriesBtn.addEventListener('click', () => {
+      addSeriesPanel.style.display = addSeriesPanel.style.display === 'none' ? 'block' : 'none';
+    });
+  }
+  if (cancelAddSeries) {
+    cancelAddSeries.addEventListener('click', () => {
+      addSeriesPanel.style.display = 'none';
+    });
+  }
+  if (addDatasetViewBtn) {
+    addDatasetViewBtn.addEventListener('click', () => {
+      addDatasetViewPanel.style.display = addDatasetViewPanel.style.display === 'none' ? 'block' : 'none';
+    });
+  }
+  if (cancelAddDatasetView) {
+    cancelAddDatasetView.addEventListener('click', () => {
+      addDatasetViewPanel.style.display = 'none';
+    });
+  }
+
+  // Handle form submissions via fetch
+  chartForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = new FormData(chartForm);
+    const resp = await fetch(chartForm.action, { method: 'POST', body: form });
+    const data = await resp.json();
+    if (data.ok && data.redirect) {
+      window.location.href = data.redirect;
+    } else if (data.ok) {
+      quickToast('Chart saved');
+    } else {
+      quickToast(data.error || 'Error saving chart', 'error');
+    }
+  });
+
+  addSeriesForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = new FormData(addSeriesForm);
+    const resp = await fetch(addSeriesForm.action, { method: 'POST', body: form });
+    const data = await resp.json();
+    if (data.ok) {
+      window.location.reload();
+    } else {
+      quickToast(data.error || 'Error adding series', 'error');
+    }
+  });
+
+  addDatasetViewForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = new FormData(addDatasetViewForm);
+    const resp = await fetch(addDatasetViewForm.action, { method: 'POST', body: form });
+    const data = await resp.json();
+    if (data.ok) {
+      window.location.reload();
+    } else {
+      quickToast(data.error || 'Error adding dataset view', 'error');
+    }
+  });
+
+  // Remove series
+  document.querySelectorAll('[data-remove-series]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const linkId = btn.dataset.removeSeries;
+      const chartId = {{ chart.id if chart else 0 }};
+      if (!confirm('Remove this series from the chart?')) return;
+      const resp = await fetch(`/api/visualizations/${chartId}/series/${linkId}`, { method: 'DELETE' });
+      const data = await resp.json();
+      if (data.ok) {
+        window.location.reload();
+      } else {
+        quickToast(data.error || 'Error removing series', 'error');
+      }
+    });
+  });
+
+  document.querySelectorAll('[data-remove-dataset-view]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const linkId = btn.dataset.removeDatasetView;
+      const chartId = {{ chart.id if chart else 0 }};
+      if (!confirm('Remove this dataset view from the chart?')) return;
+      const resp = await fetch(`/api/visualizations/${chartId}/dataset-view/${linkId}`, { method: 'DELETE' });
+      const data = await resp.json();
+      if (data.ok) {
+        window.location.reload();
+      } else {
+        quickToast(data.error || 'Error removing dataset view', 'error');
+      }
+    });
+  });
+
+  // Initialize preview chart (placeholder)
+  if (previewChart && typeof echarts !== 'undefined') {
+    const chart = echarts.init(previewChart);
+    const previewData = {
+      title: document.querySelector('[name="title"]')?.value || 'Chart Preview',
+      series: [{
+        name: document.querySelector('[name="subtitle"]')?.value || 'Preview series',
+        unit: '',
+        display_type: document.querySelector('[name="chart_style"]')?.value === 'area' ? 'area' : 'line',
+        data: [
+          { date: '2025-01-01', value: 82 },
+          { date: '2025-02-01', value: 88 },
+          { date: '2025-03-01', value: 84 },
+          { date: '2025-04-01', value: 96 },
+          { date: '2025-05-01', value: 101 },
+          { date: '2025-06-01', value: 98 },
+        ],
+      }],
+    };
+    chart.setOption(window.ThothCharting?.buildEChartOption ? window.ThothCharting.buildEChartOption(previewData, { showLegend: false }) : {
+      backgroundColor: 'transparent',
+      xAxis: { type: 'category', data: previewData.series[0].data.map((point) => point.date) },
+      yAxis: { type: 'value' },
+      series: [{ type: 'line', smooth: true, data: previewData.series[0].data.map((point) => point.value) }]
+    });
+    window.addEventListener('resize', () => chart.resize());
+
+    function refreshPreview() {
+      previewData.title = document.querySelector('[name="title"]')?.value || 'Chart Preview';
+      previewData.series[0].name = document.querySelector('[name="subtitle"]')?.value || 'Preview series';
+      previewData.series[0].display_type = document.querySelector('[name="chart_style"]')?.value === 'area' ? 'area' : 'line';
+      chart.setOption(window.ThothCharting?.buildEChartOption ? window.ThothCharting.buildEChartOption(previewData, { showLegend: false }) : {}, true);
+    }
+    document.querySelector('[name="title"]')?.addEventListener('input', (e) => {
+      refreshPreview();
+    });
+    document.querySelector('[name="subtitle"]')?.addEventListener('input', refreshPreview);
+    document.querySelector('[name="chart_style"]')?.addEventListener('change', refreshPreview);
+  }
+})();
+</script>
+{% endblock %}
+
+
+

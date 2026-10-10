@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="viz-page">
+  <div class="viz-header">
+    <div class="viz-title-row">
+      <h1>Data Series</h1>
+      <div class="btnrow">
+        <a href="/visualizations/charts" class="btn">← Back to Charts</a>
+        <a href="/visualizations/datasets" class="btn">Dataset Workbench</a>
+        <button type="button" class="btn primary" id="new-series-btn">+ New Series</button>
+      </div>
+    </div>
+    <p style="color:var(--muted);font-size:13px;margin:8px 0 0;">
+      Data series store time-series data for visualizations. Create series for metrics like Memory Exports, WFE Imports, etc.
+    </p>
+  </div>
+
+  <div class="grid-2col">
+    <div class="panel">
+      <div class="hd"><h2>All Series</h2></div>
+      <div class="bd">
+        <div class="docs" style="gap:8px;">
+          {% for s in series %}
+          <div class="viz-series-item" style="cursor:pointer;" data-series-id="{{ s.id }}">
+            <div class="viz-series-color" style="background:{{ s.color or '#ffb020' }}"></div>
+            <div style="flex:1;">
+              <span class="viz-series-name" style="display:block;">{{ s.name }}</span>
+              <span style="font-size:10px;color:var(--muted);">{{ s.category }} · {{ s.unit }} · {{ s.frequency }}</span>
+            </div>
+            <span class="pill">{{ s.points|length }} pts</span>
+          </div>
+          {% else %}
+          <p class="muted" style="font-size:12px;color:var(--muted);text-align:center;padding:24px;">
+            No data series yet. Create one to start tracking metrics.
+          </p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="series-detail-panel">
+      <div class="hd">
+        <h2 id="detail-title">Select a Series</h2>
+      </div>
+      <div class="bd" id="detail-body">
+        <p style="color:var(--muted);font-size:13px;">Click on a series to view and edit its data points.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Series Modal -->
+  <div class="modal-overlay" id="new-series-modal" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>New Data Series</h2>
+        <button type="button" class="btn" id="close-modal">×</button>
+      </div>
+      <div class="modal-body">
+        <form id="new-series-form" method="POST" action="/api/data-series">
+          <div class="field">
+            <label>Name</label>
+            <input type="text" name="name" required placeholder="Taiwan DRAM Inventory Volume" />
+          </div>
+          <div class="field">
+            <label>Slug (optional)</label>
+            <input type="text" name="slug" placeholder="taiwan-dram-inventory-volume" />
+          </div>
+          <div class="field">
+            <label>Category</label>
+            <select name="category">
+              <option value="general">General</option>
+              <option value="memory">Memory</option>
+              <option value="wfe">WFE Imports</option>
+              <option value="smartphones">Smartphones</option>
+              <option value="ai">AI/Compute</option>
+              <option value="foundry">Foundry</option>
+              <option value="packaging">Packaging</option>
+              <option value="macro">Macro</option>
+            </select>
+          </div>
+          <div class="grid-2col" style="gap:12px;">
+            <div class="field">
+              <label>Unit</label>
+              <input type="text" name="unit" value="units" placeholder="M Pcs., M$, %, WPM" />
+            </div>
+            <div class="field">
+              <label>Frequency</label>
+              <select name="frequency">
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="weekly">Weekly</option>
+                <option value="daily">Daily</option>
+                <option value="annual">Annual</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label>Source Label</label>
+            <input type="text" name="source_label" placeholder="TSIA, Korea Customs, etc." />
+          </div>
+          <div class="grid-2col" style="gap:12px;">
+            <div class="field">
+              <label>Default Chart Type</label>
+              <select name="chart_type">
+                <option value="bar">Bar</option>
+                <option value="line">Line</option>
+                <option value="area">Area</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Color</label>
+              <input type="color" name="color" value="#ffb020" />
+            </div>
+          </div>
+          <div class="btnrow" style="margin-top:16px;">
+            <button type="submit" class="btn primary">Create Series</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.modal-overlay{
+  position:fixed;
+  inset:0;
+  z-index:200;
+  background:rgba(0,0,0,0.85);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+}
+.modal{
+  width:100%;
+  max-width:500px;
+  background:rgba(7,10,13,0.98);
+  border:1px solid var(--border);
+  border-radius:16px;
+  overflow:hidden;
+}
+.modal-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:16px 20px;
+  border-bottom:1px solid var(--border);
+}
+.modal-header h2{
+  margin:0;
+  font-size:18px;
+  color:var(--accent);
+}
+.modal-body{
+  padding:20px;
+}
+.grid-2col{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:24px;
+}
+@media(max-width:768px){
+  .grid-2col{grid-template-columns:1fr;}
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  const modal = document.getElementById('new-series-modal');
+  const newSeriesBtn = document.getElementById('new-series-btn');
+  const closeModal = document.getElementById('close-modal');
+  const newSeriesForm = document.getElementById('new-series-form');
+  const detailPanel = document.getElementById('series-detail-panel');
+  const detailTitle = document.getElementById('detail-title');
+  const detailBody = document.getElementById('detail-body');
+
+  newSeriesBtn?.addEventListener('click', () => { modal.style.display = 'flex'; });
+  closeModal?.addEventListener('click', () => { modal.style.display = 'none'; });
+  modal?.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+
+  newSeriesForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = new FormData(newSeriesForm);
+    const resp = await fetch(newSeriesForm.action, { method: 'POST', body: form });
+    const data = await resp.json();
+    if (data.ok) {
+      window.location.reload();
+    } else {
+      quickToast(data.error || 'Error creating series', 'error');
+    }
+  });
+
+  // Series detail view
+  document.querySelectorAll('[data-series-id]').forEach(el => {
+    el.addEventListener('click', async () => {
+      const seriesId = el.dataset.seriesId;
+      const name = el.querySelector('.viz-series-name')?.textContent || 'Series';
+      detailTitle.textContent = name;
+      detailBody.innerHTML = `
+        <div class="field">
+          <label>Add Data Point</label>
+          <form id="add-point-form" style="display:flex;gap:8px;flex-wrap:wrap;">
+            <input type="date" name="period_date" required style="flex:1;min-width:140px;" />
+            <input type="number" step="any" name="value" required placeholder="Value" style="width:100px;" />
+            <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);">
+              <input type="checkbox" name="is_estimate" /> Estimate
+            </label>
+            <button type="submit" class="btn primary">Add</button>
+          </form>
+        </div>
+        <div class="field" style="margin-top:16px;">
+          <label>Bulk Import (CSV: date,value)</label>
+          <textarea id="bulk-data" rows="6" placeholder="2024-01-01,120
+2024-02-01,135
+2024-03-01,142"></textarea>
+          <div class="btnrow" style="margin-top:8px;">
+            <button type="button" class="btn" id="bulk-import-btn">Import CSV</button>
+          </div>
+        </div>
+      `;
+
+      const addPointForm = document.getElementById('add-point-form');
+      addPointForm?.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        const form = new FormData(addPointForm);
+        const resp = await fetch('/api/data-series/' + seriesId + '/points', { method: 'POST', body: form });
+        const data = await resp.json();
+        if (data.ok) {
+          quickToast('Point added');
+          addPointForm.reset();
+        } else {
+          quickToast(data.error || 'Error', 'error');
+        }
+      });
+
+      const bulkBtn = document.getElementById('bulk-import-btn');
+      bulkBtn?.addEventListener('click', async () => {
+        const csv = document.getElementById('bulk-data')?.value;
+        if (!csv) return quickToast('No data', 'error');
+        const form = new FormData();
+        form.append('data', csv);
+        const resp = await fetch('/api/data-series/' + seriesId + '/bulk', { method: 'POST', body: form });
+        const data = await resp.json();
+        if (data.ok) {
+          quickToast('Imported ' + data.imported + ' points');
+          if (data.errors?.length) console.warn('Import errors:', data.errors);
+        } else {
+          quickToast(data.error || 'Error', 'error');
+        }
+      });
+    });
+  });
+})();
+</script>
+{% endblock %}
+
+
+

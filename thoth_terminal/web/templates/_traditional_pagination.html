@@ -1,0 +1,32 @@
+{% if pagination %}
+<nav class="terminal-pager" aria-label="{{ pagination_label|default('Pagination') }}">
+  <span class="terminal-pager-range">{{ pagination.start }}&ndash;{{ pagination.end }} of {{ pagination.total }}</span>
+  <div class="terminal-pager-controls">
+    {% if pagination.back_ten_href %}<a href="{{ pagination.back_ten_href }}" aria-label="Back 10 pages">&larr; 10</a>{% else %}<span class="disabled" aria-disabled="true">&larr; 10</span>{% endif %}
+    {% if pagination.previous_href %}<a href="{{ pagination.previous_href }}" rel="prev">Prev</a>{% else %}<span class="disabled" aria-disabled="true">Prev</span>{% endif %}
+    {% for token in pagination.pages %}
+      {% if token %}
+        {% if token.current %}<span class="current" aria-current="page">{{ token.number }}</span>{% else %}<a href="{{ token.href }}">{{ token.number }}</a>{% endif %}
+      {% else %}
+        <span class="ellipsis" aria-hidden="true">&hellip;</span>
+      {% endif %}
+    {% endfor %}
+    {% if pagination.forward_ten_href %}<a href="{{ pagination.forward_ten_href }}" aria-label="Forward 10 pages">+10 &rarr;</a>{% else %}<span class="disabled" aria-disabled="true">+10 &rarr;</span>{% endif %}
+    {% if pagination.next_href %}<a href="{{ pagination.next_href }}" rel="next">Next</a>{% else %}<span class="disabled" aria-disabled="true">Next</span>{% endif %}
+  </div>
+  <form class="terminal-pager-jump" method="get" action="{{ pagination.base_path }}">
+    {% if pagination.hidden_params %}
+      {% for key, value in pagination.hidden_params.items() %}
+        <input type="hidden" name="{{ key }}" value="{{ value }}" />
+      {% endfor %}
+    {% elif pagination.hours is defined %}
+      <input type="hidden" name="hours" value="{{ pagination.hours }}" />
+    {% endif %}
+    <input type="hidden" name="page_size" value="{{ pagination.page_size }}" />
+    <label for="pager-page-{{ pagination.base_path|replace('/', '-') }}">Go to</label>
+    <input id="pager-page-{{ pagination.base_path|replace('/', '-') }}" name="page" type="number" min="1" max="{{ pagination.page_count }}" value="{{ pagination.page }}" />
+    <button type="submit">Go</button>
+    <span>/ {{ pagination.page_count }}</span>
+  </form>
+</nav>
+{% endif %}

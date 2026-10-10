@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="grid">
+  <div class="panel">
+    <div class="hd">
+      <h2>Exports</h2>
+      <span class="pill">history</span>
+    </div>
+    <div class="bd">
+      <div class="filter-chips">
+        <a class="filter-chip {% if not kind_filter %}active{% endif %}" href="/exports{% if selected %}?path={{ selected.name }}{% endif %}">All</a>
+        <a class="filter-chip {% if kind_filter == 'doc_bundle' %}active{% endif %}" href="/exports?kind=doc_bundle">Docs</a>
+        <a class="filter-chip {% if kind_filter == 'thesis_dossier' %}active{% endif %}" href="/exports?kind=thesis_dossier">Theses</a>
+        <a class="filter-chip {% if kind_filter == 'note_bundle' %}active{% endif %}" href="/exports?kind=note_bundle">Notes</a>
+      </div>
+    </div>
+    <div class="bd" style="padding:0">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Bundle</th>
+            <th>Kind</th>
+            <th>Count</th>
+            <th>Modified</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in bundles %}
+            <tr>
+              <td><a href="/exports?path={{ b.name }}{% if kind_filter %}&kind={{ kind_filter }}{% endif %}">{{ b.name }}</a></td>
+              <td>{{ b.kind }}</td>
+              <td>{{ b.count if b.count is not none else '—' }}</td>
+              <td data-utc="{{ b.modified.strftime('%Y-%m-%dT%H:%M:%S') }}">{{ b.modified.strftime("%Y-%m-%d %H:%M") }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="hd">
+      <h2>Preview</h2>
+      {% if selected %}
+        <span class="pill">{{ selected.name }}</span>
+      {% endif %}
+    </div>
+    <div class="bd">
+      {% if bundle_index %}
+        <div class="panel" style="margin-bottom:14px;">
+          <div class="hd"><h2>Index</h2></div>
+          <div class="bd">
+            {% if bundle_index is mapping %}
+              {% if bundle_index.kind == 'thesis_dossier' and bundle_index.thesis %}
+                <div class="meta">
+                  <span class="pill">thesis</span>
+                  <span>{{ bundle_index.thesis.title }}</span>
+                </div>
+                <div style="margin-top:8px;color:var(--muted);font-family:var(--mono);font-size:12px;">
+                  evidence {{ bundle_index.evidence|length if bundle_index.evidence else 0 }}
+                </div>
+              {% elif bundle_index.kind == 'note_bundle' and bundle_index.note %}
+                <div class="meta">
+                  <span class="pill">note</span>
+                  <span>{{ bundle_index.note.title }}</span>
+                </div>
+                <div style="margin-top:8px;color:var(--muted);font-family:var(--mono);font-size:12px;">
+                  linked docs {{ bundle_index.linked_documents|length if bundle_index.linked_documents else 0 }}
+                </div>
+              {% else %}
+                <div style="color:var(--muted);font-family:var(--mono);font-size:12px;">Bundle metadata loaded.</div>
+              {% endif %}
+            {% elif bundle_index is sequence %}
+              <div style="color:var(--muted);font-family:var(--mono);font-size:12px;">{{ bundle_index|length }} docs</div>
+              <div class="domains" style="margin-top:8px;">
+                {% for item in bundle_index[:12] %}
+                  <span class="pill">{{ item.translation_title_en or item.title or item.url or ('doc ' ~ item.id) }}</span>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+      {% if bundle_md %}
+        <pre style="white-space:pre-wrap;margin:0;background:rgba(7,10,13,.55);border:1px solid var(--border);border-radius:14px;padding:12px;">{{ bundle_md }}</pre>
+      {% else %}
+        <div style="color:var(--muted);font-family:var(--mono)">Select a bundle.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

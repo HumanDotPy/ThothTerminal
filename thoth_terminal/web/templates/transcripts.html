@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="hd">
+    <h2>Transcripts</h2>
+  </div>
+  <div class="bd">
+    <form method="get" action="/transcripts">
+      <div class="grid" style="grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>Ticker</label>
+          <input type="text" name="ticker" value="{{ ticker or '' }}" placeholder="NVDA" />
+        </div>
+        <div class="field">
+          <label>Mode</label>
+          <select name="most_recent">
+            <option value="true" {% if most_recent %}selected{% endif %}>most recent</option>
+            <option value="false" {% if not most_recent %}selected{% endif %}>list</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Year</label>
+          <input type="number" name="year" value="{{ year if year is not none else '' }}" placeholder="2025" min="1990" max="2100" />
+        </div>
+        <div class="field">
+          <label>Quarter</label>
+          <input type="number" name="quarter" value="{{ quarter if quarter is not none else '' }}" placeholder="1-4" min="1" max="4" />
+        </div>
+        <div class="field">
+          <label>Limit</label>
+          <input type="number" name="limit" value="{{ limit }}" min="1" max="50" />
+        </div>
+      </div>
+      <div class="btnrow" style="margin-top:8px;">
+        <button class="btn primary" type="submit">Search</button>
+      </div>
+    </form>
+    {% if error %}
+      <div style="margin-top:10px;color:#fca5a5;">{{ error }}</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="panel" style="margin-top:14px;">
+  <div class="hd">
+    <h2>Results</h2>
+    <div class="btnrow">
+      <span class="pill">{{ transcripts|length }} found</span>
+    </div>
+  </div>
+  <div class="bd" style="padding:0">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Ticker</th>
+          <th>Issuer</th>
+          <th>Period</th>
+          <th>Published</th>
+          <th>Source</th>
+          <th>Link</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if transcripts %}
+          {% for row in transcripts %}
+            <tr>
+              <td>{{ row.ticker }}</td>
+              <td>{{ row.company_or_issuer }}</td>
+              <td>{{ row.period_label or '—' }}</td>
+              <td>{{ row.published_at or '—' }}</td>
+              <td>{{ row.source_kind }}</td>
+              <td>
+                <a href="{{ row.url }}" target="_blank" rel="noopener">open</a>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="6" style="color:var(--muted);">No transcripts.</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

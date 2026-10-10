@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Thoth Research Desk</title>
+  <style>
+    :root{color-scheme:light dark;--bg:#f6f4ef;--paper:#fffefa;--ink:#252d2b;--muted:#65706b;--line:#dce1db;--accent:#246458;--soft:#edf4ef}
+    @media(prefers-color-scheme:dark){:root{--bg:#171d1b;--paper:#202724;--ink:#edf1ec;--muted:#aebbb2;--line:#3a4840;--accent:#9ed5bd;--soft:#293a31}}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}main{max-width:940px;margin:auto;padding:36px 24px 56px}
+    h1,h2,h3,h4{line-height:1.25;margin:0 0 12px}h1{font-family:Georgia,serif;font-size:34px;font-weight:500}h2{font-size:20px}h3{font-size:18px}h4{font-size:15px}p{margin:0 0 12px}p:last-child{margin-bottom:0}
+    .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.15em;color:var(--accent);font-weight:700;margin-bottom:7px}.muted,.meta{color:var(--muted)}.meta{font-size:12px}.header,.row{display:flex;gap:16px;justify-content:space-between;align-items:center;flex-wrap:wrap}.header{align-items:flex-start;margin-bottom:24px}.intro{max-width:580px}.controls{display:flex;gap:8px;flex-wrap:wrap}
+    button{font:inherit;color:inherit;background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:7px 12px;cursor:pointer}button:hover{background:var(--soft)}button:disabled{opacity:.6;cursor:wait}button[aria-pressed=true]{background:var(--soft);border-color:var(--accent);color:var(--accent)}button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+    a{color:var(--accent);text-underline-offset:3px;overflow-wrap:anywhere}.card{background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:22px;margin-bottom:14px}.card-head{margin-bottom:16px}.group{margin-bottom:30px}.group>h2{padding-bottom:10px;border-bottom:1px solid var(--line)}.change-fields{display:grid;gap:14px;margin-bottom:18px}.label{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:650;margin-bottom:3px}.actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:18px}.actions button{font-size:13px}.kind{display:inline-block;background:var(--soft);color:var(--accent);padding:2px 7px;border-radius:4px;margin-right:8px}
+    details{margin-top:15px}summary{cursor:pointer;color:var(--accent);font-weight:600;width:fit-content}.detail-body{border-top:1px solid var(--line);padding-top:18px;margin-top:14px}.detail-body section{margin-bottom:20px}.detail-body ul{padding-left:22px}.detail-body dl{margin:0;display:grid;gap:12px}.detail-body dt{font-size:12px;color:var(--muted)}.detail-body dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}.prose{overflow-wrap:anywhere}.prose h2,.prose h3,.prose h4{margin-top:20px;font-size:17px}.prose ul{padding-left:22px}.prose pre{overflow:auto;padding:12px;background:var(--soft);border-radius:6px}.prose code{background:var(--soft);padding:1px 4px;border-radius:3px}.prose blockquote{margin:12px 0;padding-left:16px;border-left:3px solid var(--line);color:var(--muted)}
+    #status{min-height:25px;margin-bottom:12px;font-size:13px;color:var(--muted)}#status.error{color:#bd533e}.empty{padding:40px 22px;text-align:center;color:var(--muted)}#coverage{font-size:12px;margin-top:26px;color:var(--muted)}#older{display:block;margin:24px auto 0}[hidden]{display:none!important}.needs{border-left:3px solid var(--accent)}.selection-status{color:var(--accent);font-size:12px}time{white-space:nowrap}@media(max-width:560px){main{padding:22px 15px 36px}.card{padding:17px}h1{font-size:29px}.header{gap:12px}}
+  </style>
+</head>
+<body>
+<main>
+  <header class="header">
+    <div class="intro"><div class="eyebrow">Thoth Terminal</div><h1>Research desk</h1><p id="description" class="muted">Published dispatches and the research changes behind them.</p></div>
+    <div class="controls" aria-label="Desk controls"><div id="modes" hidden role="group" aria-label="Research view"><button data-mode="minimal" aria-pressed="true">Dispatches</button><button data-mode="operator" aria-pressed="false">Operator</button></div><button id="refresh">Refresh</button></div>
+  </header>
+  <div id="status" role="status" aria-live="polite">Loading research…</div>
+  <section id="needs" hidden aria-label="Needs your input"></section>
+  <section id="content" aria-label="Research updates" aria-busy="true"></section>
+  <button id="older" hidden>Load older</button>
+  <p id="coverage"></p>
+</main>
+<script type="module">
+  const $ = id => document.getElementById(id);
+  const embedded = window.parent !== window;
+  const state = {mode:'minimal',data:null,busy:false,sequence:0,changes:new Map(),details:new Map()};
+  const pending = new Map();
+  let publicBase = '';
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const textValue = value => typeof value === 'string' || typeof value === 'number' ? String(value) : '';
+  const safeUrl = value => {
+    if (typeof value !== 'string' || /[\u0000-\u0020\u007f]/.test(value)) return '';
+    try { const base=embedded ? publicBase : location.href; const url = new URL(value, base); return ['http:','https:'].includes(url.protocol) && (/^https?:\/\//i.test(value) || (value.startsWith('/') && !value.startsWith('//') && url.origin===new URL(base).origin)) ? url.href : ''; } catch { return ''; }
+  };
+  const link = (url,title) => { const safe=safeUrl(url); return safe ? `<a href="${esc(safe)}" target="_blank" rel="noopener noreferrer">${esc(title)}</a>` : esc(title); };
+  const date = value => { const d=new Date(value); return value && !Number.isNaN(d.getTime()) ? `<time datetime="${esc(d.toISOString())}" title="${esc(d.toLocaleString())}">${esc(d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}))}</time>` : 'Date unavailable'; };
+  // A deliberately small Markdown renderer. Source HTML stays escaped; links accept only web URLs.
+  const inline = value => {
+    const fragments=[];
+    const marked=String(value ?? '').replace(/`([^`\n]+)`|\[([^\]\n]+)\]\(([^\s)]+)\)/g, (_,code,title,url) => {
+      fragments.push(code !== undefined ? `<code>${esc(code)}</code>` : link(url,title)); return `\u0000${fragments.length-1}\u0000`;
+    });
+    return esc(marked).replace(/\*\*([^*\n]+)\*\*/g,'<strong>$1</strong>').replace(/\*([^*\n]+)\*/g,'<em>$1</em>').replace(/\u0000(\d+)\u0000/g,(_,i)=>fragments[Number(i)] || '');
+  };
+  const markdown = value => {
+    const lines=String(value ?? '').replace(/\u0000/g,'').replace(/\r\n?/g,'\n').split('\n'); let out='',paragraph=[],list=[],code=null;
+    const flush=()=>{if(paragraph.length){out+=`<p>${paragraph.map(inline).join('<br>')}</p>`;paragraph=[];}if(list.length){out+=`<ul>${list.map(v=>`<li>${inline(v)}</li>`).join('')}</ul>`;list=[];}};
+    for(const line of lines){if(/^```/.test(line)){flush();if(code!==null){out+=`<pre><code>${esc(code.join('\n'))}</code></pre>`;code=null;}else code=[];continue;}if(code!==null){code.push(line);continue;}const heading=line.match(/^(#{1,6})\s+(.+)$/),bullet=line.match(/^\s*[-*]\s+(.+)$/);if(heading){flush();const level=Math.min(heading[1].length+1,4);out+=`<h${level}>${inline(heading[2])}</h${level}>`;}else if(bullet){if(paragraph.length)flush();list.push(bullet[1]);}else if(/^>\s?/.test(line)){flush();out+=`<blockquote>${inline(line.replace(/^>\s?/,''))}</blockquote>`;}else if(!line.trim())flush();else{if(list.length)flush();paragraph.push(line);}}
+    flush();if(code!==null)out+=`<pre><code>${esc(code.join('\n'))}</code></pre>`;return out;
+  };
+  const normalize = raw => {
+    let value=raw?.result ?? raw?.params ?? raw;
+    if(value?.isError)throw new Error(value.content?.find(c=>c.type==='text')?.text || 'Research request failed.');
+    const base=value?._meta?.thoth?.publicBaseUrl;
+    if(typeof base==='string' && /^https?:\/\//i.test(base))publicBase=base;
+    return value?._meta?.thoth?.result ?? value?.structuredContent ?? value ?? {};
+  };
+  const rpc = (method,params={}) => new Promise((resolve,reject)=>{
+    const id=`research-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const timer=setTimeout(()=>{pending.delete(id);reject(new Error('The research desk did not receive a response. Try again.'));},20000);
+    pending.set(id,{resolve:value=>{clearTimeout(timer);resolve(value);},reject:error=>{clearTimeout(timer);reject(error);}});
+    window.parent.postMessage({jsonrpc:'2.0',id,method,params},'*');
+  });
+  let bridgeReady;
+  const request = async (tool,args) => {
+    if(embedded){await bridgeReady;try{return normalize(await rpc('tools/call',{name:tool,arguments:args}));}catch(error){if(typeof window.openai?.callTool==='function')return normalize(await window.openai.callTool(tool,args));throw error;}}
+    const url=tool==='get_research_change' ? `/api/research-desk/changes/${encodeURIComponent(args.id)}` : `/api/research-desk?${new URLSearchParams(args)}`;
+    const response=await fetch(url,{credentials:'same-origin',headers:{Accept:'application/json'}});
+    if(!response.ok)throw new Error(response.status===403 ? 'This research view is unavailable for this session.' : `Research could not be loaded (${response.status}).`);
+    return normalize(await response.json());
+  };
+  const status = (message,error=false) => {$('status').textContent=message;$('status').classList.toggle('error',error);};
+  const selectionButton = (id,kind) => embedded ? `<button data-select="${esc(id)}" data-kind="${kind}">Use in conversation</button>` : '';
+  const changeCard = change => {
+    state.changes.set(String(change.id),change);
+    return `<article class="card"><div class="card-head"><div class="meta"><span class="kind">${esc(change.kind || 'Research change')}</span>${date(change.changed_at)}</div><h3>${esc(change.title || 'Research updated')}</h3></div><div class="change-fields"><div><div class="label">What changed</div><p>${esc(change.what_changed || 'A durable research update was recorded.')}</p></div>${change.why_it_matters ? `<div><div class="label">Why it matters</div><p>${esc(change.why_it_matters)}</p></div>` : ''}</div>${change.details_available ? `<details data-change="${esc(change.id)}"><summary>Rationale, evidence & history</summary><div class="detail-body">Expand to load supporting details.</div></details>` : '<p class="meta">Supporting details are not available for this change.</p>'}<div class="actions">${safeUrl(change.reference?.url) ? link(change.reference.url,'Open research') : ''}${selectionButton(change.id,'change')}</div></article>`;
+  };
+  const render = () => {
+    const data=state.data;if(!data)return;
+    state.mode=data.mode==='operator' && data.operator_available ? 'operator' : 'minimal';
+    $('modes').hidden=!data.operator_available;
+    document.querySelectorAll('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mode===state.mode)));
+    $('description').textContent=state.mode==='operator' ? 'Durable research changes, grouped by subject. Open an update to review its rationale and evidence.' : 'Published research dispatches: what changed and why it matters.';
+    state.changes.clear();
+    const dispatches=Array.isArray(data.dispatches)?data.dispatches:[],groups=Array.isArray(data.groups)?data.groups:[];
+    const html=state.mode==='operator' ? groups.map(group=>`<section class="group"><h2>${esc(group.subject || 'Research')}</h2>${(group.changes || []).map(changeCard).join('')}</section>`).join('') : dispatches.map(dispatch=>`<article class="card"><div class="card-head"><div class="meta">${date(dispatch.published_at)}</div><h2>${esc(dispatch.title || 'Research dispatch')}</h2></div><div class="prose">${markdown(dispatch.content_md || 'No dispatch text is available.')}</div><div class="actions">${safeUrl(dispatch.url) ? link(dispatch.url,'Open dispatch') : ''}${selectionButton(dispatch.id,'dispatch')}</div></article>`).join('');
+    $('content').innerHTML=html || `<div class="card empty">${state.mode==='operator' ? 'No research changes are available in this view.' : 'No published dispatches yet.'}</div>`;
+    const needs=Array.isArray(data.needs_input)?data.needs_input:[];
+    $('needs').hidden=!needs.length;
+    $('needs').innerHTML=needs.length ? `<section class="card needs"><h2>Needs your input</h2>${needs.map(item=>`<details><summary>${esc(item.title || 'Research question')}</summary><div class="detail-body"><div class="meta">${date(item.created_at)}</div><div class="prose">${markdown(item.text || 'No question text was recorded.')}</div></div></details>`).join('')}</section>` : '';
+    $('coverage').textContent=data.coverage?.description || '';
+    $('older').hidden=!data.pagination?.has_more || data.pagination?.next_before_id==null;
+  };
+  const merge = (previous,next) => {
+    const unique=(items,key)=>[...new Map(items.map(item=>[String(item[key]),item])).values()];
+    const groups=new Map();for(const group of [...(previous.groups || []),...(next.groups || [])]){const subject=group.subject || 'Research';const old=groups.get(subject);groups.set(subject,{...group,changes:unique([...(old?.changes || []),...(group.changes || [])],'id')});}
+    return {...next,dispatches:unique([...(previous.dispatches || []),...(next.dispatches || [])],'id'),groups:[...groups.values()],needs_input:unique([...(previous.needs_input || []),...(next.needs_input || [])],'id')};
+  };
+  const load = async (older=false) => {
+    if(state.busy)return;state.busy=true;const sequence=++state.sequence;
+    $('refresh').disabled=true;$('older').disabled=true;document.querySelectorAll('[data-mode]').forEach(b=>b.disabled=true);$('content').setAttribute('aria-busy','true');status(older?'Loading older research…':'Loading research…');
+    try {const args={mode:state.mode,limit:20};if(older)args.before_id=state.data.pagination.next_before_id;const data=await request('get_research_desk',args);if(sequence!==state.sequence)return;if(!Array.isArray(data.dispatches)||!Array.isArray(data.groups))throw new Error('The research desk received an incomplete response.');state.data=older?merge(state.data,data):data;render();status(older?'Older research loaded.':'');}
+    catch(error){if(state.data)state.mode=state.data.mode==='operator' && state.data.operator_available ? 'operator' : 'minimal';status(error.message || 'Research could not be loaded. Try again.',true);}
+    finally{state.busy=false;$('refresh').disabled=false;$('older').disabled=false;document.querySelectorAll('[data-mode]').forEach(b=>b.disabled=false);$('content').setAttribute('aria-busy','false');}
+  };
+  const detailHtml = change => {
+    const evidence=Array.isArray(change.evidence)?change.evidence:[],details=Array.isArray(change.details)?change.details:[],versions=Array.isArray(change.versions)?change.versions:[];
+    return `<section><h4>Rationale</h4><div class="prose">${change.rationale ? markdown(textValue(change.rationale)) : '<p class="muted">No rationale was recorded.</p>'}</div></section><section><h4>Evidence</h4>${evidence.length ? `<ul>${evidence.map(e=>`<li>${link(e.url,e.title || (e.id ? `Evidence ${e.id}` : 'Evidence'))}</li>`).join('')}</ul>` : '<p class="muted">No evidence links were recorded.</p>'}</section>${details.length ? `<section><h4>Recorded details</h4><dl>${details.map(d=>`<div><dt>${esc(d.label)}</dt><dd>${esc(textValue(d.value)) || 'Not recorded'}</dd></div>`).join('')}</dl></section>` : ''}<section><h4>Version history</h4>${versions.length ? `<ul>${versions.map(v=>`<li>${esc(v.title || v.label || (v.version ? `Version ${v.version}` : 'Version'))} <span class="meta">${date(v.changed_at || v.created_at || v.published_at)}</span>${v.what_changed || v.summary ? `<p>${esc(v.what_changed || v.summary)}</p>` : ''}</li>`).join('')}</ul>` : '<p class="muted">No version history is available for this change.</p>'}</section>`;
+  };
+  $('content').addEventListener('toggle',async event=>{
+    const disclosure=event.target;if(!(disclosure instanceof HTMLDetailsElement)||!disclosure.open||!disclosure.dataset.change)return;
+    const id=disclosure.dataset.change,body=disclosure.querySelector('.detail-body');if(state.details.has(id)){body.innerHTML=detailHtml(state.details.get(id));return;}if(disclosure.dataset.loading)return;
+    disclosure.dataset.loading='true';body.textContent='Loading supporting details…';body.setAttribute('aria-busy','true');
+    try{const change=await request('get_research_change',{id});state.details.set(id,change);body.innerHTML=detailHtml(change);}catch(error){body.innerHTML=`<p>${esc(error.message || 'Details could not be loaded.')}</p><button data-retry>Try again</button>`;}finally{delete disclosure.dataset.loading;body.setAttribute('aria-busy','false');}
+  },true);
+  document.addEventListener('click',async event=>{
+    const button=event.target.closest('button');if(!button)return;
+    if(button.hasAttribute('data-retry')){const detail=button.closest('details');detail.open=false;detail.open=true;return;}
+    if(button.dataset.mode && button.dataset.mode!==state.mode){state.mode=button.dataset.mode;state.details.clear();await load();return;}
+    if(!button.hasAttribute('data-select'))return;
+    const id=button.dataset.select,kind=button.dataset.kind;
+    const item=kind==='change'?state.changes.get(id):state.data?.dispatches?.find(d=>String(d.id)===id);
+    if(!item)return;
+    const reference=kind==='change'?item.reference:{kind:'dispatch',id:item.id,url:item.url};
+    const context={type:'research_selection',change_id:kind==='change'?id:undefined,title:item.title,reference:{kind:reference?.kind,id:reference?.id,url:safeUrl(reference?.url)||undefined}};
+    button.disabled=true;
+    try{await rpc('ui/update-model-context',{content:[{type:'text',text:JSON.stringify(context)}]});status('Research reference selected for the conversation.');}catch(error){status(error.message || 'The reference could not be selected.',true);}finally{button.disabled=false;}
+  });
+  $('refresh').addEventListener('click',()=>{state.details.clear();load();});$('older').addEventListener('click',()=>load(true));
+  window.addEventListener('message',event=>{
+    if(event.source!==window.parent)return;const message=event.data;if(message?.jsonrpc!=='2.0')return;
+    if(message.id && pending.has(message.id)){const waiter=pending.get(message.id);pending.delete(message.id);message.error?waiter.reject(new Error(message.error.message || 'Research request failed.')):waiter.resolve(message.result);return;}
+    if(message.method==='ui/notifications/tool-result'){try{const data=normalize(message.params);if(Array.isArray(data.dispatches)&&Array.isArray(data.groups)){state.data=data;state.details.clear();render();status('');}}catch(error){status(error.message,true);}}
+  });
+  if(embedded){bridgeReady=rpc('ui/initialize',{protocolVersion:'2026-01-26',appInfo:{name:'thoth-research-desk',version:'1.0.0'},appCapabilities:{}}).then(()=>{window.parent.postMessage({jsonrpc:'2.0',method:'ui/notifications/initialized'},'*');}).catch(error=>{if(typeof window.openai?.callTool!=='function')throw error;});}else bridgeReady=Promise.resolve();
+  const initial=window.openai?.toolOutput ? normalize(window.openai.toolOutput) : null;
+  if(initial && Array.isArray(initial.dispatches)&&Array.isArray(initial.groups)){state.data=initial;render();$('content').setAttribute('aria-busy','false');status('');bridgeReady.catch(error=>status(error.message,true));}else load();
+</script>
+</body>
+</html>

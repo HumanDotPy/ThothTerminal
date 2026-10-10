@@ -1,0 +1,1840 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  .cc-page {
+    --cc-bg: #08111a;
+    --cc-panel: linear-gradient(180deg, rgba(15, 24, 35, 0.96), rgba(7, 14, 22, 0.98));
+    --cc-panel-alt: rgba(10, 18, 27, 0.92);
+    --cc-border: rgba(148, 163, 184, 0.18);
+    --cc-text: #edf4ff;
+    --cc-muted: rgba(211, 221, 236, 0.72);
+    --cc-accent: #f1b24a;
+    display: grid;
+    gap: 22px;
+    color: var(--cc-text);
+  }
+  .cc-hero,
+  .cc-panel,
+  .cc-card {
+    background: var(--cc-panel);
+    border: 1px solid var(--cc-border);
+    border-radius: 24px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
+  }
+  .cc-hero {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 30px;
+    background:
+      radial-gradient(circle at top right, rgba(241, 178, 74, 0.22), transparent 34%),
+      linear-gradient(180deg, rgba(16, 26, 39, 0.98), rgba(8, 17, 26, 0.98));
+  }
+  .cc-hero h1 {
+    margin: 6px 0 8px;
+    font-size: clamp(2rem, 4vw, 3.15rem);
+    line-height: 1.02;
+  }
+  .cc-eyebrow {
+    color: var(--cc-accent);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .cc-subtitle {
+    max-width: 900px;
+    margin: 0;
+    color: var(--cc-muted);
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+  .cc-kpis {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 14px;
+  }
+  .cc-kpi {
+    padding: 20px 22px;
+    border-radius: 20px;
+    background: var(--cc-panel-alt);
+    border: 1px solid var(--cc-border);
+  }
+  .cc-kpi-label {
+    color: var(--cc-muted);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .cc-kpi-value {
+    margin-top: 8px;
+    font-size: 1.75rem;
+    font-weight: 700;
+  }
+  .cc-kpi-foot {
+    margin-top: 4px;
+    color: var(--cc-muted);
+    font-size: 0.9rem;
+  }
+  .cc-network-grid,
+  .cc-analytics-grid,
+  .cc-about-grid,
+  .cc-dossier-grid {
+    display: grid;
+    gap: 20px;
+  }
+  .cc-network-grid {
+    grid-template-columns: minmax(0, 1.9fr) minmax(300px, 0.9fr);
+  }
+  .cc-panel {
+    padding: 24px 26px;
+  }
+  .cc-panel .hd,
+  .cc-card .hd {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  .cc-panel .hd h2,
+  .cc-card .hd h3 {
+    margin: 0;
+    font-size: 1.02rem;
+    letter-spacing: 0.02em;
+  }
+  .cc-card {
+    padding: 20px 22px;
+  }
+  .cc-network-stage {
+    min-height: 640px;
+  }
+  #cc-network {
+    width: 100%;
+    height: 560px;
+    border-radius: 20px;
+    background:
+      radial-gradient(circle at top, rgba(125, 211, 252, 0.06), transparent 34%),
+      linear-gradient(180deg, rgba(10, 17, 27, 0.95), rgba(6, 10, 16, 0.98));
+    border: 1px solid rgba(148, 163, 184, 0.14);
+  }
+  .cc-network-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+    color: var(--cc-muted);
+    font-size: 0.95rem;
+  }
+  .cc-network-axis {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .cc-stage-band {
+    padding: 12px 14px;
+    border-radius: 16px;
+    background: rgba(8, 17, 26, 0.88);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+  }
+  .cc-stage-band strong {
+    display: block;
+    font-size: 0.88rem;
+  }
+  .cc-stage-band span {
+    display: block;
+    margin-top: 4px;
+    color: var(--cc-muted);
+    font-size: 0.8rem;
+  }
+  .cc-rail {
+    display: grid;
+    gap: 20px;
+  }
+  .cc-family-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .cc-family-card,
+  .cc-pill,
+  .cc-tag {
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    background: rgba(18, 28, 40, 0.86);
+  }
+  .cc-family-card {
+    padding: 14px 16px;
+    border-radius: 18px;
+  }
+  .cc-family-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+  }
+  .cc-family-shape {
+    width: 44px;
+    height: 22px;
+    color: var(--cc-accent);
+  }
+  .cc-family-card p,
+  .cc-empty,
+  .cc-muted {
+    color: var(--cc-muted);
+  }
+  .cc-lint-list,
+  .cc-list,
+  .cc-context-list,
+  .cc-watch-list {
+    display: grid;
+    gap: 12px;
+  }
+  .cc-lint-row,
+  .cc-context-row,
+  .cc-binding-card,
+  .cc-mini-row {
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: rgba(12, 22, 34, 0.9);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+  }
+  .cc-lint-row.warning {
+    border-color: rgba(249, 115, 115, 0.4);
+  }
+  .cc-lint-row.info {
+    border-color: rgba(125, 211, 252, 0.28);
+  }
+  .cc-lint-meta,
+  .cc-row-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .cc-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 9px;
+    font-size: 0.76rem;
+    color: var(--cc-muted);
+  }
+  .cc-dossier-grid,
+  .cc-about-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .cc-dossier-col,
+  .cc-about-col {
+    display: grid;
+    gap: 16px;
+  }
+  .cc-section-title {
+    margin: 0 0 6px;
+    font-size: 0.92rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--cc-muted);
+  }
+  .cc-dossier-copy h3,
+  .cc-about-copy h3 {
+    margin: 0 0 8px;
+    font-size: 1.2rem;
+  }
+  .cc-dossier-copy p,
+  .cc-about-copy p,
+  .cc-family-card p {
+    margin: 0;
+    line-height: 1.55;
+  }
+  .cc-pill-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .cc-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 13px;
+    color: var(--cc-text);
+  }
+  .cc-metric-grid,
+  .cc-analytics-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .cc-metric {
+    padding: 14px 16px;
+    border-radius: 18px;
+    background: rgba(7, 14, 22, 0.88);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+  }
+  .cc-metric-label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--cc-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .cc-metric-value {
+    display: block;
+    margin-top: 6px;
+    font-size: 1.28rem;
+    font-weight: 700;
+  }
+  .cc-mini-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+  }
+  .cc-mini-table th,
+  .cc-mini-table td {
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+    text-align: left;
+    vertical-align: top;
+  }
+  .cc-mini-table th {
+    color: var(--cc-muted);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .cc-spark {
+    width: 100%;
+    height: 46px;
+  }
+  .cc-binding-card h4,
+  .cc-context-row h4 {
+    margin: 0 0 6px;
+    font-size: 1rem;
+  }
+  .cc-binding-card p,
+  .cc-context-row p,
+  .cc-subchain p {
+    margin: 0;
+    color: var(--cc-muted);
+    line-height: 1.5;
+  }
+  .cc-subchain {
+    padding: 16px 18px;
+    border-radius: 18px;
+    background: rgba(14, 28, 44, 0.8);
+    border: 1px solid rgba(241, 178, 74, 0.16);
+  }
+  .cc-node-hero {
+    display: grid;
+    gap: 16px;
+    padding: 20px;
+    border-radius: 20px;
+    background:
+      radial-gradient(circle at top right, rgba(125, 211, 252, 0.1), transparent 38%),
+      rgba(8, 16, 25, 0.92);
+    border: 1px solid rgba(125, 211, 252, 0.18);
+  }
+  .cc-node-kicker {
+    color: var(--cc-muted);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .cc-node-hero h3 {
+    margin: 0;
+    font-size: 1.7rem;
+  }
+  .cc-brief-strip,
+  .cc-lint-summary-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .cc-brief,
+  .cc-lint-summary-chip {
+    padding: 12px 14px;
+    border-radius: 16px;
+    background: rgba(12, 22, 34, 0.88);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    min-width: 132px;
+  }
+  .cc-brief strong,
+  .cc-lint-summary-chip strong {
+    display: block;
+    font-size: 1rem;
+  }
+  .cc-brief span,
+  .cc-lint-summary-chip span {
+    color: var(--cc-muted);
+    font-size: 0.8rem;
+  }
+  .cc-lede-grid,
+  .cc-binding-grid,
+  .cc-neighbor-grid {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .cc-lede-card,
+  .cc-neighbor-card,
+  .cc-lint-cluster {
+    padding: 16px 18px;
+    border-radius: 18px;
+    background: rgba(12, 22, 34, 0.88);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+  }
+  .cc-lede-card h4,
+  .cc-neighbor-card h4,
+  .cc-lint-cluster h4 {
+    margin: 0 0 8px;
+    font-size: 0.95rem;
+  }
+  .cc-cluster-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: rgba(241, 178, 74, 0.14);
+    color: var(--cc-accent);
+    font-size: 0.78rem;
+  }
+  .cc-binding-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .cc-value-trend {
+    text-align: right;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .cc-value-trend span {
+    display: block;
+    color: var(--cc-muted);
+    font-size: 0.78rem;
+    font-weight: 500;
+  }
+  .cc-value-trend.up {
+    color: #86efac;
+  }
+  .cc-value-trend.down {
+    color: #fca5a5;
+  }
+  .cc-binding-card.compact h4 {
+    font-size: 0.94rem;
+  }
+  .cc-binding-card.compact p {
+    font-size: 0.88rem;
+  }
+  .cc-exposure-list,
+  .cc-company-links,
+  .cc-delta-list {
+    display: grid;
+    gap: 12px;
+  }
+  .cc-exposure-row {
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: rgba(12, 22, 34, 0.9);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+  }
+  .cc-exposure-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .cc-exposure-head h4 {
+    margin: 0;
+    font-size: 0.98rem;
+  }
+  .cc-exposure-links,
+  .cc-exposure-meta,
+  .cc-node-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .cc-exposure-link {
+    color: #9fd5ff;
+    text-decoration: none;
+  }
+  .cc-exposure-link:hover {
+    text-decoration: underline;
+  }
+  .cc-security-pill,
+  .cc-confidence-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    background: rgba(18, 28, 40, 0.86);
+    font-size: 0.78rem;
+  }
+  .cc-confidence-pill.high {
+    color: #86efac;
+  }
+  .cc-confidence-pill.medium {
+    color: #fcd34d;
+  }
+  .cc-confidence-pill.ambiguous {
+    color: #fca5a5;
+  }
+  .cc-exposure-groups {
+    display: grid;
+    gap: 14px;
+  }
+  .cc-exposure-group {
+    padding: 16px 18px;
+    border-radius: 18px;
+    background: rgba(12, 22, 34, 0.88);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+  }
+  .cc-exposure-group h4 {
+    margin: 0 0 10px;
+    font-size: 0.95rem;
+  }
+  .cc-exposure-public,
+  .cc-exposure-private {
+    display: grid;
+    gap: 10px;
+  }
+  .cc-private-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .cc-private-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: rgba(8, 17, 26, 0.88);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    color: var(--cc-muted);
+    font-size: 0.82rem;
+  }
+  .cc-private-pill.ambiguous {
+    color: #fca5a5;
+  }
+  .cc-delta-stat {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .cc-delta-stat .cc-brief {
+    min-width: 0;
+  }
+  .cc-inline-note {
+    margin-top: 8px;
+    color: var(--cc-muted);
+    font-size: 0.84rem;
+    line-height: 1.45;
+  }
+  .cc-about-list,
+  .cc-watch-list {
+    padding-left: 18px;
+    margin: 0;
+  }
+  .cc-about-list li,
+  .cc-watch-list li {
+    margin-bottom: 8px;
+    color: var(--cc-muted);
+  }
+  @media (max-width: 1120px) {
+    .cc-network-grid,
+    .cc-metric-grid,
+    .cc-analytics-grid,
+    .cc-dossier-grid,
+    .cc-about-grid,
+    .cc-kpis {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 760px) {
+    .cc-hero,
+    .cc-network-grid,
+    .cc-kpis,
+    .cc-network-axis,
+    .cc-metric-grid,
+    .cc-analytics-grid,
+    .cc-dossier-grid,
+    .cc-about-grid,
+    .cc-family-grid,
+    .cc-lede-grid,
+    .cc-binding-grid,
+    .cc-neighbor-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .cc-hero {
+      padding: 22px;
+    }
+    #cc-network {
+      height: 440px;
+    }
+  }
+</style>
+<link rel="stylesheet" href="/static/supply_chain_command_center.css?v={{ settings.static_assets_version }}&amp;omori=1" />
+<div class="cc-page">
+  <section class="cc-hero">
+    <div>
+      <div class="cc-eyebrow">Supply Chain Command Center</div>
+      <h1>{{ chain.title }}</h1>
+      <p class="cc-subtitle">
+        {{ (chain_payload.about.summary if chain_payload.about else chain.description) or "Institutional command surface for chain structure, bottlenecks, and linked context." }}
+      </p>
+    </div>
+    <div class="btnrow">
+      <a class="btn" href="/visualizations/supply-chains">All Chains</a>
+      <a class="btn" href="/visualizations/datasets">Dataset Workbench</a>
+      <a class="btn primary" href="/visualizations/supply-chains/{{ chain.id }}">Open Studio</a>
+    </div>
+  </section>
+
+  <section class="cc-kpis">
+    <div class="cc-kpi">
+      <div class="cc-kpi-label">Layers</div>
+      <div class="cc-kpi-value">{{ chain_payload.counts.layers }}</div>
+      <div class="cc-kpi-foot">Stage families drive shape grammar</div>
+    </div>
+    <div class="cc-kpi">
+      <div class="cc-kpi-label">Nodes</div>
+      <div class="cc-kpi-value">{{ chain_payload.counts.nodes }}</div>
+      <div class="cc-kpi-foot">Selectable dossier drilldown</div>
+    </div>
+    <div class="cc-kpi">
+      <div class="cc-kpi-label">Bindings</div>
+      <div class="cc-kpi-value">{{ chain_payload.counts.bindings }}</div>
+      <div class="cc-kpi-foot">Dataset cards scope to chain or node</div>
+    </div>
+    <div class="cc-kpi">
+      <div class="cc-kpi-label">Alerts</div>
+      <div class="cc-kpi-value">{{ chain_payload.counts.alerts }}</div>
+      <div class="cc-kpi-foot">Watchpoints plus threshold rules</div>
+    </div>
+    <div class="cc-kpi">
+      <div class="cc-kpi-label">Draft</div>
+      <div class="cc-kpi-value">
+        {% if chain_payload.draft_version %}v{{ chain_payload.draft_version.version }}{% else %}n/a{% endif %}
+      </div>
+      <div class="cc-kpi-foot">
+        {% if chain_payload.draft_version %}{{ chain_payload.draft_version.status }}{% else %}No draft snapshot{% endif %}
+      </div>
+    </div>
+    <div class="cc-kpi">
+      <div class="cc-kpi-label">Published</div>
+      <div class="cc-kpi-value">
+        {% if chain_payload.published_version %}v{{ chain_payload.published_version.version }}{% else %}n/a{% endif %}
+      </div>
+      <div class="cc-kpi-foot">
+        {% if chain_payload.published_version %}{{ chain_payload.published_version.label or "Released snapshot" }}{% else %}Not published yet{% endif %}
+      </div>
+    </div>
+  </section>
+
+  <section class="cc-network-grid">
+    <div class="cc-panel cc-network-stage">
+      <div class="hd">
+        <h2>Network Map</h2>
+        <div class="btnrow">
+          <span class="pill" id="cc-selected-pill">Primer mode</span>
+          <button class="btn" type="button" id="cc-clear-node">Clear selection</button>
+        </div>
+      </div>
+      <div class="cc-network-meta">
+        <span id="cc-network-caption">Click a node to populate the semantic dossier and node-aware dataset cards.</span>
+        <span class="pill">Deep links via <code>?node=</code></span>
+      </div>
+      <div id="cc-network"></div>
+      <div id="cc-network-axis" class="cc-network-axis"></div>
+    </div>
+
+    <aside class="cc-rail">
+      <section class="cc-card">
+        <div class="hd">
+          <h3>Visual Grammar</h3>
+          <span class="pill">Layer color + family shape</span>
+        </div>
+        <div id="cc-family-legend" class="cc-family-grid"></div>
+      </section>
+
+      <section class="cc-card">
+        <div class="hd">
+          <h3>Lint Warnings</h3>
+          <span class="pill" id="cc-lint-count">{{ chain_payload.lints|length }}</span>
+        </div>
+        <div id="cc-lint-list" class="cc-lint-list"></div>
+      </section>
+    </aside>
+  </section>
+
+  <section class="cc-panel">
+    <div class="hd">
+      <h2>Selected Node Dossier</h2>
+      <div class="btnrow" id="cc-dossier-actions"></div>
+    </div>
+    <div id="cc-dossier"></div>
+  </section>
+
+  <section class="cc-analytics-grid">
+    <div class="cc-card">
+      <div class="hd">
+        <h3>Top Public Exposures</h3>
+        <span class="pill">{{ exposure_summary.count or 0 }}</span>
+      </div>
+      <div id="cc-exposure-summary" class="cc-exposure-list"></div>
+    </div>
+
+    <div class="cc-card">
+      <div class="hd">
+        <h3>Highest Bottleneck Nodes</h3>
+        <span class="pill">Top pressure nodes</span>
+      </div>
+      <div id="cc-bottleneck-watch"></div>
+    </div>
+
+    <div class="cc-card">
+      <div class="hd">
+        <h3>Single-Sourcing Watchlist</h3>
+        <span class="pill">{{ single_source_watchlist|length }}</span>
+      </div>
+      <div id="cc-single-source-watch"></div>
+    </div>
+
+    <div class="cc-card">
+      <div class="hd">
+        <h3>Snapshot Delta</h3>
+        <span class="pill">{{ delta.comparison_label if delta else "No comparison" }}</span>
+      </div>
+      <div id="cc-delta-summary"></div>
+    </div>
+
+    <div class="cc-card">
+      <div class="hd">
+        <h3>Dataset Bindings</h3>
+        <span class="pill" id="cc-binding-mode-pill">Chain scope</span>
+      </div>
+      <div id="cc-binding-cards" class="cc-list"></div>
+    </div>
+
+    <div class="cc-card">
+      <div class="hd">
+        <h3>Alerts</h3>
+        <span class="pill">{{ alerts|length }}</span>
+      </div>
+      <div class="cc-list">
+        {% for alert in alerts %}
+        <div class="cc-context-row">
+          <h4>{{ alert.name }}</h4>
+          <p>{{ alert.scope_type }} / {{ alert.scope_key }} · {{ alert.metric_kind }} {{ alert.operator }} {{ alert.threshold_value }}</p>
+        </div>
+        {% else %}
+        <div class="cc-empty">No alert rules configured yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="cc-card">
+      <div class="hd">
+        <h3>Linked Context</h3>
+        <span class="pill">{{ (linked_context.notes|length) + (linked_context.theses|length) }}</span>
+      </div>
+      <div class="cc-context-list">
+        {% for note in linked_context.notes %}
+        <div class="cc-context-row">
+          <h4><a href="{{ note.href }}">{{ note.title }}</a></h4>
+          <p>Linked note</p>
+        </div>
+        {% endfor %}
+        {% for thesis in linked_context.theses %}
+        <div class="cc-context-row">
+          <h4><a href="{{ thesis.href }}">{{ thesis.title }}</a></h4>
+          <p>Linked thesis</p>
+        </div>
+        {% endfor %}
+        {% if (linked_context.notes|length) + (linked_context.theses|length) == 0 %}
+        <div class="cc-empty">No notes or theses are linked to this chain yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <section class="cc-panel">
+    <div class="hd">
+      <h2>About This Supply Chain</h2>
+      <span class="pill">{{ chain.category or "general" }}</span>
+    </div>
+    <div class="cc-about-grid">
+      <div class="cc-about-col">
+        <div class="cc-about-copy">
+          <div class="cc-section-title">Summary</div>
+          <h3>{{ chain_payload.about.summary or chain.title }}</h3>
+          <p>{{ chain_payload.about.scope or chain.description or "No scope summary yet." }}</p>
+        </div>
+        <div class="cc-about-copy">
+          <div class="cc-section-title">Why It Matters</div>
+          <p>{{ chain_payload.about.why_it_matters or "Use this command center to explain bottlenecks, dataset shifts, and downstream system dependencies." }}</p>
+        </div>
+      </div>
+      <div class="cc-about-col">
+        <div>
+          <div class="cc-section-title">Key Players</div>
+          <ul class="cc-about-list">
+            {% for item in chain_payload.about.key_players or [] %}
+            <li>{{ item }}</li>
+            {% else %}
+            <li>No key players authored yet.</li>
+            {% endfor %}
+          </ul>
+        </div>
+        <div>
+          <div class="cc-section-title">Watchpoints</div>
+          <ul class="cc-watch-list">
+            {% for item in chain_payload.about.watchpoints or [] %}
+            <li>{{ item }}</li>
+            {% else %}
+            <li>No chain watchpoints authored yet.</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+  <nav class="cc-action-strip" aria-label="Supply chain actions">
+    <strong>Actions</strong>
+    <a href="#cc-dossier">[Enter] Open dossier</a>
+    <a href="/visualizations/datasets">[D] Dataset cards</a>
+    <a href="/visualizations/supply-chains/{{ chain.id }}">[S] Scenario studio</a>
+    <button type="button" id="cc-export-proof">[E] Export proof</button>
+    <a href="/visualizations/supply-chains">[Esc] All chains</a>
+  </nav>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/vendor/echarts.min.js?v={{ settings.static_assets_version }}"></script>
+<script>
+(() => {
+  const payload = {{ command_center_json|safe }};
+  const chainId = {{ chain.id }};
+  const state = {
+    focusNode: payload.focus_node || null,
+    nodePayload: payload.node_payload || null,
+  };
+
+  const el = {
+    network: document.getElementById("cc-network"),
+    networkAxis: document.getElementById("cc-network-axis"),
+    selectedPill: document.getElementById("cc-selected-pill"),
+    clearNode: document.getElementById("cc-clear-node"),
+    lintList: document.getElementById("cc-lint-list"),
+    lintCount: document.getElementById("cc-lint-count"),
+    familyLegend: document.getElementById("cc-family-legend"),
+    dossier: document.getElementById("cc-dossier"),
+    dossierActions: document.getElementById("cc-dossier-actions"),
+    bindingCards: document.getElementById("cc-binding-cards"),
+    bindingMode: document.getElementById("cc-binding-mode-pill"),
+    networkCaption: document.getElementById("cc-network-caption"),
+    exposureSummary: document.getElementById("cc-exposure-summary"),
+    bottleneckWatch: document.getElementById("cc-bottleneck-watch"),
+    singleSourceWatch: document.getElementById("cc-single-source-watch"),
+    deltaSummary: document.getElementById("cc-delta-summary"),
+  };
+
+  const SHAPES = {
+    diamond_plaque: "path://M50 4 L95 25 L50 46 L5 25 Z",
+    hex_plate: "path://M18 4 L82 4 L96 25 L82 46 L18 46 L4 25 Z",
+    block_rect: "path://M4 4 L96 4 L96 46 L4 46 Z",
+    capsule: "path://M22 4 L78 4 Q96 4 96 25 Q96 46 78 46 L22 46 Q4 46 4 25 Q4 4 22 4 Z",
+    chevron_card: "path://M4 4 L68 4 L96 25 L68 46 L4 46 L20 25 Z",
+    tag_badge: "path://M4 12 Q4 4 12 4 L78 4 L96 25 L78 46 L12 46 Q4 46 4 38 Z",
+  };
+  const FAMILY_ORDER = Object.fromEntries((((payload.legend || {}).families) || []).map((family, idx) => [family.id, Number(family.order ?? idx)]));
+  const LINT_LABELS = {
+    edge_direction_backward: "Backward flow",
+    linked_chain_gap: "Missing subchain",
+    downstream_readability: "Downstream readability",
+    layer_family_mismatch: "Family mismatch",
+  };
+  const ROLE_LABELS = {
+    primary: "Primary",
+    supplier_option: "Supplier Options",
+    ecosystem: "Ecosystem",
+    downstream_demand: "Downstream Demand",
+  };
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function pct(value) {
+    const num = Number(value || 0);
+    return `${Math.round(num * 100)}%`;
+  }
+
+  function formatCompactNumber(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) {
+      return "n/a";
+    }
+    return new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(num);
+  }
+
+  function familyLabel(id) {
+    const family = (((payload.legend || {}).families) || []).find((item) => item.id === id);
+    return family ? family.label : (id || "Component");
+  }
+
+  function roleLabel(id) {
+    return ROLE_LABELS[id] || String(id || "Exposure").replaceAll("_", " ");
+  }
+
+  function securityLabel(security) {
+    if (!security || !security.ticker) {
+      return "";
+    }
+    return security.exchange ? `${security.ticker} · ${security.exchange}` : `${security.ticker}`;
+  }
+
+  function confidencePill(entry) {
+    const confidence = String(entry?.match_confidence || "").trim().toLowerCase();
+    if (!confidence) {
+      return "";
+    }
+    return `<span class="cc-confidence-pill ${escapeHtml(confidence)}">${escapeHtml(confidence)}</span>`;
+  }
+
+  function securityPill(security) {
+    const label = securityLabel(security);
+    if (!label) {
+      return "";
+    }
+    const kind = security.listing_kind === "adr" ? "ADR" : "Local";
+    return `<span class="cc-security-pill">${escapeHtml(label)} <span style="color:rgba(226,232,240,0.66);">${escapeHtml(kind)}</span></span>`;
+  }
+
+  function exposurePublicEntries(group) {
+    const items = Array.isArray(group?.items) ? group.items : [];
+    return items.filter((item) => item && item.match_state === "resolved" && item.is_public && item.primary_security);
+  }
+
+  function exposurePrivateEntries(group) {
+    const items = Array.isArray(group?.items) ? group.items : [];
+    return items.filter((item) => !item || item.match_state !== "resolved" || !item.is_public || !item.primary_security);
+  }
+
+  function stageCountMap() {
+    const counts = new Map();
+    for (const node of (payload.network || {}).nodes || []) {
+      const key = String(node.stage_family || "component");
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return counts;
+  }
+
+  function groupLints(rows) {
+    const map = new Map();
+    for (const lint of Array.isArray(rows) ? rows : []) {
+      const code = String(lint.code || "misc");
+      const severity = String(lint.severity || "info");
+      const key = `${severity}:${code}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          code,
+          severity,
+          count: 0,
+          nodes: new Set(),
+          messages: [],
+        });
+      }
+      const bucket = map.get(key);
+      bucket.count += 1;
+      if (lint.node_id) {
+        bucket.nodes.add(String(lint.node_id));
+      }
+      if (lint.message && bucket.messages.length < 2) {
+        bucket.messages.push(String(lint.message));
+      }
+    }
+    return [...map.values()].sort((left, right) => {
+      const sev = (value) => value.severity === "warning" ? 0 : 1;
+      return sev(left) - sev(right) || right.count - left.count || left.code.localeCompare(right.code);
+    });
+  }
+
+  function shapeSvg(shapeKey) {
+    const path = SHAPES[shapeKey] || SHAPES.block_rect;
+    return `<svg class="cc-family-shape" viewBox="0 0 100 50" aria-hidden="true"><path d="${path.replace("path://", "")}" fill="currentColor"></path></svg>`;
+  }
+
+  function renderLegend() {
+    const families = (((payload.legend || {}).families) || []);
+    el.familyLegend.innerHTML = families.map((family) => `
+      <div class="cc-family-card">
+        <div class="cc-family-head">
+          ${shapeSvg(family.shape_key)}
+          <span>${escapeHtml(family.label)}</span>
+        </div>
+        <p>${escapeHtml(family.description || "")}</p>
+      </div>
+    `).join("");
+  }
+
+  function renderNetworkAxis() {
+    const counts = stageCountMap();
+    const families = (((payload.legend || {}).families) || []).slice().sort((left, right) => Number(left.order || 0) - Number(right.order || 0));
+    const total = ((payload.network || {}).nodes || []).length;
+    const linked = ((payload.network || {}).nodes || []).filter((node) => node.has_child_chain).length;
+    const severityCounts = (Array.isArray(payload.lints) ? payload.lints : []).reduce((out, lint) => {
+      const key = String(lint.severity || "info");
+      out[key] = (out[key] || 0) + 1;
+      return out;
+    }, {});
+    el.networkAxis.innerHTML = families.map((family) => `
+      <div class="cc-stage-band">
+        <strong>${escapeHtml(family.label)}</strong>
+        <span>${escapeHtml(String(counts.get(family.id) || 0))} nodes in this stage</span>
+      </div>
+    `).join("");
+    el.networkCaption.textContent = state.focusNode
+      ? el.networkCaption.textContent
+      : `${total} total nodes · ${linked} linked subchains · ${(severityCounts.warning || 0)} warnings on active snapshot`;
+  }
+
+  function renderLints() {
+    const lints = Array.isArray(payload.lints) ? payload.lints : [];
+    const groups = groupLints(lints);
+    const warnings = lints.filter((lint) => String(lint.severity || "info") === "warning").length;
+    const infos = lints.length - warnings;
+    el.lintCount.textContent = String(lints.length);
+    if (!lints.length) {
+      el.lintList.innerHTML = `<div class="cc-empty">No non-blocking lint warnings on the active snapshot.</div>`;
+      return;
+    }
+    el.lintList.innerHTML = `
+      <div class="cc-lint-summary-strip">
+        <div class="cc-lint-summary-chip"><strong>${warnings}</strong><span>warnings</span></div>
+        <div class="cc-lint-summary-chip"><strong>${infos}</strong><span>info items</span></div>
+        <div class="cc-lint-summary-chip"><strong>${groups.length}</strong><span>clusters</span></div>
+      </div>
+      ${groups.map((group) => `
+        <div class="cc-lint-cluster">
+          <div class="cc-binding-card-head">
+            <div>
+              <h4>${escapeHtml(LINT_LABELS[group.code] || group.code.replaceAll("_", " "))}</h4>
+              <div class="cc-row-meta">
+                <span class="cc-tag">${escapeHtml(group.severity)}</span>
+                <span class="cc-cluster-count">${group.count}</span>
+              </div>
+            </div>
+            <div class="cc-value-trend">
+              ${group.nodes.size}
+              <span>affected nodes</span>
+            </div>
+          </div>
+          <p>${escapeHtml(group.messages[0] || "Structural lint warning")}</p>
+          ${group.nodes.size ? `<p style="margin-top:8px;">${escapeHtml([...group.nodes].slice(0, 4).join(", "))}</p>` : ""}
+        </div>
+      `).join("")}
+    `;
+  }
+
+  function renderMetricGrid(metrics) {
+    const items = [
+      ["Bottleneck", pct(metrics.bottleneck)],
+      ["Capacity", pct(metrics.capacity)],
+      ["Pricing Power", pct(metrics.pricing_power)],
+      ["Confidence", pct(metrics.confidence)],
+      ["Lead Time", `${Number(metrics.lead_time_months || 0)} mo`],
+    ];
+    return `
+      <div class="cc-metric-grid">
+        ${items.map(([label, value]) => `
+          <div class="cc-metric">
+            <span class="cc-metric-label">${escapeHtml(label)}</span>
+            <span class="cc-metric-value">${escapeHtml(value)}</span>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function renderPeoplePills(items) {
+    if (!Array.isArray(items) || !items.length) {
+      return `<div class="cc-empty">No participant detail authored yet.</div>`;
+    }
+    return `<div class="cc-pill-grid">${items.map((item) => `<span class="cc-pill">${escapeHtml(item)}</span>`).join("")}</div>`;
+  }
+
+  function renderNeighborRows(items) {
+    if (!Array.isArray(items) || !items.length) {
+      return `<div class="cc-empty">None mapped.</div>`;
+    }
+    return `
+      <div class="cc-list">
+        ${items.map((item) => `
+          <div class="cc-mini-row">
+            <div class="cc-row-meta">
+              <span class="cc-tag">${escapeHtml(item.layer_name || "layer")}</span>
+              <span class="cc-tag">${escapeHtml(familyLabel(item.stage_family || "component"))}</span>
+            </div>
+            <strong>${escapeHtml(item.name || item.id)}</strong>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function renderSparkline(series) {
+    if (!Array.isArray(series) || !series.length) {
+      return "";
+    }
+    const values = series.map((item) => Number(item.value || 0));
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const span = max - min || 1;
+    const points = values.map((value, idx) => {
+      const x = values.length === 1 ? 0 : (idx / (values.length - 1)) * 100;
+      const y = 40 - (((value - min) / span) * 32);
+      return `${x},${y}`;
+    }).join(" ");
+    return `
+      <svg class="cc-spark" viewBox="0 0 100 46" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0 42 L100 42" stroke="rgba(148,163,184,0.18)" stroke-width="1" fill="none"></path>
+        <polyline points="${points}" stroke="rgba(125,211,252,0.95)" stroke-width="2.5" fill="none"></polyline>
+      </svg>
+    `;
+  }
+
+  function trendClass(value) {
+    if (!Number.isFinite(Number(value))) {
+      return "";
+    }
+    if (Number(value) > 0) {
+      return "up";
+    }
+    if (Number(value) < 0) {
+      return "down";
+    }
+    return "";
+  }
+
+  function trendText(card) {
+    if (!Number.isFinite(Number(card.delta_abs))) {
+      return "No prior observation";
+    }
+    const abs = formatCompactNumber(card.delta_abs);
+    const pctText = Number.isFinite(Number(card.delta_pct)) ? ` (${pct(card.delta_pct)})` : "";
+    const direction = Number(card.delta_abs) > 0 ? "+" : "";
+    return `${direction}${abs}${pctText}`;
+  }
+
+  function bindingCardsMarkup(cards, compact = false) {
+    const rows = Array.isArray(cards) ? cards : [];
+    if (!rows.length) {
+      return `<div class="cc-empty">No dataset bindings available for the current focus.</div>`;
+    }
+    const className = compact ? "cc-binding-card compact" : "cc-binding-card";
+    return rows.map((card) => {
+      const binding = card.binding || {};
+      const dataset = card.dataset || {};
+      const chart = card.chart || {};
+      const last = Array.isArray(chart.series) && chart.series.length ? chart.series[chart.series.length - 1] : null;
+      return `
+        <div class="${className}">
+          <div class="cc-binding-card-head">
+            <div>
+              <div class="cc-row-meta">
+                <span class="cc-tag">${escapeHtml(binding.metric_kind || "metric")}</span>
+                <span class="cc-tag">${escapeHtml(binding.scope_type || "chain")}</span>
+                ${card.is_focus_scope ? `<span class="cc-tag">focused node</span>` : ""}
+                <span class="cc-tag">${escapeHtml(String(card.observation_count || 0))} points</span>
+              </div>
+              <h4><a href="/visualizations/datasets/${escapeHtml(dataset.id)}">${escapeHtml(dataset.title || "Dataset")}</a></h4>
+            </div>
+            <div class="cc-value-trend ${trendClass(card.delta_abs)}">
+              ${Number.isFinite(Number(card.latest_value)) ? formatCompactNumber(card.latest_value) : "n/a"}
+              <span>${escapeHtml(trendText(card))}</span>
+            </div>
+          </div>
+          <p>${escapeHtml(dataset.category || "general")} · ${escapeHtml(binding.aggregation || "latest")} · ${escapeHtml(binding.column_key || chart.y_key || "series")}</p>
+          ${renderSparkline(chart.series)}
+          <p>${last ? `Latest ${escapeHtml(String(card.latest_date || last.date || ""))} · ${escapeHtml(String(card.row_count || 0))} rows in dataset.` : "No preview series yet."}</p>
+        </div>
+      `;
+    }).join("");
+  }
+
+  function renderBindingCards(cards) {
+    const rows = Array.isArray(cards) ? cards : [];
+    el.bindingMode.textContent = state.focusNode ? `Node scope: ${state.focusNode}` : "Chain scope";
+    el.bindingCards.innerHTML = bindingCardsMarkup(rows, false);
+  }
+
+  function publicExposureMarkup(entry) {
+    const alternates = Array.isArray(entry.alternate_securities) ? entry.alternate_securities : [];
+    return `
+      <div class="cc-exposure-row">
+        <div class="cc-exposure-head">
+          <div>
+            <h4>${escapeHtml(entry.display_name || "Company")}</h4>
+            <div class="cc-row-meta">
+              <span class="cc-tag">${escapeHtml(roleLabel(entry.role))}</span>
+              ${confidencePill(entry)}
+            </div>
+          </div>
+          ${securityPill(entry.primary_security)}
+        </div>
+        <div class="cc-exposure-links">
+          ${entry.company_href ? `<a class="cc-exposure-link" href="${escapeHtml(entry.company_href)}">Company page</a>` : ""}
+          ${entry.source_name && entry.source_name !== entry.display_name ? `<span class="cc-tag">source: ${escapeHtml(entry.source_name)}</span>` : ""}
+        </div>
+        ${alternates.length ? `<div class="cc-exposure-meta">${alternates.map((security) => securityPill(security)).join("")}</div>` : ""}
+      </div>
+    `;
+  }
+
+  function privateExposureMarkup(entry) {
+    if (entry.match_state === "ambiguous") {
+      const candidates = Array.isArray(entry.ambiguous_matches) ? entry.ambiguous_matches : [];
+      const preview = candidates.map((candidate) => {
+        const security = securityLabel(candidate.primary_security);
+        return security ? `${candidate.display_name} (${security})` : candidate.display_name;
+      }).join(" · ");
+      return `<span class="cc-private-pill ambiguous">${escapeHtml(entry.display_name || "Needs review")}${preview ? ` → ${escapeHtml(preview)}` : ""}</span>`;
+    }
+    return `<span class="cc-private-pill">${escapeHtml(entry.display_name || "Unmapped")}</span>`;
+  }
+
+  function exposureGroupMarkup(role, group) {
+    const publicItems = exposurePublicEntries(group);
+    const privateItems = exposurePrivateEntries(group);
+    if (!publicItems.length && !privateItems.length) {
+      return "";
+    }
+    return `
+      <div class="cc-exposure-group">
+        <h4>${escapeHtml(roleLabel(role))}</h4>
+        ${publicItems.length ? `<div class="cc-exposure-public">${publicItems.map((entry) => publicExposureMarkup(entry)).join("")}</div>` : ""}
+        ${privateItems.length ? `
+          <div class="cc-exposure-private">
+            <div class="cc-inline-note">Private, unmapped, or ambiguous names remain visible here so the modeled context does not disappear.</div>
+            <div class="cc-private-list">${privateItems.map((entry) => privateExposureMarkup(entry)).join("")}</div>
+          </div>
+        ` : ""}
+      </div>
+    `;
+  }
+
+  function renderExposureSummary() {
+    if (!el.exposureSummary) {
+      return;
+    }
+    const summary = payload.exposure_summary || {};
+    const rows = Array.isArray(summary.companies) ? summary.companies : [];
+    if (!rows.length) {
+      el.exposureSummary.innerHTML = `<div class="cc-empty">No public-company exposure mapping is available for this chain yet.</div>`;
+      return;
+    }
+    el.exposureSummary.innerHTML = rows.slice(0, 8).map((row) => `
+      <div class="cc-exposure-row">
+        <div class="cc-exposure-head">
+          <div>
+            <h4>${row.company_href ? `<a class="cc-exposure-link" href="${escapeHtml(row.company_href)}">${escapeHtml(row.display_name || "Company")}</a>` : escapeHtml(row.display_name || "Company")}</h4>
+            <div class="cc-row-meta">
+              <span class="cc-tag">${escapeHtml(String(row.linked_node_count || 0))} linked nodes</span>
+              <span class="cc-tag">bottleneck ${escapeHtml(pct(row.max_bottleneck || 0))}</span>
+              <span class="cc-tag">pricing ${escapeHtml(pct(row.max_pricing_power || 0))}</span>
+            </div>
+          </div>
+          ${securityPill(row.primary_security)}
+        </div>
+        ${Array.isArray(row.alternate_securities) && row.alternate_securities.length ? `<div class="cc-exposure-meta">${row.alternate_securities.map((security) => securityPill(security)).join("")}</div>` : ""}
+        <div class="cc-node-links">
+          ${(row.top_nodes || []).map((node) => `<a class="cc-exposure-link" href="?node=${encodeURIComponent(node.id)}">${escapeHtml(node.name)}</a>`).join("")}
+        </div>
+      </div>
+    `).join("");
+  }
+
+  function renderBottleneckWatch() {
+    if (!el.bottleneckWatch) {
+      return;
+    }
+    const rows = Array.isArray(payload.top_bottlenecks) ? payload.top_bottlenecks : [];
+    if (!rows.length) {
+      el.bottleneckWatch.innerHTML = `<div class="cc-empty">No bottleneck data yet.</div>`;
+      return;
+    }
+    el.bottleneckWatch.innerHTML = `
+      <table class="cc-mini-table">
+        <thead>
+          <tr>
+            <th>Node</th>
+            <th>Lead</th>
+            <th>Pricing</th>
+            <th>Bottleneck</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((node) => `
+            <tr>
+              <td><a class="cc-exposure-link" href="?node=${encodeURIComponent(node.id)}">${escapeHtml(node.name)}</a></td>
+              <td>${escapeHtml(String(node.lead_time_months || 0))} mo</td>
+              <td>${escapeHtml(pct(node.pricing_power || 0))}</td>
+              <td>${escapeHtml(pct(node.bottleneck || 0))}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    `;
+  }
+
+  function renderSingleSourceWatch() {
+    if (!el.singleSourceWatch) {
+      return;
+    }
+    const rows = Array.isArray(payload.single_source_watchlist) ? payload.single_source_watchlist : [];
+    if (!rows.length) {
+      el.singleSourceWatch.innerHTML = `<div class="cc-empty">No obvious single-sourcing pressure nodes are modeled yet.</div>`;
+      return;
+    }
+    el.singleSourceWatch.innerHTML = rows.slice(0, 8).map((row) => `
+      <div class="cc-mini-row">
+        <div class="cc-row-meta">
+          <span class="cc-tag">${escapeHtml(String(row.lead_time_months || 0))} mo</span>
+          <span class="cc-tag">bottleneck ${escapeHtml(pct(row.bottleneck || 0))}</span>
+          <span class="cc-tag">pricing ${escapeHtml(pct(row.pricing_power || 0))}</span>
+        </div>
+        <strong><a class="cc-exposure-link" href="?node=${encodeURIComponent(row.id)}">${escapeHtml(row.name)}</a></strong>
+        <div class="cc-inline-note">${escapeHtml(row.manufacturer || "Single named source")}</div>
+      </div>
+    `).join("");
+  }
+
+  function renderDeltaSummary() {
+    if (!el.deltaSummary) {
+      return;
+    }
+    const delta = payload.delta || null;
+    if (!delta) {
+      el.deltaSummary.innerHTML = `<div class="cc-empty">No comparable published snapshot is available yet.</div>`;
+      return;
+    }
+    const exposureDelta = delta.exposure_delta || {};
+    const nodeAdds = (delta.nodes_added || []).length;
+    const nodeChanges = (delta.nodes_changed || []).length;
+    const exposureAdds = (exposureDelta.companies_added || []).length;
+    const coverageAdds = (exposureDelta.companies_increased || []).length;
+    const detailRows = [];
+    if (nodeAdds) {
+      detailRows.push(`<div class="cc-mini-row">Nodes added: ${escapeHtml(String(nodeAdds))}</div>`);
+    }
+    if (nodeChanges) {
+      detailRows.push(`<div class="cc-mini-row">Nodes changed: ${escapeHtml(String(nodeChanges))}</div>`);
+    }
+    if ((delta.bindings_changed || []).length || (delta.bindings_added || []).length) {
+      detailRows.push(`<div class="cc-mini-row">Bindings moved: ${escapeHtml(String((delta.bindings_changed || []).length + (delta.bindings_added || []).length))}</div>`);
+    }
+    if (exposureAdds) {
+      detailRows.push(`<div class="cc-mini-row">New public exposures: ${escapeHtml(String(exposureAdds))}</div>`);
+    }
+    if (coverageAdds) {
+      detailRows.push(`<div class="cc-mini-row">Companies with broader node coverage: ${escapeHtml(String(coverageAdds))}</div>`);
+    }
+    el.deltaSummary.innerHTML = `
+      <div class="cc-delta-stat">
+        <div class="cc-brief"><strong>${escapeHtml(String(nodeAdds))}</strong><span>nodes added</span></div>
+        <div class="cc-brief"><strong>${escapeHtml(String(exposureAdds))}</strong><span>exposures added</span></div>
+        <div class="cc-brief"><strong>${escapeHtml(String(coverageAdds))}</strong><span>coverage widened</span></div>
+      </div>
+      <div class="cc-inline-note">${escapeHtml(delta.comparison_label || "Snapshot comparison")}</div>
+      <div class="cc-delta-list">${detailRows.length ? detailRows.join("") : `<div class="cc-empty">Draft and published views currently resolve to the same exposure surface.</div>`}</div>
+    `;
+  }
+
+  function coverageBriefs() {
+    const nodes = ((payload.network || {}).nodes || []);
+    const linked = nodes.filter((node) => node.has_child_chain).length;
+    const systemCount = nodes.filter((node) => String(node.stage_family || "") === "system").length;
+    const bottleneckMax = nodes.reduce((max, node) => Math.max(max, Number(node.bottleneck || 0)), 0);
+    return `
+      <div class="cc-brief-strip">
+        <div class="cc-brief"><strong>${nodes.length}</strong><span>modeled nodes</span></div>
+        <div class="cc-brief"><strong>${linked}</strong><span>linked subchains</span></div>
+        <div class="cc-brief"><strong>${systemCount}</strong><span>downstream systems</span></div>
+        <div class="cc-brief"><strong>${pct(bottleneckMax)}</strong><span>peak bottleneck</span></div>
+      </div>
+    `;
+  }
+
+  function focusBriefs(node, dossier, nodePayload) {
+    const overview = dossier.overview || {};
+    const participants = dossier.participants || {};
+    const context = dossier.context || {};
+    const exposure = dossier.exposure || {};
+    const exposureCounts = exposure.counts || {};
+    return `
+      <div class="cc-brief-strip">
+        <div class="cc-brief"><strong>${participants.upstream?.length || 0}</strong><span>upstream dependencies</span></div>
+        <div class="cc-brief"><strong>${participants.downstream?.length || 0}</strong><span>downstream systems</span></div>
+        <div class="cc-brief"><strong>${(nodePayload.binding_cards || []).length}</strong><span>data signals</span></div>
+        <div class="cc-brief"><strong>${exposureCounts.public || 0}</strong><span>public exposures</span></div>
+      </div>
+    `;
+  }
+
+  function renderNodeExposure(exposure) {
+    const groups = exposure && typeof exposure === "object" ? (exposure.groups || {}) : {};
+    const markup = Object.keys(ROLE_LABELS)
+      .map((role) => exposureGroupMarkup(role, groups[role] || {}))
+      .filter(Boolean)
+      .join("");
+    if (!markup) {
+      return `<div class="cc-empty">No company or ticker mapping is available for this node yet.</div>`;
+    }
+    return `<div class="cc-exposure-groups">${markup}</div>`;
+  }
+
+  function renderPrimer() {
+    const about = payload.about || {};
+    const families = (((payload.legend || {}).families) || []);
+    const players = Array.isArray(about.key_players) ? about.key_players : [];
+    const watchpoints = Array.isArray(about.watchpoints) ? about.watchpoints : [];
+    el.dossierActions.innerHTML = "";
+    el.selectedPill.textContent = "Primer mode";
+    el.networkCaption.textContent = "Click a node to populate the semantic dossier and node-aware dataset cards.";
+    el.dossier.innerHTML = `
+      <div class="cc-dossier-grid">
+        <div class="cc-dossier-col">
+          <div class="cc-node-hero">
+            <div class="cc-node-kicker">Chain primer</div>
+            <h3>${escapeHtml(about.summary || payload.chain.title)}</h3>
+            <p>${escapeHtml(about.scope || about.why_it_matters || "Select a node to see definitions, participants, subchain drilldown, and linked context.")}</p>
+            ${coverageBriefs()}
+          </div>
+          <div>
+            <div class="cc-section-title">Key Players</div>
+            ${renderPeoplePills(players)}
+          </div>
+        </div>
+        <div class="cc-dossier-col">
+          <div class="cc-lede-grid">
+            <div class="cc-lede-card">
+              <h4>How to read this chain</h4>
+              <p>Color carries layer context. Shape carries stage family. Child-chain accents mark nodes that can expand into deeper supply-chain command centers.</p>
+            </div>
+            <div class="cc-lede-card">
+              <h4>Research posture</h4>
+              <p>${escapeHtml(about.why_it_matters || "Use this surface to move from bottleneck identification to downstream read-through and supporting evidence.")}</p>
+            </div>
+          </div>
+          <div>
+            <div class="cc-section-title">Watchpoints</div>
+            <ul class="cc-watch-list">
+              ${(watchpoints.length ? watchpoints : ["No chain watchpoints authored yet."]).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+            </ul>
+          </div>
+          <div>
+            <div class="cc-section-title">Shape Legend</div>
+            <div class="cc-family-grid">
+              ${families.map((family) => `
+                <div class="cc-family-card">
+                  <div class="cc-family-head">
+                    ${shapeSvg(family.shape_key)}
+                    <span>${escapeHtml(family.label)}</span>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    renderBindingCards(payload.binding_cards || []);
+  }
+
+  function renderDossier(nodePayload) {
+    if (!nodePayload || !nodePayload.node || !nodePayload.dossier) {
+      renderPrimer();
+      return;
+    }
+    const node = nodePayload.node;
+    const dossier = nodePayload.dossier;
+    const overview = dossier.overview || {};
+    const participants = dossier.participants || {};
+    const context = dossier.context || {};
+    const subchain = dossier.subchain || null;
+    const lints = Array.isArray(context.lints) ? context.lints : [];
+    state.focusNode = node.id;
+    el.selectedPill.textContent = node.name || node.id;
+    el.networkCaption.textContent = `${node.name || node.id} · ${overview.family_label || overview.family || "component"} · ${overview.layer || node.layer_name || ""}`;
+    el.dossierActions.innerHTML = `
+      <a class="btn" href="/visualizations/supply-chains/${chainId}?node=${encodeURIComponent(node.id)}">Open in Studio</a>
+      ${subchain && subchain.id ? `<a class="btn primary" href="/visualizations/supply-chains/${subchain.id}/command-center">Open full chain</a>` : ""}
+    `;
+    el.dossier.innerHTML = `
+      <div class="cc-dossier-grid">
+        <div class="cc-dossier-col">
+          <div class="cc-node-hero">
+            <div class="cc-node-kicker">Selected node</div>
+            <h3>${escapeHtml(node.name || node.id)}</h3>
+            <p>${escapeHtml(overview.definition || "")}</p>
+            <div class="cc-pill-grid">
+              <span class="cc-pill">${shapeSvg(overview.shape_key)} ${escapeHtml(overview.family_label || overview.family || "component")}</span>
+              <span class="cc-pill">${escapeHtml(overview.layer || "Layer")}</span>
+              ${overview.manufacturer ? `<span class="cc-pill">${escapeHtml(overview.manufacturer)}</span>` : ""}
+              ${overview.location ? `<span class="cc-pill">${escapeHtml(overview.location)}</span>` : ""}
+              ${subchain ? `<span class="cc-pill">linked subchain</span>` : ""}
+            </div>
+            ${focusBriefs(node, dossier, nodePayload)}
+          </div>
+          <div class="cc-lede-grid">
+            <div class="cc-lede-card">
+              <h4>Why it matters</h4>
+              <p>${escapeHtml(overview.why_it_matters || "")}</p>
+            </div>
+            <div class="cc-lede-card">
+              <h4>Critical path</h4>
+              <p>${participants.upstream?.length ? `This node is gated by ${participants.upstream.map((row) => row.name).slice(0, 3).join(", ")}.` : "No upstream dependencies are mapped yet."}</p>
+            </div>
+          </div>
+          ${renderMetricGrid(overview.metrics || {})}
+          ${overview.glossary ? `<div class="cc-context-row"><h4>Glossary</h4><p>${escapeHtml(overview.glossary)}</p></div>` : ""}
+          <div>
+            <div class="cc-section-title">Data Signals</div>
+            <div class="cc-binding-grid">
+              ${bindingCardsMarkup(nodePayload.binding_cards || [], true)}
+            </div>
+          </div>
+        </div>
+        <div class="cc-dossier-col">
+          <div>
+            <div class="cc-section-title">Participants</div>
+            ${renderPeoplePills(participants.who_matters || [])}
+          </div>
+          <div>
+            <div class="cc-section-title">Public Market Exposure</div>
+            ${renderNodeExposure(dossier.exposure || {})}
+          </div>
+          <div class="cc-neighbor-grid">
+            <div class="cc-neighbor-card">
+              <h4>Immediate Upstream</h4>
+              ${renderNeighborRows(participants.upstream || [])}
+            </div>
+            <div class="cc-neighbor-card">
+              <h4>Immediate Downstream</h4>
+              ${renderNeighborRows(participants.downstream || [])}
+            </div>
+          </div>
+          <div>
+            <div class="cc-section-title">Watchpoints</div>
+            <ul class="cc-watch-list">
+              ${((Array.isArray(dossier.watchpoints) && dossier.watchpoints.length) ? dossier.watchpoints : ["No node watchpoints authored yet."]).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+            </ul>
+          </div>
+          <div class="cc-lede-grid">
+            <div class="cc-lede-card">
+              <h4>Context</h4>
+              <p>${(context.notes || []).length} notes · ${(context.theses || []).length} theses · ${(context.alerts || []).length} alerts linked into this node view.</p>
+            </div>
+            <div class="cc-lede-card">
+              <h4>Control Surface</h4>
+              <p>${participants.supplier_options?.length ? `${participants.supplier_options.length} supplier option rows captured.` : "Supplier options are not authored yet."}</p>
+            </div>
+          </div>
+          ${subchain ? `
+            <div class="cc-subchain">
+              <div class="cc-section-title">Subchain</div>
+              <h3>${escapeHtml(subchain.title || "Linked subchain")}</h3>
+              <p>${escapeHtml(subchain.summary || "Linked child chain available for deeper drilldown.")}</p>
+              <div class="cc-pill-grid">
+                <span class="cc-pill">nodes ${escapeHtml(String((subchain.counts || {}).nodes || 0))}</span>
+                <span class="cc-pill">edges ${escapeHtml(String((subchain.counts || {}).edges || 0))}</span>
+                <span class="cc-pill">${escapeHtml(subchain.category || "general")}</span>
+              </div>
+              ${renderNeighborRows(subchain.top_nodes || [])}
+            </div>
+          ` : ""}
+          ${lints.length ? `
+            <div>
+              <div class="cc-section-title">Lint Context</div>
+              <div class="cc-list">
+                ${lints.map((lint) => `<div class="cc-lint-row ${escapeHtml(lint.severity || "info")}">${escapeHtml(lint.message || lint.code || "Lint warning")}</div>`).join("")}
+              </div>
+            </div>
+          ` : ""}
+        </div>
+      </div>
+    `;
+    renderBindingCards(nodePayload.binding_cards || []);
+  }
+
+  function nodeSymbolSize(node) {
+    const family = String(node.stage_family || "component");
+    const nameLen = String(node.name || "").length;
+    if (family === "system") {
+      return [Math.max(176, Math.min(250, 138 + (nameLen * 5))), 56];
+    }
+    if (family === "market") {
+      return [Math.max(150, Math.min(220, 124 + (nameLen * 4))), 50];
+    }
+    if (family === "input") {
+      return [Math.max(142, Math.min(210, 118 + (nameLen * 4))), 46];
+    }
+    return [Math.max(150, Math.min(228, 118 + (nameLen * 4))), 48];
+  }
+
+  function layoutGraphNodes(nodes, width, height) {
+    const families = (((payload.legend || {}).families) || []).slice().sort((left, right) => Number(left.order || 0) - Number(right.order || 0));
+    const familyIds = families.map((family) => family.id);
+    const familyMap = new Map(familyIds.map((id) => [id, []]));
+    for (const node of nodes) {
+      const family = familyMap.has(String(node.stage_family || "")) ? String(node.stage_family || "") : "component";
+      familyMap.get(family).push(node);
+    }
+    const leftPad = 90;
+    const rightPad = 90;
+    const topPad = 60;
+    const bottomPad = 70;
+    const usableWidth = Math.max(420, width - leftPad - rightPad);
+    const usableHeight = Math.max(320, height - topPad - bottomPad);
+    const colStep = usableWidth / Math.max(1, familyIds.length - 1 || 1);
+    for (const familyId of familyIds) {
+      const rows = familyMap.get(familyId) || [];
+      rows.sort((left, right) => {
+        return (Number(left.category || 0) - Number(right.category || 0))
+          || (Number(right.bottleneck || 0) - Number(left.bottleneck || 0))
+          || String(left.name || "").localeCompare(String(right.name || ""));
+      });
+      rows.forEach((node, idx) => {
+        const col = FAMILY_ORDER[familyId] ?? 3;
+        const x = leftPad + (col * colStep);
+        const rowCount = rows.length || 1;
+        const y = topPad + (((idx + 0.5) / rowCount) * usableHeight);
+        const layerOffset = ((Number(node.category || 0) % 3) - 1) * 18;
+        node.x = x + layerOffset;
+        node.y = y;
+      });
+    }
+    return nodes;
+  }
+
+  function graphTheme() {
+    const styles = getComputedStyle(document.documentElement);
+    const read = (name, fallback) => styles.getPropertyValue(name).trim() || fallback;
+    return {
+      accent: read("--thoth-mood-accent", "#ffffff"),
+      accent2: read("--thoth-mood-accent-2", "#777777"),
+      text: read("--thoth-mood-text", "#ffffff"),
+      muted: read("--cc-muted", "#888888"),
+      surface: "#08090a",
+      tooltip: "#030405",
+    };
+  }
+
+  function graphData(width, height) {
+    const network = payload.network || {};
+    const categories = Array.isArray(network.categories) ? network.categories : [];
+    const theme = graphTheme();
+    const nodes = layoutGraphNodes((network.nodes || []).map((node) => ({ ...node })), width, height).map((node) => {
+      const focused = state.focusNode && state.focusNode === node.id;
+      const family = String(node.stage_family || "component");
+      const border = node.lint_count
+        ? "rgba(249,115,115,0.95)"
+        : node.has_child_chain
+          ? theme.accent2
+          : theme.accent;
+      return {
+        ...node,
+        symbol: SHAPES[node.shape_key] || SHAPES.block_rect,
+        symbolKeepAspect: true,
+        symbolSize: nodeSymbolSize(node),
+        label: {
+          show: true,
+          color: theme.text,
+          width: family === "system" ? 130 : 116,
+          overflow: "break",
+          fontSize: family === "system" ? 12.5 : 12,
+          fontWeight: family === "system" || family === "market" ? 700 : 600,
+          formatter: node.name,
+        },
+        itemStyle: {
+          color: theme.surface,
+          borderColor: border,
+          borderWidth: focused ? 4 : node.delta_state ? 3 : 2,
+          borderType: node.has_child_chain ? "dashed" : "solid",
+          shadowBlur: focused ? 24 : node.has_child_chain ? 16 : 8,
+          shadowColor: focused ? theme.accent : node.has_child_chain ? theme.accent2 : "rgba(0,0,0,0.28)",
+          opacity: family === "market" ? 0.98 : 0.96,
+        },
+      };
+    });
+    return {
+      categories,
+      nodes,
+      links: (network.links || []).map((link) => ({
+        ...link,
+        lineStyle: {
+          color: link.lint_count ? "rgba(249,115,115,0.65)" : theme.accent2,
+          width: link.value ? Math.max(1.2, Math.min(4.4, 1.2 + (Number(link.value) * 4))) : 1.6,
+          curveness: 0.12,
+        },
+      })),
+    };
+  }
+
+  let chart = null;
+  function renderGraph() {
+    if (!el.network || !window.echarts) {
+      return;
+    }
+    if (!chart) {
+      chart = window.echarts.init(el.network, null, { renderer: "canvas" });
+      chart.on("click", async (params) => {
+        if (params.dataType === "node" && params.data && params.data.id) {
+          await focusNode(params.data.id);
+        }
+      });
+      window.addEventListener("resize", () => {
+        if (!chart) {
+          return;
+        }
+        chart.resize();
+        renderGraph();
+      });
+    }
+    const data = graphData(chart.getWidth(), chart.getHeight());
+    const theme = graphTheme();
+    chart.setOption({
+      backgroundColor: "transparent",
+      tooltip: {
+        trigger: "item",
+        backgroundColor: theme.tooltip,
+        borderColor: theme.accent,
+        textStyle: { color: theme.text },
+        formatter: (params) => {
+          if (params.dataType !== "node") {
+            return "";
+          }
+          const node = params.data || {};
+          const exposurePreview = Array.isArray(node.exposure_preview) ? node.exposure_preview : [];
+          const previewRows = exposurePreview.slice(0, 3).map((entry) => {
+            const security = securityLabel(entry.primary_security);
+            return `
+              <div style="font-size:11px;margin-top:4px;">
+                <span style="color:rgba(226,232,240,0.6);">${escapeHtml(roleLabel(entry.role))}:</span>
+                ${escapeHtml(entry.display_name || "")}
+                ${security ? `<strong style="margin-left:6px;">${escapeHtml(security)}</strong>` : ""}
+              </div>
+            `;
+          }).join("");
+          return `
+            <div style="font-weight:700;margin-bottom:6px;">${escapeHtml(node.name || node.id || "")}</div>
+            <div style="font-size:12px;color:rgba(226,232,240,0.76);">${escapeHtml(node.layer_name || "")} · ${escapeHtml(node.stage_family || "")}</div>
+            <div style="font-size:12px;margin-top:6px;">Lead time: ${escapeHtml(String(node.leadTime || 0))} mo</div>
+            <div style="font-size:12px;">Bottleneck: ${escapeHtml(pct(node.bottleneck || 0))}</div>
+            <div style="font-size:12px;">Pricing power: ${escapeHtml(pct(node.pricingPower || 0))}</div>
+            ${previewRows ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);">${previewRows}</div>` : ""}
+          `;
+        },
+      },
+      series: [{
+        type: "graph",
+        layout: "none",
+        roam: true,
+        draggable: true,
+        data: data.nodes,
+        links: data.links,
+        categories: data.categories,
+        edgeSymbol: ["circle", "arrow"],
+        edgeSymbolSize: [4, 9],
+        emphasis: {
+          focus: "adjacency",
+          scale: 1.06,
+        },
+        lineStyle: {
+          opacity: 0.9,
+        },
+      }],
+    });
+  }
+
+  async function focusNode(nodeKey) {
+    try {
+      const resp = await fetch(`/api/supply-chains/${chainId}/nodes/${encodeURIComponent(nodeKey)}`);
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
+      const data = await resp.json();
+      state.focusNode = nodeKey;
+      state.nodePayload = data;
+      const url = new URL(window.location.href);
+      url.searchParams.set("node", nodeKey);
+      window.history.replaceState({}, "", url);
+      renderDossier(state.nodePayload);
+      renderGraph();
+    } catch (error) {
+      if (typeof quickToast === "function") {
+        quickToast("Failed to load node dossier");
+      }
+      console.error(error);
+    }
+  }
+
+  function clearNode() {
+    state.focusNode = null;
+    state.nodePayload = null;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("node");
+    window.history.replaceState({}, "", url);
+    renderPrimer();
+    renderGraph();
+  }
+
+  el.clearNode.addEventListener("click", clearNode);
+  document.getElementById("cc-export-proof")?.addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const href = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    anchor.download = `supply-chain-${chainId}-proof.json`;
+    anchor.click();
+    URL.revokeObjectURL(href);
+  });
+  window.addEventListener("thoth:moodchange", renderGraph);
+  if (el.network && "ResizeObserver" in window) {
+    el._resizeObserver = new ResizeObserver(() => {
+      if (!chart) return;
+      requestAnimationFrame(() => {
+        chart.resize({ width: el.network.clientWidth, height: el.network.clientHeight });
+        renderGraph();
+      });
+    });
+    el._resizeObserver.observe(el.network);
+  }
+  renderNetworkAxis();
+  renderLegend();
+  renderLints();
+  renderExposureSummary();
+  renderBottleneckWatch();
+  renderSingleSourceWatch();
+  renderDeltaSummary();
+  renderDossier(state.nodePayload);
+  renderGraph();
+})();
+</script>
+{% endblock %}

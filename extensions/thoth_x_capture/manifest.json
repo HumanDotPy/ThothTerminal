@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Thoth X Capture",
+  "version": "0.1.9",
+  "description": "Capture X list tweets into Thoth Terminal.",
+  "permissions": ["storage", "tabs", "scripting", "alarms", "activeTab"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "host_permissions": [
+    "https://x.com/*",
+    "https://twitter.com/*",
+    "http://127.0.0.1/*",
+    "http://localhost/*",
+    "https://*.trycloudflare.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_page": "options.html",
+  "action": {
+    "default_title": "Capture current tweet(s)"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://x.com/*", "https://twitter.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

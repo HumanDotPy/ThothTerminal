@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block content %}
+{% set note_ns = namespace(pinned=0) %}
+{% for n in items %}
+  {% if n.pinned %}
+    {% set note_ns.pinned = note_ns.pinned + 1 %}
+  {% endif %}
+{% endfor %}
+<section class="workspace-header">
+  <div class="workspace-copy">
+    <div class="workspace-kicker">Internal Scaffolding / Context</div>
+    <h1>Notebook</h1>
+    <p>Notes are working memory for frameworks, company context, open questions, and quick takeaways. Keep them linked close to the theses and documents they support.</p>
+  </div>
+  <div class="workspace-summary">
+    <div class="workspace-stat">
+      <span class="workspace-stat-label">Visible notes</span>
+      <span class="workspace-stat-value">{{ items|length }}</span>
+      <span class="workspace-stat-copy">Current result count after filters.</span>
+    </div>
+    <div class="workspace-stat">
+      <span class="workspace-stat-label">Pinned</span>
+      <span class="workspace-stat-value">{{ note_ns.pinned }}</span>
+      <span class="workspace-stat-copy">High-value context kept close to the top.</span>
+    </div>
+    <div class="workspace-stat">
+      <span class="workspace-stat-label">Types</span>
+      <span class="workspace-stat-value">{{ note_types|length }}</span>
+      <span class="workspace-stat-copy">Operational note shapes available.</span>
+    </div>
+    <div class="workspace-stat">
+      <span class="workspace-stat-label">New entry</span>
+      <span class="workspace-stat-value">/notes/new</span>
+      <span class="workspace-stat-copy">Create a clean note or seed one from a document.</span>
+    </div>
+  </div>
+</section>
+
+<div class="feed-layout" id="notes-layout">
+  <div class="panel sidebar">
+    <div class="hd">
+      <div class="hd-left">
+        <h2>Notebook filters</h2>
+        <span class="pill">{{ items|length }} shown</span>
+      </div>
+      <a class="btn primary" href="/notes/new">New</a>
+    </div>
+    <div class="bd">
+      <div class="search-wrap">
+        <span class="search-icon">QRY</span>
+        <form method="get" action="/notes" id="note-search-form" style="width:100%;">
+          <input type="text" name="q" class="search-input" value="{{ filters.q }}" placeholder="Search notes" />
+          {% if filters.status %}<input type="hidden" name="status" value="{{ filters.status }}" />{% endif %}
+          {% if filters.note_type %}<input type="hidden" name="note_type" value="{{ filters.note_type }}" />{% endif %}
+          {% if filters.pinned is not none %}<input type="hidden" name="pinned" value="{{ filters.pinned }}" />{% endif %}
+          {% if filters.domain %}<input type="hidden" name="domain" value="{{ filters.domain }}" />{% endif %}
+          {% if filters.tag %}<input type="hidden" name="tag" value="{{ filters.tag }}" />{% endif %}
+          {% if filters.entity %}<input type="hidden" name="entity" value="{{ filters.entity }}" />{% endif %}
+          {% if filters.days %}<input type="hidden" name="days" value="{{ filters.days }}" />{% endif %}
+        </form>
+        <span class="search-kbd">⌘K</span>
+      </div>
+
+      <div class="filter-section">
+        <span class="filter-label">Status</span>
+        <div class="filter-chips">
+          <a href="/notes?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.note_type %}note_type={{ filters.note_type }}&{% endif %}{% if filters.pinned is not none %}pinned={{ filters.pinned }}&{% endif %}{% if filters.domain %}domain={{ filters.domain }}&{% endif %}{% if filters.tag %}tag={{ filters.tag }}&{% endif %}{% if filters.entity %}entity={{ filters.entity }}&{% endif %}{% if filters.days %}days={{ filters.days }}&{% endif %}" class="filter-chip {% if not filters.status %}active{% endif %}">All</a>
+          {% for s in note_statuses %}
+            <a href="/notes?status={{ s }}{% if filters.q %}&q={{ filters.q }}{% endif %}{% if filters.note_type %}&note_type={{ filters.note_type }}{% endif %}{% if filters.pinned is not none %}&pinned={{ filters.pinned }}{% endif %}{% if filters.domain %}&domain={{ filters.domain }}{% endif %}{% if filters.tag %}&tag={{ filters.tag }}{% endif %}{% if filters.entity %}&entity={{ filters.entity }}{% endif %}{% if filters.days %}&days={{ filters.days }}{% endif %}" class="filter-chip {% if filters.status == s %}active{% endif %}">{{ s }}</a>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="filter-section">
+        <span class="filter-label">Type</span>
+        <div class="filter-chips">
+          <a href="/notes?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.status %}status={{ filters.status }}&{% endif %}{% if filters.pinned is not none %}pinned={{ filters.pinned }}&{% endif %}{% if filters.domain %}domain={{ filters.domain }}&{% endif %}{% if filters.tag %}tag={{ filters.tag }}&{% endif %}{% if filters.entity %}entity={{ filters.entity }}&{% endif %}{% if filters.days %}days={{ filters.days }}&{% endif %}" class="filter-chip {% if not filters.note_type %}active{% endif %}">All</a>
+          {% for t in note_types %}
+            <a href="/notes?note_type={{ t }}{% if filters.q %}&q={{ filters.q }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.pinned is not none %}&pinned={{ filters.pinned }}{% endif %}{% if filters.domain %}&domain={{ filters.domain }}{% endif %}{% if filters.tag %}&tag={{ filters.tag }}{% endif %}{% if filters.entity %}&entity={{ filters.entity }}{% endif %}{% if filters.days %}&days={{ filters.days }}{% endif %}" class="filter-chip {% if filters.note_type == t %}active{% endif %}">{{ t.replace('_',' ') }}</a>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="filter-section">
+        <span class="filter-label">Pinned</span>
+        <div class="filter-chips">
+          <a href="/notes?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.status %}status={{ filters.status }}&{% endif %}{% if filters.note_type %}note_type={{ filters.note_type }}&{% endif %}{% if filters.domain %}domain={{ filters.domain }}&{% endif %}{% if filters.tag %}tag={{ filters.tag }}&{% endif %}{% if filters.entity %}entity={{ filters.entity }}&{% endif %}{% if filters.days %}days={{ filters.days }}&{% endif %}" class="filter-chip {% if filters.pinned is none %}active{% endif %}">All</a>
+          <a href="/notes?pinned=1{% if filters.q %}&q={{ filters.q }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.note_type %}&note_type={{ filters.note_type }}{% endif %}{% if filters.domain %}&domain={{ filters.domain }}{% endif %}{% if filters.tag %}&tag={{ filters.tag }}{% endif %}{% if filters.entity %}&entity={{ filters.entity }}{% endif %}{% if filters.days %}&days={{ filters.days }}{% endif %}" class="filter-chip {% if filters.pinned == 1 %}active{% endif %}">Pinned only</a>
+        </div>
+      </div>
+
+      <div class="filter-section">
+        <span class="filter-label">Updated</span>
+        <div class="filter-chips">
+          <a href="/notes?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.status %}status={{ filters.status }}&{% endif %}{% if filters.note_type %}note_type={{ filters.note_type }}&{% endif %}{% if filters.pinned is not none %}pinned={{ filters.pinned }}&{% endif %}{% if filters.domain %}domain={{ filters.domain }}&{% endif %}{% if filters.tag %}tag={{ filters.tag }}&{% endif %}{% if filters.entity %}entity={{ filters.entity }}&{% endif %}" class="filter-chip {% if not filters.days %}active{% endif %}">Any</a>
+          {% for d in [1,3,7,14,30,90] %}
+            <a href="/notes?days={{ d }}{% if filters.q %}&q={{ filters.q }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.note_type %}&note_type={{ filters.note_type }}{% endif %}{% if filters.pinned is not none %}&pinned={{ filters.pinned }}{% endif %}{% if filters.domain %}&domain={{ filters.domain }}{% endif %}{% if filters.tag %}&tag={{ filters.tag }}{% endif %}{% if filters.entity %}&entity={{ filters.entity }}{% endif %}" class="filter-chip {% if filters.days == d %}active{% endif %}">{{ d }}d</a>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="filter-section">
+        <span class="filter-label">Domain</span>
+        <select class="search-input" onchange="location.href=this.value">
+          <option value="/notes?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.status %}status={{ filters.status }}&{% endif %}{% if filters.note_type %}note_type={{ filters.note_type }}&{% endif %}{% if filters.pinned is not none %}pinned={{ filters.pinned }}&{% endif %}{% if filters.tag %}tag={{ filters.tag }}&{% endif %}{% if filters.entity %}entity={{ filters.entity }}&{% endif %}{% if filters.days %}days={{ filters.days }}&{% endif %}" {% if not filters.domain %}selected{% endif %}>All</option>
+          {% for d in domains %}
+            <option value="/notes?domain={{ d.slug }}{% if filters.q %}&q={{ filters.q }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.note_type %}&note_type={{ filters.note_type }}{% endif %}{% if filters.pinned is not none %}&pinned={{ filters.pinned }}{% endif %}{% if filters.tag %}&tag={{ filters.tag }}{% endif %}{% if filters.entity %}&entity={{ filters.entity }}{% endif %}{% if filters.days %}&days={{ filters.days }}{% endif %}" {% if filters.domain == d.slug %}selected{% endif %}>{{ d.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="filter-section">
+        <span class="filter-label">Tag</span>
+        <select class="search-input" onchange="location.href=this.value">
+          <option value="/notes?{% if filters.q %}q={{ filters.q }}&{% endif %}{% if filters.status %}status={{ filters.status }}&{% endif %}{% if filters.note_type %}note_type={{ filters.note_type }}&{% endif %}{% if filters.pinned is not none %}pinned={{ filters.pinned }}&{% endif %}{% if filters.domain %}domain={{ filters.domain }}&{% endif %}{% if filters.entity %}entity={{ filters.entity }}&{% endif %}{% if filters.days %}days={{ filters.days }}&{% endif %}" {% if not filters.tag %}selected{% endif %}>All</option>
+          {% for t in tags %}
+            <option value="/notes?tag={{ t.slug }}{% if filters.q %}&q={{ filters.q }}{% endif %}{% if filters.status %}&status={{ filters.status }}{% endif %}{% if filters.note_type %}&note_type={{ filters.note_type }}{% endif %}{% if filters.pinned is not none %}&pinned={{ filters.pinned }}{% endif %}{% if filters.domain %}&domain={{ filters.domain }}{% endif %}{% if filters.entity %}&entity={{ filters.entity }}{% endif %}{% if filters.days %}&days={{ filters.days }}{% endif %}" {% if filters.tag == t.slug %}selected{% endif %}>{{ t.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="filter-section">
+        <span class="filter-label">Entity</span>
+        <form method="get" action="/notes">
+          <input type="text" class="search-input" name="entity" value="{{ filters.entity }}" placeholder="MCL or 12" />
+          <input type="hidden" name="q" value="{{ filters.q }}" />
+          <input type="hidden" name="status" value="{{ filters.status }}" />
+          <input type="hidden" name="note_type" value="{{ filters.note_type }}" />
+          {% if filters.pinned is not none %}<input type="hidden" name="pinned" value="{{ filters.pinned }}" />{% endif %}
+          <input type="hidden" name="domain" value="{{ filters.domain }}" />
+          <input type="hidden" name="tag" value="{{ filters.tag }}" />
+          {% if filters.days %}<input type="hidden" name="days" value="{{ filters.days }}" />{% endif %}
+        </form>
+      </div>
+
+      <div class="workspace-list-copy">Use notes for internal framing, assumptions, and context you want available while evaluating documents and theses.</div>
+
+      <hr style="border:0;border-top:1px solid var(--border);margin:16px 0;" />
+
+      <div class="field" data-saved-views="notes">
+        <label>Saved views</label>
+        <div class="btnrow" style="gap:8px;flex-wrap:wrap;">
+          <input type="text" class="search-input" data-saved-views-name="1" placeholder="Name this view" />
+          <button class="btn" type="button" data-saved-views-save>Save view</button>
+        </div>
+        <div class="chiprow" style="margin-top:8px;" data-saved-views-list></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="hd">
+      <div class="hd-left">
+        <h2>Notes</h2>
+        <span class="pill">working notes</span>
+      </div>
+    </div>
+
+    {% set has_filters = (filters.q or filters.status or filters.note_type or (filters.pinned is not none) or filters.domain or filters.tag or filters.entity or filters.days) %}
+    {% if has_filters %}
+      <div class="chiprow" style="padding:0 18px 12px;gap:8px;flex-wrap:wrap;">
+        <span class="pill">Active filters</span>
+        {% if filters.q %}<span class="pill">query: {{ filters.q[:24] }}{% if filters.q|length > 24 %}…{% endif %}</span>{% endif %}
+        {% if filters.status %}<span class="pill">status: {{ filters.status }}</span>{% endif %}
+        {% if filters.note_type %}<span class="pill">type: {{ filters.note_type }}</span>{% endif %}
+        {% if filters.pinned is not none %}<span class="pill">pinned: {{ 'yes' if filters.pinned else 'no' }}</span>{% endif %}
+        {% if filters.domain %}<span class="pill">domain: {{ filters.domain }}</span>{% endif %}
+        {% if filters.tag %}<span class="pill">tag: {{ filters.tag }}</span>{% endif %}
+        {% if filters.entity %}<span class="pill">entity: {{ filters.entity }}</span>{% endif %}
+        {% if filters.days %}<span class="pill">window: {{ filters.days }}d</span>{% endif %}
+        <a class="pill" href="/notes">Clear all</a>
+      </div>
+    {% endif %}
+
+    <div class="docs" data-query="{{ filters.q }}">
+      {% for n in items %}
+        <div class="note-card {% if n.pinned %}pinned{% endif %} {% if n.status != 'active' %}archived{% endif %}">
+          <div class="note-card-top">
+            <div class="note-meta">
+              <span class="pill">N{{ n.id }}</span>
+              {% if n.pinned %}<span class="pill">pinned</span>{% endif %}
+              <span class="pill">{{ n.note_type.replace('_',' ') }}</span>
+              <span class="pill">{{ n.status }}</span>
+              <span class="pill">imp {{ n.importance }}</span>
+            </div>
+            <div class="note-meta">
+              <span data-utc="{{ n.updated_at.strftime('%Y-%m-%dT%H:%M:%S') }}">{{ n.updated_at.strftime("%Y-%m-%d %H:%M") }}</span>
+            </div>
+          </div>
+
+          <h3 class="note-title"><a href="/notes/{{ n.id }}">{{ n.title }}</a></h3>
+          <div class="note-excerpt">{{ n.body_md[:220] }}{% if n.body_md|length > 220 %}…{% endif %}</div>
+
+          <div class="note-foot">
+            <div class="note-foot-left">
+              <span class="pill">linked context</span>
+            </div>
+            <div class="note-foot-right">
+              {% for e in n.entities[:6] %}
+                <span class="pill">{{ e.canonical_name }}</span>
+              {% endfor %}
+              {% if n.entities|length > 6 %}<span class="pill">+{{ n.entities|length - 6 }}</span>{% endif %}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+
+      {% if items|length == 0 %}
+        <div class="empty-callout">
+          <h3>No notes match this slice.</h3>
+          <p>Create a new note, clear a few filters, or seed one from a document so your research context stays attached to the intake flow.</p>
+          <div class="btnrow" style="justify-content:center;margin-top:16px;">
+            <a class="btn primary" href="/notes/new">Create note</a>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="/static/list_view_helpers.js?v={{ settings.static_assets_version }}"></script>
+{% endblock %}

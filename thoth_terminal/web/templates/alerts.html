@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="hd">
+    <h2>Alert Discovery</h2>
+    <span class="pill">{{ counts.notification_active }} notification</span>
+    <span class="pill">{{ counts.supply_active }} supply-chain</span>
+    <div class="btnrow" style="margin-left:auto;">
+      <a class="btn" href="/notifications">Rules</a>
+      <a class="btn" href="/notifications/inbox">Inbox</a>
+    </div>
+  </div>
+  <div class="bd">
+    <form method="get" action="/alerts" class="btnrow" style="justify-content:space-between;align-items:flex-end;margin-bottom:12px;">
+      <div class="field" style="flex:1;min-width:220px;">
+        <label>Search</label>
+        <input type="text" name="q" value="{{ q or '' }}" placeholder="ticker, company, chain, metric, regex" />
+      </div>
+      <div class="field" style="width:180px;">
+        <label>Status</label>
+        <select name="status">
+          <option value="" {{ 'selected' if not status else '' }}>all</option>
+          <option value="active" {{ 'selected' if status == 'active' else '' }}>active</option>
+          <option value="disabled" {{ 'selected' if status == 'disabled' else '' }}>disabled</option>
+          <option value="paused" {{ 'selected' if status == 'paused' else '' }}>paused</option>
+        </select>
+      </div>
+      <button class="btn primary" type="submit">Filter</button>
+    </form>
+    <div class="metric-grid">
+      <div><span>Notification Rules</span><strong>{{ counts.notification_total }}</strong></div>
+      <div><span>Active Notifications</span><strong>{{ counts.notification_active }}</strong></div>
+      <div><span>Supply-Chain Rules</span><strong>{{ counts.supply_total }}</strong></div>
+      <div><span>Active Supply Rules</span><strong>{{ counts.supply_active }}</strong></div>
+      <div><span>Recent Rule Hits</span><strong>{{ counts.recent_hits }}</strong></div>
+    </div>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:14px;">
+  <div class="hd">
+    <h2>Notification Rules</h2>
+    <span class="pill">{{ notification_rows|length }}</span>
+  </div>
+  <div class="bd">
+    {% if notification_rows|length == 0 %}
+      <div class="empty-state">No matching notification rules.</div>
+    {% else %}
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Rule</th>
+            <th>State</th>
+            <th>Action</th>
+            <th>Filters</th>
+            <th>Recent Hits</th>
+            <th>Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in notification_rows %}
+          <tr>
+            <td><a href="{{ row.href }}">{{ row.name }}</a></td>
+            <td><span class="pill {{ 'good' if row.state == 'active' else 'bad' }}">{{ row.state }}</span></td>
+            <td>{{ row.action }}</td>
+            <td>
+              {% if row.filters|length %}
+                <div class="chiprow">
+                  {% for item in row.filters %}
+                    <span class="pill">{{ item }}</span>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <span style="color:var(--muted);">global</span>
+              {% endif %}
+            </td>
+            <td>
+              <strong>{{ row.recent_hits }}</strong>
+              {% if row.last_hit_at %}
+                <span data-utc="{{ row.last_hit_at.strftime('%Y-%m-%dT%H:%M:%S') }}">{{ row.last_hit_at.strftime('%Y-%m-%d %H:%M') }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if row.updated_at %}
+                <span data-utc="{{ row.updated_at.strftime('%Y-%m-%dT%H:%M:%S') }}">{{ row.updated_at.strftime('%Y-%m-%d %H:%M') }}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </div>
+</div>
+
+<div class="panel" style="margin-top:14px;">
+  <div class="hd">
+    <h2>Supply-Chain Alerts</h2>
+    <span class="pill">{{ supply_rows|length }}</span>
+  </div>
+  <div class="bd">
+    {% if supply_rows|length == 0 %}
+      <div class="empty-state">No matching supply-chain alerts.</div>
+    {% else %}
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Alert</th>
+            <th>Chain</th>
+            <th>State</th>
+            <th>Scope</th>
+            <th>Metric</th>
+            <th>Threshold</th>
+            <th>Last Trigger</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in supply_rows %}
+          <tr>
+            <td><a href="{{ row.href }}">{{ row.name }}</a></td>
+            <td><a href="{{ row.chain_href }}">{{ row.chain_title }}</a></td>
+            <td><span class="pill {{ 'good' if row.state == 'active' else 'bad' }}">{{ row.state }}</span></td>
+            <td>{{ row.scope }}</td>
+            <td>{{ row.metric }}</td>
+            <td>{{ row.threshold }}{% if row.window_days %} · {{ row.window_days }}d{% endif %}</td>
+            <td>
+              {% if row.last_triggered_at %}
+                <span data-utc="{{ row.last_triggered_at.strftime('%Y-%m-%dT%H:%M:%S') }}">{{ row.last_triggered_at.strftime('%Y-%m-%d %H:%M') }}</span>
+              {% else %}
+                <span style="color:var(--muted);">none</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </div>
+</div>
+
+<div class="panel" style="margin-top:14px;">
+  <div class="hd">
+    <h2>Recent Hits</h2>
+    <span class="pill">{{ recent_hits|length }}</span>
+  </div>
+  <div class="bd">
+    {% if recent_hits|length == 0 %}
+      <div class="empty-state">No recent rule hits.</div>
+    {% else %}
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Rule</th>
+            <th>Source</th>
+            <th>Run</th>
+            <th>Count</th>
+            <th>Quiet</th>
+            <th>Finished</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for hit in recent_hits %}
+          <tr>
+            <td>{{ hit.rule_id }}</td>
+            <td>{{ source_names.get(hit.source_id, 'source ' ~ hit.source_id) }}</td>
+            <td>{{ hit.run_id }}</td>
+            <td>{{ hit.count }}</td>
+            <td>{{ 'yes' if hit.quiet else 'no' }}</td>
+            <td>
+              {% if hit.finished_at %}
+                <span data-utc="{{ hit.finished_at.strftime('%Y-%m-%dT%H:%M:%S') }}">{{ hit.finished_at.strftime('%Y-%m-%d %H:%M') }}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

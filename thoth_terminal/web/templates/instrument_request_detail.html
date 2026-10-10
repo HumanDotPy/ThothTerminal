@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="viz-page">
+  <div class="viz-header">
+    <div class="viz-title-row">
+      <div>
+        <div class="kicker">Instrument Request</div>
+        <h1>{{ item.title }}</h1>
+        <p style="color:var(--muted);margin:8px 0 0;max-width:780px;">{{ item.summary or 'No summary yet.' }}</p>
+      </div>
+      <div class="btnrow">
+        <a href="/instruments/requests" class="btn">← Queue</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid" style="grid-template-columns:1.1fr .9fr;gap:18px;">
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <div class="panel">
+        <div class="hd"><h2>Request Detail</h2></div>
+        <div class="bd">
+          <div class="viz-equities" style="gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+            <span class="pill mono">{{ item.status }}</span>
+            <span class="pill mono">priority {{ item.priority }}</span>
+            <span class="pill mono">{{ item.intent }}</span>
+            {% if item.evidence_tier %}<span class="pill mono">{{ item.evidence_tier }}</span>{% endif %}
+          </div>
+          <div class="grid-2col" style="gap:16px;">
+            <div>
+              <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;">Entities</div>
+              <div>{{ item.target_entities|join(', ') if item.target_entities else "None" }}</div>
+            </div>
+            <div>
+              <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;">Outputs</div>
+              <div>{{ item.desired_outputs|join(', ') if item.desired_outputs else "None" }}</div>
+            </div>
+          </div>
+          {% if item.provenance_summary %}
+          <div style="margin-top:14px;padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.03);">
+            <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;">Provenance</div>
+            <div style="line-height:1.55;">{{ item.provenance_summary }}</div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hd"><h2>Evidence Bundle</h2></div>
+        <div class="bd" style="display:flex;flex-direction:column;gap:8px;">
+          {% for row in item.evidence_bundle %}
+          <div class="link-row">
+            <div>
+              <div>{{ row.title or row.label or row.source or 'Evidence' }}</div>
+              <div style="color:var(--muted);font-size:11px;">{{ row.source or 'unknown source' }}</div>
+            </div>
+            {% if row.url %}
+            <a class="btn" href="{{ row.url }}" target="_blank" rel="noreferrer">Open</a>
+            {% endif %}
+          </div>
+          {% else %}
+          <div style="color:var(--muted);font-size:12px;">No evidence attached yet.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hd"><h2>Draft Export</h2></div>
+        <div class="bd">
+          <textarea rows="20" style="width:100%;background:#05080b;color:#d8dee7;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px;font-family:var(--mono);font-size:12px;">{{ markdown_export }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <div class="panel">
+        <div class="hd"><h2>Workflow Controls</h2></div>
+        <div class="bd" style="display:flex;flex-direction:column;gap:12px;">
+          <form id="request-run-form" method="post" action="/instruments/requests/{{ item.id }}/run" style="display:flex;flex-direction:column;gap:10px;">
+            <div class="field" style="margin:0;">
+              <label>Run Summary</label>
+              <textarea name="run_summary" rows="4" placeholder="What Codex prepared for review."></textarea>
+            </div>
+            <div class="btnrow" style="justify-content:flex-end;">
+              <button class="btn" type="submit">Mark Ready For Review</button>
+            </div>
+          </form>
+          <form id="request-review-form" method="post" action="/instruments/requests/{{ item.id }}/review" style="display:flex;flex-direction:column;gap:10px;">
+            <div class="field" style="margin:0;">
+              <label>Decision</label>
+              <select name="decision">
+                <option value="submit">Submit For Review</option>
+                <option value="approve">Approve / Live</option>
+                <option value="reject">Reject</option>
+              </select>
+            </div>
+            <div class="field" style="margin:0;">
+              <label>Reviewer Note</label>
+              <textarea name="reviewer_note" rows="4" placeholder="Why this should move, or why it should not."></textarea>
+            </div>
+            <div class="btnrow" style="justify-content:flex-end;">
+              <button class="btn primary" type="submit">Apply Decision</button>
+            </div>
+          </form>
+          <form id="request-fulfill-form" method="post" action="/instruments/requests/{{ item.id }}/fulfill" style="display:flex;flex-direction:column;gap:10px;border-top:1px solid rgba(255,255,255,.08);padding-top:12px;">
+            <div class="field" style="margin:0;">
+              <label>Fulfillment Summary</label>
+              <textarea name="fulfillment_summary" rows="4" placeholder="What was implemented, connected, verified, or intentionally closed."></textarea>
+            </div>
+            <div class="field" style="margin:0;">
+              <label>Fulfilled By</label>
+              <input name="fulfilled_by" placeholder="codex / subagent / operator" />
+            </div>
+            <div class="btnrow" style="justify-content:flex-end;">
+              <button class="btn primary" type="submit">Mark Fulfilled</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hd"><h2>Linked Objects</h2></div>
+        <div class="bd" style="display:flex;flex-direction:column;gap:12px;">
+          {% if item.linked_objects and item.linked_objects.report_url %}
+          <div>
+            <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;">Report Context</div>
+            <div class="link-row"><a href="{{ item.linked_objects.report_url }}">Open linked report{% if item.linked_objects.report_version_id %} version {{ item.linked_objects.report_version_id }}{% endif %}</a></div>
+          </div>
+          {% endif %}
+          <div>
+            <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;">Companies</div>
+            {% for row in linked_companies %}
+            <div class="link-row"><a href="/companies/{{ row.slug }}">{{ row.name }}</a></div>
+            {% else %}
+            <div style="color:var(--muted);font-size:12px;">None linked.</div>
+            {% endfor %}
+          </div>
+          <div>
+            <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;">Reports</div>
+            {% for row in linked_reports %}
+            <div class="link-row"><a href="/reports/{{ row.slug }}">{{ row.title }}</a></div>
+            {% else %}
+            <div style="color:var(--muted);font-size:12px;">None linked.</div>
+            {% endfor %}
+          </div>
+          <div>
+            <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;">Datasets</div>
+            {% for row in linked_datasets %}
+            <div class="link-row"><a href="/visualizations/datasets/{{ row.id }}">{{ row.title }}</a></div>
+            {% else %}
+            <div style="color:var(--muted);font-size:12px;">None linked.</div>
+            {% endfor %}
+          </div>
+          <div>
+            <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;">Supply Chains</div>
+            {% for row in linked_supply_chains %}
+            <div class="link-row"><a href="/visualizations/supply-chains/{{ row.id }}/command-center">{{ row.title }}</a></div>
+            {% else %}
+            <div style="color:var(--muted);font-size:12px;">None linked.</div>
+            {% endfor %}
+          </div>
+          <div>
+            <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;">Stage Tracker</div>
+            {% for row in linked_stage_entries %}
+            <div class="link-row">
+              <div>
+                <div><a href="/stage-tracker/{{ row.id }}">{{ row.company_name }} · {{ row.product_name }}</a></div>
+                <div style="color:var(--muted);font-size:11px;">
+                  reviewed {{ row.current_reviewed.stage if row.current_reviewed else row.stage }}
+                  {% if row.current_candidate and (not row.current_reviewed or row.current_candidate.id != row.current_reviewed.id) %}
+                  · candidate {{ row.current_candidate.stage }}
+                  {% endif %}
+                  · {{ row.conflict_state }}
+                </div>
+              </div>
+            </div>
+            {% else %}
+            <div style="color:var(--muted);font-size:12px;">None linked.</div>
+            {% endfor %}
+          </div>
+          <div>
+            <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;">Notes</div>
+            {% for row in linked_notes %}
+            <div class="link-row"><a href="/notes/{{ row.id }}">{{ row.title }}</a></div>
+            {% else %}
+            <div style="color:var(--muted);font-size:12px;">None linked.</div>
+            {% endfor %}
+          </div>
+          <div>
+            <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;">Theses</div>
+            {% for row in linked_theses %}
+            <div class="link-row"><a href="/theses/{{ row.id }}">{{ row.title }}</a></div>
+            {% else %}
+            <div style="color:var(--muted);font-size:12px;">None linked.</div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  const runForm = document.getElementById('request-run-form');
+  const reviewForm = document.getElementById('request-review-form');
+  const fulfillForm = document.getElementById('request-fulfill-form');
+
+  runForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const payload = {
+      run_summary: new FormData(runForm).get('run_summary'),
+    };
+    const resp = await fetch('/api/instrument-requests/{{ item.id }}/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      window.location.reload();
+      return;
+    }
+    quickToast(data.error || 'Failed to update request', 'error');
+  });
+
+  reviewForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const fd = new FormData(reviewForm);
+    const payload = {
+      decision: fd.get('decision'),
+      reviewer_note: fd.get('reviewer_note'),
+    };
+    const resp = await fetch('/api/instrument-requests/{{ item.id }}/review', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      window.location.reload();
+      return;
+    }
+    quickToast(data.error || 'Failed to apply decision', 'error');
+  });
+
+  fulfillForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const fd = new FormData(fulfillForm);
+    const payload = {
+      fulfillment_summary: fd.get('fulfillment_summary'),
+      fulfilled_by: fd.get('fulfilled_by'),
+    };
+    const resp = await fetch('/api/instrument-requests/{{ item.id }}/fulfill', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      window.location.reload();
+      return;
+    }
+    quickToast(data.error || 'Failed to fulfill request', 'error');
+  });
+})();
+</script>
+{% endblock %}

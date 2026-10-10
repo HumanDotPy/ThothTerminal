@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel" style="max-width: 1100px; margin: 0 auto;">
+  <div class="hd">
+    <h2>New Note</h2>
+    <div class="btnrow">
+      <span class="pill" id="note-draft-status" style="opacity:.8;">draft idle</span>
+      <a class="btn" href="/notes">Back</a>
+    </div>
+  </div>
+  <div class="bd">
+    <div class="panel" id="note-draft-restore" style="display:none;margin-bottom:12px;">
+      <div class="bd" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+        <div style="color:var(--muted);font-family:var(--mono);font-size:12px;">
+          Draft available · <span id="note-draft-timestamp"></span>
+        </div>
+        <div class="btnrow" style="gap:8px;">
+          <button class="btn" type="button" id="note-draft-restore-btn">Restore</button>
+          <button class="btn" type="button" id="note-draft-discard-btn">Discard</button>
+        </div>
+      </div>
+    </div>
+
+    <form method="post" action="/notes/new" id="note-new-form">
+      {% if link.from_doc %}<input type="hidden" name="from_doc" value="{{ link.from_doc }}" />{% endif %}
+      {% if link.from_thesis %}<input type="hidden" name="from_thesis" value="{{ link.from_thesis }}" />{% endif %}
+
+      <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div class="field">
+          <label>Title</label>
+          <input type="text" name="title" value="{{ prefill.title }}" required />
+        </div>
+        <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="field" style="margin:0;">
+            <label>Type</label>
+            <select name="note_type">
+              {% for t in note_types %}
+                <option value="{{ t }}" {% if prefill.note_type == t %}selected{% endif %}>{{ t.replace('_',' ') }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field" style="margin:0;">
+            <label>Importance</label>
+            <input type="number" name="importance" min="1" max="5" value="{{ prefill.importance or 3 }}" />
+          </div>
+        </div>
+      </div>
+
+      <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div class="field">
+          <label>Status</label>
+          <select name="status">
+            <option value="active" selected>active</option>
+            <option value="archived">archived</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Pinned</label>
+          <select name="pinned">
+            <option value="false" selected>no</option>
+            <option value="true">yes</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Body (Markdown)</label>
+        <textarea name="body_md" style="min-height: 320px;" placeholder="# Heading&#10;&#10;Write your memo here…">{{ prefill.body_md }}</textarea>
+        <div style="margin-top:6px;color:var(--muted);font-family:var(--mono);font-size:11px;">
+          Tip: Use <span class="pill">[[doc:123]]</span> or <span class="pill">[[thesis:5]]</span> to create stable links for export.
+        </div>
+      </div>
+
+      <details style="margin-top:10px;">
+        <summary style="cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--muted);">Taxonomy (optional)</summary>
+        <div style="margin-top:10px;">
+          <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="field">
+              <label>Entities (comma-separated)</label>
+              <input type="text" name="entities" value="{{ prefill.entities }}" placeholder="MCL, VR200" />
+            </div>
+            <div class="field">
+              <label>Domains (comma-separated slugs; max 2)</label>
+              <input type="text" name="domains" value="{{ prefill.domains }}" placeholder="advanced_packaging" />
+            </div>
+          </div>
+          <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="field">
+              <label>Tags (comma-separated slugs)</label>
+              <input type="text" name="tags" value="{{ prefill.tags }}" placeholder="watch, early_signal" />
+            </div>
+            <div class="field">
+              <label>Event types (comma-separated slugs)</label>
+              <input type="text" name="event_types" value="{{ prefill.event_types }}" placeholder="adoption_timing" />
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <div class="btnrow" style="justify-content:flex-end; gap: 8px; margin-top: 14px;">
+        <a class="btn" href="/notes">Cancel</a>
+        <button class="btn primary" type="submit">Create</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="/static/form_draft_autosave.js?v={{ settings.static_assets_version }}"></script>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="hd">
+    <h2>Currency Rates</h2>
+    <div class="meta">
+      <span>Base: {{ base }}</span>
+      {% if as_of %}<span>·</span><span>As of {{ as_of }}</span>{% endif %}
+      {% if provider %}<span>·</span><span>{{ provider }}</span>{% endif %}
+    </div>
+  </div>
+  <div class="bd">
+    {% if rates and rates|length > 0 %}
+      <table class="fx-table">
+        <thead>
+          <tr>
+            <th>Currency</th>
+            <th>Per {{ base }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for code, rate in rates %}
+            <tr>
+              <td>{{ code }}</td>
+              <td>{{ "{:,.6f}".format(rate) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="pill">No rates available yet.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

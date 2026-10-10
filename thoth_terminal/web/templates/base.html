@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    {% set path = request.url.path if request else '/' %}
+    {% if path == '/' %}
+      {% set route_class = 'route-home' %}
+      {% set shell_mode = 'Command surface' %}
+    {% elif path.startswith('/feed') %}
+      {% set route_class = 'route-feed' %}
+      {% set shell_mode = 'Signal board' %}
+    {% elif path.startswith('/agents') %}
+      {% set route_class = 'route-agents' %}
+      {% set shell_mode = 'Agent workspace' %}
+    {% elif path.startswith('/consensus') %}
+      {% set route_class = 'route-consensus' %}
+      {% set shell_mode = 'Consensus OS' %}
+    {% elif path.startswith('/roadmaps') %}
+      {% set route_class = 'route-roadmaps' %}
+      {% set shell_mode = 'Forward roadmap' %}
+    {% elif path.startswith('/informal-research') %}
+      {% set route_class = 'route-informal-research' %}
+      {% set shell_mode = 'Informal research' %}
+    {% elif path.startswith('/docs/') %}
+      {% set route_class = 'route-doc' %}
+      {% set shell_mode = 'Document dossier' %}
+    {% elif path.startswith('/notes') %}
+      {% set route_class = 'route-notes' %}
+      {% set shell_mode = 'Notebook' %}
+    {% elif path.startswith('/theses') %}
+      {% set route_class = 'route-theses' %}
+      {% set shell_mode = 'Claims registry' %}
+    {% elif path.startswith('/reports') %}
+      {% set route_class = 'route-reports' %}
+      {% set shell_mode = 'Research dossiers' %}
+    {% elif path.startswith('/knowledge') %}
+      {% set route_class = 'route-knowledge' %}
+      {% set shell_mode = 'Knowledge assets' %}
+    {% elif path.startswith('/research/plays') %}
+      {% set route_class = 'route-research-plays' %}
+      {% set shell_mode = 'Skills and plays' %}
+    {% elif path.startswith('/companies') %}
+      {% set route_class = 'route-companies' %}
+      {% set shell_mode = 'Issuer coverage' %}
+    {% elif path.startswith('/universes') %}
+      {% set route_class = 'route-universes' %}
+      {% set shell_mode = 'Research universes' %}
+    {% elif path.startswith('/calendar') %}
+      {% set route_class = 'route-calendar' %}
+      {% set shell_mode = 'Catalyst calendar' %}
+    {% elif path.startswith('/alerts') %}
+      {% set route_class = 'route-alerts' %}
+      {% set shell_mode = 'Alert discovery' %}
+    {% elif path.startswith('/visualizations/supply-chains') %}
+      {% set route_class = 'route-supply-chains' %}
+      {% set shell_mode = 'Network modeling' %}
+    {% elif path.startswith('/institutional') %}
+      {% set route_class = 'route-institutional' %}
+      {% set shell_mode = 'Institutional spine' %}
+    {% elif path.startswith('/agent-review') %}
+      {% set route_class = 'route-agent-review' %}
+      {% set shell_mode = 'Agent review' %}
+    {% elif path.startswith('/sources') %}
+      {% set route_class = 'route-sources' %}
+      {% set shell_mode = 'Source registry' %}
+    {% elif path.startswith('/ops') %}
+      {% set route_class = 'route-ops' %}
+      {% set shell_mode = 'Operations' %}
+    {% elif path.startswith('/capture') %}
+      {% set route_class = 'route-capture' %}
+      {% set shell_mode = 'Agent intake' %}
+    {% elif path.startswith('/visualizations') %}
+      {% set route_class = 'route-visualizations' %}
+      {% set shell_mode = 'Model surfaces' %}
+    {% elif path.startswith('/settings') %}
+      {% set route_class = 'route-settings' %}
+      {% set shell_mode = 'Terminal prefs' %}
+    {% else %}
+      {% set route_class = 'route-generic' %}
+      {% set shell_mode = 'Research system' %}
+    {% endif %}
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>{{ title or "Thoth Terminal" }}</title>
+    <meta name="theme-color" content="#070a0d" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Thoth Terminal" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/x-icon" href="/static/icons/thoth-terminal.ico?v={{ settings.static_assets_version }}" sizes="any" />
+    <link rel="apple-touch-icon" href="/static/icons/thoth-terminal-1024.png" />
+    <script>
+      (function () {
+        const uiDefaults = { tone: "measured", intensity: "signal", density: "balanced" };
+        const moodKey = "thoth_omori_mood_state";
+        const sessionMoodKey = "thoth_omori_mood_session_v1";
+        const legacyCharacterKey = "thoth_home_omori_character";
+        const runtimeRoot = "/omori-mood-runtime";
+        const fallbackThemes = {{ omori_mood_themes|tojson }};
+        const fallbackBackgrounds = {{ omori_mood_backgrounds|tojson }};
+
+        function normalizeMood(value) {
+          const mood = String(value || "neutral").trim().toLowerCase().replace(/[\s-]+/g, "_");
+          return mood || "neutral";
+        }
+
+        function resolveRuntimePath(path) {
+          const value = String(path || "").trim();
+          if (!value) return "";
+          if (/^(?:https?:)?\/\//.test(value) || value.startsWith("/") || value.startsWith("data:")) return value;
+          return `${runtimeRoot}/${value.replace(/^\/+/, "")}`;
+        }
+
+        function cssUrl(path) {
+          const value = String(path || "").trim();
+          if (!value) return "none";
+          if (value.startsWith("url(")) return value;
+          return `url("${resolveRuntimePath(value).replace(/"/g, '\\"')}")`;
+        }
+
+        function moodGradients(theme) {
+          const fallback = fallbackThemes.neutral;
+          const accent = theme?.accent || fallback.accent;
+          const accent2 = theme?.accent2 || fallback.accent2;
+          const background = theme?.background || fallback.background;
+          return {
+            full: theme?.gradient || `linear-gradient(135deg, ${background} 0%, ${accent} 52%, ${accent2} 100%)`,
+            soft: theme?.gradientSoft || `linear-gradient(135deg, color-mix(in srgb, ${accent} 20%, transparent) 0%, color-mix(in srgb, ${accent2} 14%, transparent) 48%, transparent 84%)`,
+            panel: theme?.gradientPanel || `linear-gradient(135deg, color-mix(in srgb, ${accent} 14%, rgba(255, 255, 255, 0.02)) 0%, color-mix(in srgb, ${accent2} 8%, transparent) 54%, rgba(3, 3, 3, 0.94) 100%)`,
+            panelStrong: theme?.gradientPanelStrong || `linear-gradient(135deg, color-mix(in srgb, ${accent} 24%, rgba(255, 255, 255, 0.035)) 0%, color-mix(in srgb, ${accent2} 16%, transparent) 52%, rgba(3, 3, 3, 0.86) 100%)`,
+            line: theme?.gradientLine || `linear-gradient(90deg, ${accent}, ${accent2}, transparent)`,
+          };
+        }
+
+        function readStoredMood() {
+          const current = window.__THOTH_OMORI_MOOD_STATE__;
+          if (current && typeof current === "object") return Object.assign({}, current);
+          try {
+            const raw = sessionStorage.getItem(sessionMoodKey);
+            const stored = raw ? JSON.parse(raw) : null;
+            if (stored && typeof stored === "object") return Object.assign({}, stored);
+          } catch (_e) {}
+          return { mood: "neutral", character: "omori", source: "default" };
+        }
+
+        function applyMood(state) {
+          const root = document.documentElement;
+          const mood = normalizeMood(state?.mood);
+          const theme = Object.assign({}, fallbackThemes[mood] || fallbackThemes.neutral, state?.theme || {});
+          const gradients = moodGradients(theme);
+          const backgroundImage = state?.backgroundImage || state?.background || fallbackBackgrounds[mood] || fallbackBackgrounds.neutral;
+          root.dataset.thothMood = mood;
+          root.dataset.thothCharacter = state?.character || "omori";
+          root.dataset.thothMoodSource = state?.source || "default";
+          root.style.setProperty("--thoth-mood-accent", theme.accent || fallbackThemes.neutral.accent);
+          root.style.setProperty("--thoth-mood-accent-2", theme.accent2 || fallbackThemes.neutral.accent2);
+          root.style.setProperty("--thoth-mood-bg", theme.background || fallbackThemes.neutral.background);
+          root.style.setProperty("--thoth-mood-text", theme.text || fallbackThemes.neutral.text);
+          root.style.setProperty("--accent", theme.accent || fallbackThemes.neutral.accent);
+          root.style.setProperty("--accent2", theme.accent2 || fallbackThemes.neutral.accent2);
+          root.style.setProperty("--accent-glow", `${theme.accent || fallbackThemes.neutral.accent}2b`);
+          root.style.setProperty("--thoth-mood-gradient", gradients.full);
+          root.style.setProperty("--thoth-mood-gradient-soft", gradients.soft);
+          root.style.setProperty("--thoth-mood-gradient-panel", gradients.panel);
+          root.style.setProperty("--thoth-mood-gradient-panel-strong", gradients.panelStrong);
+          root.style.setProperty("--thoth-mood-gradient-line", gradients.line);
+          root.style.setProperty("--omori-terminal-bg-image", cssUrl(backgroundImage));
+          window.__THOTH_OMORI_MOOD_STATE__ = Object.assign({}, state || {}, { mood, theme, gradients, backgroundImage });
+        }
+
+        function writeMood(next) {
+          const previous = readStoredMood();
+          const mood = normalizeMood(next?.mood || previous.mood);
+          const merged = Object.assign({}, previous, next || {}, {
+            mood,
+            character: next?.character || previous.character || "omori",
+            updatedAt: next?.updatedAt || new Date().toISOString(),
+          });
+          applyMood(merged);
+          try {
+            sessionStorage.setItem(sessionMoodKey, JSON.stringify(merged));
+          } catch (_e) {}
+          try {
+            window.dispatchEvent(new CustomEvent("thoth:moodchange", { detail: merged }));
+          } catch (_e) {}
+          return merged;
+        }
+
+        try {
+          localStorage.removeItem(moodKey);
+          localStorage.removeItem(legacyCharacterKey);
+        } catch (_e) {}
+
+        try {
+          const raw = localStorage.getItem("thoth_ui_prefs");
+          const parsed = raw ? JSON.parse(raw) : {};
+          const prefs = Object.assign({}, uiDefaults, parsed || {});
+          const root = document.documentElement;
+          root.dataset.uiTone = prefs.tone || uiDefaults.tone;
+          root.dataset.uiIntensity = prefs.intensity || uiDefaults.intensity;
+          root.dataset.uiDensity = prefs.density || uiDefaults.density;
+        } catch (_e) {
+          const root = document.documentElement;
+          root.dataset.uiTone = uiDefaults.tone;
+          root.dataset.uiIntensity = uiDefaults.intensity;
+          root.dataset.uiDensity = uiDefaults.density;
+        }
+
+        window.ThothMoodState = {
+          key: moodKey,
+          sessionKey: sessionMoodKey,
+          characterKey: legacyCharacterKey,
+          runtimeRoot,
+          fallbackThemes,
+          fallbackBackgrounds,
+          normalizeMood,
+          moodGradients,
+          read: readStoredMood,
+          write: writeMood,
+          apply: applyMood,
+          cssUrl,
+        };
+        const previewMoodParam = new URLSearchParams(window.location.search).get("mood_preview");
+        const previewMood = previewMoodParam ? normalizeMood(previewMoodParam) : "";
+        if (previewMood && Object.prototype.hasOwnProperty.call(fallbackThemes, previewMood)) {
+          writeMood({
+            mood: previewMood,
+            character: "omori",
+            source: "preview",
+            theme: fallbackThemes[previewMood],
+            backgroundImage: fallbackBackgrounds[previewMood],
+          });
+        } else {
+          applyMood(readStoredMood());
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="/static/app.css?v={{ settings.static_assets_version }}" />
+    <link rel="stylesheet" href="/static/terminal-redesign.css?v={{ settings.static_assets_version }}" />
+    <link rel="stylesheet" href="/static/terminal-omori-primitives.css?v={{ settings.static_assets_version }}&amp;omori=1" />
+    <link rel="stylesheet" href="/static/terminal-omori-surfaces.css?v={{ settings.static_assets_version }}&amp;omori=4" />
+    {% if route_class == 'route-doc' %}
+    <link rel="stylesheet" href="/static/terminal-doc.css?v={{ settings.static_assets_version }}" />
+    {% endif %}
+    {% if route_class == 'route-home' %}
+    <link rel="stylesheet" href="/static/terminal-home.css?v={{ settings.static_assets_version }}" />
+    {% endif %}
+    {% if route_class == 'route-feed' %}
+    <link rel="stylesheet" href="/static/terminal-feed.css?v={{ settings.static_assets_version }}&amp;feed=research-v9" />
+    {% endif %}
+    {% if route_class == 'route-agents' or route_class == 'route-agent-review' %}
+    <link rel="stylesheet" href="/static/terminal-agents.css?v={{ settings.static_assets_version }}&amp;agents=omori-v6" />
+    {% endif %}
+    {% if request.url.path == '/visualizations/datasets' or request.url.path.startswith('/visualizations/datasets/') %}
+    <link rel="stylesheet" href="/static/terminal-datasets.css?v={{ settings.static_assets_version }}&amp;datasets=omori-v3" />
+    {% endif %}
+  </head>
+  <body class="{{ route_class }} {{ body_class or '' }}">
+    <div class="topbar">
+      <a class="brand" href="/" aria-label="Open Thoth home">
+        <span class="logo">
+          <span class="logo-mark">THOTH</span>
+          <span class="logo-grid"></span>
+        </span>
+        <div class="brand-copy">
+          <div class="tag">tactical research terminal</div>
+          <div class="brand-subline">{{ shell_mode }} · local graph · command search</div>
+        </div>
+      </a>
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-label="Toggle navigation">Sections</button>
+      <nav class="nav">
+        <div class="nav-primary">
+          <a href="/" class="{{ 'active' if request.url.path == '/' else '' }}">Home</a>
+          <a href="/feed" class="{{ 'active' if request.url.path.startswith('/feed') else '' }}">Feed</a>
+          <a href="/consensus" class="{{ 'active' if request.url.path.startswith('/consensus') or request.url.path.startswith('/worlds') or request.url.path.startswith('/product-models') or request.url.path.startswith('/product-configurations') or request.url.path.startswith('/agentx') else '' }}">Models</a>
+          <a href="/roadmaps" class="{{ 'active' if request.url.path.startswith('/roadmaps') else '' }}">Roadmaps</a>
+          <a href="/codex-usage" target="_blank" rel="noopener">Codex usage</a>
+          <a href="/reports" class="{{ 'active' if request.url.path.startswith('/reports') or request.url.path.startswith('/informal-research') or request.url.path.startswith('/worldview-journal') else '' }}">Research</a>
+          <a href="/universes" class="{{ 'active' if request.url.path.startswith('/universes') else '' }}">Universes</a>
+          <a href="/calendar" class="{{ 'active' if request.url.path.startswith('/calendar') else '' }}">Calendar</a>
+          <a href="/agents/harness" class="{{ 'active' if request.url.path.startswith('/agents') or request.url.path.startswith('/agent-review') else '' }}">Harness</a>
+        </div>
+        <div class="nav-secondary">
+          <a href="/settings" class="settings-gear {{ 'active' if request.url.path.startswith('/settings') else '' }}" aria-label="Settings">Prefs</a>
+          <div class="burger">
+            <button class="burger-btn" id="burger-btn" type="button" aria-label="Research menu">Index</button>
+            <div class="burger-menu" id="burger-menu" hidden>
+              <div class="index-group"><span>Research</span>
+              <a href="/reports" class="{{ 'active' if request.url.path.startswith('/reports') else '' }}">Reports</a>
+              <a href="/worldview-journal" class="{{ 'active' if request.url.path.startswith('/worldview-journal') else '' }}">Worldview journal</a>
+              <a href="/informal-research" class="{{ 'active' if request.url.path.startswith('/informal-research') else '' }}">Informal research</a>
+              <a href="/theses" class="{{ 'active' if request.url.path.startswith('/theses') else '' }}">Theses</a>
+              <a href="/notes" class="{{ 'active' if request.url.path.startswith('/notes') else '' }}">Notes</a>
+              <a href="/knowledge" class="{{ 'active' if request.url.path.startswith('/knowledge') else '' }}">Knowledge</a>
+              <a href="/research/plays" class="{{ 'active' if request.url.path.startswith('/research/plays') else '' }}">Plays</a></div>
+              <div class="index-group"><a href="/research">Research desk</a></div>
+              <div class="index-group"><span>Models & coverage</span>
+              <a href="/consensus" class="{{ 'active' if request.url.path.startswith('/consensus') else '' }}">Consensus models</a>
+              <a href="/worlds" class="{{ 'active' if request.url.path.startswith('/worlds') else '' }}">Named worlds</a>
+              <a href="/product-models" class="{{ 'active' if request.url.path.startswith('/product-models') or request.url.path.startswith('/product-configurations') else '' }}">Product models</a>
+              <a href="/agentx" class="{{ 'active' if request.url.path.startswith('/agentx') else '' }}">AgentX models</a>
+              <a href="/companies" class="{{ 'active' if request.url.path.startswith('/companies') else '' }}">Companies</a>
+              <a href="/institutional/ops" class="{{ 'active' if request.url.path.startswith('/institutional') else '' }}">Institutional</a>
+              <a href="/stage-tracker" class="{{ 'active' if request.url.path.startswith('/stage-tracker') else '' }}">Stage tracker</a>
+              <a href="/visualizations/memory-system" class="{{ 'active' if request.url.path.startswith('/visualizations/memory-system') else '' }}">Memory system</a>
+              <a href="/visualizations/robotics-deployment" class="{{ 'active' if request.url.path.startswith('/visualizations/robotics-deployment') else '' }}">Robotics model</a>
+              <a href="/visualizations/datasets" class="{{ 'active' if request.url.path.startswith('/visualizations/datasets') else '' }}">Data workbench</a></div>
+              <div class="index-group"><span>Agents & intake</span>
+              <a href="/agents/cloud" class="{{ 'active' if request.url.path.startswith('/agents/cloud') else '' }}">Cloud agents</a>
+              <a href="/agent-review" class="{{ 'active' if request.url.path.startswith('/agent-review') else '' }}">Agentic ingestion</a>
+              <a href="/agent-review" class="{{ 'active' if request.url.path.startswith('/agent-review') else '' }}">Agent review</a>
+              <a href="/instruments/requests" class="{{ 'active' if request.url.path.startswith('/instruments/requests') else '' }}">Research requests</a></div>
+              <div class="index-group"><span>Operations</span>
+              <a href="/sources" class="{{ 'active' if request.url.path.startswith('/sources') else '' }}">Sources</a>
+              <a href="/ops" class="{{ 'active' if request.url.path.startswith('/ops') else '' }}">Ops</a>
+              {% if settings.earnings_nav_enabled %}
+                <a href="/earnings" class="{{ 'active' if request.url.path.startswith('/earnings') else '' }}">Earnings</a>
+              {% endif %}
+              <a href="/transcripts" class="{{ 'active' if request.url.path.startswith('/transcripts') else '' }}">Transcripts</a>
+              {% if settings.markets_enabled %}
+              <a href="/markets" class="{{ 'active' if request.url.path.startswith('/markets') else '' }}">Markets</a>
+              {% endif %}
+              <a href="/currency" class="{{ 'active' if request.url.path.startswith('/currency') else '' }}">Currency</a>
+              <a href="/exports" class="{{ 'active' if request.url.path.startswith('/exports') else '' }}">Exports</a>
+              <a href="/freshness" class="{{ 'active' if request.url.path.startswith('/freshness') else '' }}">Freshness</a>
+              <a href="/alerts" class="{{ 'active' if request.url.path.startswith('/alerts') else '' }}">Alerts</a>
+              <a href="/notifications" class="{{ 'active' if request.url.path.startswith('/notifications') else '' }}">Notifications</a></div>
+            </div>
+          </div>
+          {% if desktop_enabled|default(false) %}
+            <button class="desktop-update-btn" id="desktop-update-check-btn" type="button" aria-label="Check for Thoth Terminal updates">Update</button>
+            <button class="desktop-exit-btn" id="desktop-exit-btn" type="button" aria-label="Exit Thoth Terminal">Exit</button>
+          {% endif %}
+        </div>
+      </nav>
+      <div class="topbar-right">
+        <div class="terminal-status">
+          <span class="terminal-status-label">Mode</span>
+          <span class="terminal-status-value">{{ shell_mode }}</span>
+        </div>
+        <div class="global-search">
+          <label class="global-search-label" for="global-search-input">Command Search</label>
+          <div class="global-search-field">
+            <input id="global-search-input" type="text" placeholder="Search docs, theses, notes, reports, knowledge, datasets, chains" />
+            <span class="global-search-kbd">⌘K</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pwa-install" id="pwa-install-banner" style="display:none;">
+      <div class="pwa-copy">
+        <strong>Install Terminal</strong>
+        <span>Keep Thoth one tap away on this device.</span>
+      </div>
+      <div class="btnrow">
+        <button class="btn" type="button" id="pwa-install-btn">Install</button>
+        <button class="btn" type="button" id="pwa-install-dismiss">Dismiss</button>
+      </div>
+    </div>
+    <div class="nav-overlay" id="nav-overlay"></div>
+    <div class="burger-overlay" id="burger-overlay"></div>
+    <div class="filters-overlay" id="filters-overlay"></div>
+    <div class="wrap {{ wrap_class or '' }}">
+      {% block content %}{% endblock %}
+    </div>
+    <div class="overlay" id="global-search-overlay" style="display:none;">
+      <div class="panel overlay-panel">
+        <div class="hd">
+          <h2>Command Search</h2>
+          <div class="btnrow" style="gap:8px;">
+            <span class="pill">Esc</span>
+            <button class="btn" type="button" id="global-search-close">Close</button>
+          </div>
+        </div>
+        <div class="bd">
+          <div class="search-wrap">
+            <span class="search-icon">CMD</span>
+            <input type="text" id="global-search-query" class="search-input" placeholder="Type to search docs, reports, subjects, knowledge, notes, theses, charts, datasets, companies..." />
+            <span class="search-kbd">Enter</span>
+          </div>
+          <div class="filter-chips" id="global-search-kinds">
+            <button class="filter-chip active" type="button" data-kind="all">All</button>
+            <button class="filter-chip" type="button" data-kind="doc">Docs</button>
+            <button class="filter-chip" type="button" data-kind="thesis">Theses</button>
+            <button class="filter-chip" type="button" data-kind="note">Notes</button>
+            <button class="filter-chip" type="button" data-kind="chart">Charts</button>
+            <button class="filter-chip" type="button" data-kind="dataset">Datasets</button>
+            <button class="filter-chip" type="button" data-kind="company">Companies</button>
+            <button class="filter-chip" type="button" data-kind="research_report">Reports</button>
+            <button class="filter-chip" type="button" data-kind="research_subject">Subjects</button>
+            <button class="filter-chip" type="button" data-kind="knowledge_asset">Knowledge</button>
+            <button class="filter-chip" type="button" data-kind="instrument_request">Requests</button>
+            <button class="filter-chip" type="button" data-kind="product_stage">Stages</button>
+            <button class="filter-chip" type="button" data-kind="supply_chain">Chains</button>
+          </div>
+          <div id="global-search-results" class="search-results" style="margin-top:10px;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="overlay" id="keyboard-help-overlay" style="display:none;">
+      <div class="panel overlay-panel">
+        <div class="hd">
+          <h2>Keyboard shortcuts</h2>
+          <div class="btnrow" style="gap:8px;">
+            <span class="pill">?</span>
+            <button class="btn" type="button" id="keyboard-help-close">Close</button>
+          </div>
+        </div>
+        <div class="bd">
+          <div class="kb-grid">
+            <div class="kb-section">
+              <div class="kb-title">Global</div>
+              <div class="kb-row"><span class="pill">⌘/Ctrl + K</span><span>Search</span></div>
+              <div class="kb-row"><span class="pill">?</span><span>Help</span></div>
+            </div>
+            <div class="kb-section">
+              <div class="kb-title">Feed</div>
+              <div class="kb-row"><span class="pill">j / k</span><span>Navigate</span></div>
+              <div class="kb-row"><span class="pill">Enter</span><span>Open</span></div>
+              <div class="kb-row"><span class="pill">s</span><span>Save</span></div>
+              <div class="kb-row"><span class="pill">a</span><span>Actioned</span></div>
+              <div class="kb-row"><span class="pill">x</span><span>Ignore</span></div>
+              <div class="kb-row"><span class="pill">u</span><span>Reset</span></div>
+              <div class="kb-row"><span class="pill">/</span><span>Search feed</span></div>
+            </div>
+            <div class="kb-section">
+              <div class="kb-title">Notes</div>
+              <div class="kb-row"><span class="pill">Cmd/Ctrl + S</span><span>Autosave</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="toast-container" id="toast-container" aria-live="polite"></div>
+    <div class="thoth-operation" id="thoth-operation" role="status" aria-live="polite" aria-atomic="true" hidden>
+      <div class="thoth-operation-name">MEWO</div>
+      <div class="thoth-operation-dialogue">
+        <span class="thoth-operation-cat" aria-hidden="true"><i></i></span>
+        <span id="thoth-operation-text">Meow? (Waiting for something to happen?)</span>
+        <span class="thoth-operation-time" id="thoth-operation-time"></span>
+      </div>
+    </div>
+    <div class="new-items-banner" id="new-items-banner" style="display:none;">
+      <div class="new-items-content">
+        <span class="new-items-icon">●</span>
+        <span class="new-items-text"><strong id="new-items-count">0</strong> new items available</span>
+      </div>
+      <div class="new-items-actions">
+        <button class="btn" type="button" id="new-items-load">Load new</button>
+        <button class="btn" type="button" id="new-items-dismiss">×</button>
+      </div>
+    </div>
+    {% if desktop_enabled|default(false) %}
+    <div class="desktop-update-banner" id="desktop-update-banner" style="display:none;">
+      <div class="desktop-update-content">
+        <span class="desktop-update-icon">↻</span>
+        <span class="desktop-update-text" id="desktop-update-text">Desktop update available</span>
+      </div>
+      <div class="desktop-update-actions">
+        <button class="btn primary" type="button" id="desktop-update-restart">Update and restart</button>
+        <button class="btn" type="button" id="desktop-update-dismiss">Later</button>
+      </div>
+    </div>
+    {% endif %}
+    <script>
+      window.THOTH_CONFIG = {
+        desktopEnabled: {{ 'true' if desktop_enabled|default(false) else 'false' }},
+        enableSeen: {{ 'true' if settings.enable_seen_tracking else 'false' }},
+        seenDwellMs: {{ settings.seen_dwell_ms }},
+        seenScrollWindowS: {{ settings.seen_scroll_window_s }},
+        seenAfkS: {{ settings.seen_afk_s }},
+        notificationPollS: {{ settings.notification_poll_s }},
+        notificationSoundRateS: {{ settings.notification_sound_rate_s }},
+        notificationToastRateS: {{ settings.notification_toast_rate_s }},
+        notificationRequireIdle: {{ 'true' if settings.notification_require_idle else 'false' }},
+        notificationIdleS: {{ settings.notification_idle_s }},
+        notificationDedupeWindowS: {{ settings.notification_dedupe_window_s }},
+        autosaveIntervalMs: {{ settings.autosave_interval_ms }},
+        latestIngestId: {{ get_latest_ingest_id() }},
+      };
+    </script>
+    <script src="/static/app.js?v={{ settings.static_assets_version }}"></script>
+    <script src="/static/operation_status.js?v={{ settings.static_assets_version }}&amp;operation=20260924-2"></script>
+    {% if desktop_enabled|default(false) %}
+    <script src="/static/desktop_shell.js?v={{ settings.static_assets_version }}"></script>
+    {% endif %}
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

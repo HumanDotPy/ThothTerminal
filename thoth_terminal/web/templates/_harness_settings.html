@@ -1,0 +1,28 @@
+<div class="panel settings-section agent-schedules" data-settings-section="agent" data-agent-schedules style="display:none;" id="agent-automation">
+  <div class="hd"><h2>Harness &amp; schedules</h2><span class="pill">DeepSeek Harness</span></div>
+  <div class="bd">
+    <p>Configure provider credentials, models, presets, Creator tools, and workspaces inside <a href="/agents/harness">Harness</a>. Thoth uses the installed Harness and its saved conversations.</p>
+    <p>Thoth research schedules use the worldview preset. Times are in {{ schedule_timezone }}. <a href="/agents/cloud">Research runs</a> · <a href="/agents/activity">Activity</a> · <a href="/ops">Runtime health</a></p>
+    <form id="agent-schedule-form">
+      <label class="schedule-switch"><input name="enabled" type="checkbox" {% if schedule.enabled %}checked{% endif %}> Scheduled research enabled</label>
+      <div class="schedule-grid">
+        {% for mode, label in [('heartbeat','Worldview research'), ('nightly','Nightly research'), ('inquisitive','Inquisitive research')] %}
+        {% set current = schedule.get(mode, {}) %}
+        <fieldset class="schedule-card">
+          <legend>{{ label }}</legend>
+          <label class="schedule-switch"><input name="{{ mode }}_enabled" type="checkbox" {% if current.get('enabled') %}checked{% endif %}> Enabled</label>
+          <label>Local times <input name="{{ mode }}_local_times" value="{{ current.get('local_times', '') }}" placeholder="08:00,20:00" {% if mode != 'heartbeat' %}required{% endif %}></label>
+          {% if mode == 'heartbeat' %}
+          <p class="muted">Leave times blank to use the interval.</p>
+          <label>Interval (hours)<input name="heartbeat_interval_hours" type="number" min="1" max="168" required value="{{ current.get('interval_hours', 12) }}"></label>
+          {% endif %}
+          <label>Lookback (hours)<input name="{{ mode }}_lookback_hours" type="number" min="1" max="720" required value="{{ current.get('lookback_hours', 72) }}"></label>
+        </fieldset>
+        {% endfor %}
+      </div>
+      <div class="schedule-save"><button class="btn primary" type="submit" id="agent-schedule-save">Save schedules</button><span id="agent-schedule-feedback" role="status" aria-live="polite"></span></div>
+    </form>
+  </div>
+</div>
+<link rel="stylesheet" href="/static/agent_schedules.css?v={{ settings.static_assets_version }}">
+<script src="/static/agent_schedules.js?v={{ settings.static_assets_version }}" defer></script>

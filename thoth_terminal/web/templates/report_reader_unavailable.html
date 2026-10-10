@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="reports-shell">
+  <section class="workspace-header">
+    <div class="workspace-copy">
+      <div class="workspace-kicker">Report Reader</div>
+      <h1>{{ title or 'Reader unavailable' }}</h1>
+      <p>{{ message or 'This report cannot be opened in the reader.' }}</p>
+    </div>
+    <div class="workspace-summary">
+      <div class="workspace-stat">
+        <span class="workspace-stat-label">Report</span>
+        <span class="workspace-stat-value">{{ report.display_name or report.title or report.slug or 'Unknown' }}</span>
+        <span class="workspace-stat-copy">{{ report.report_type_label or 'Report registry item' }}</span>
+      </div>
+      <div class="workspace-stat">
+        <span class="workspace-stat-label">Version</span>
+        <span class="workspace-stat-value">{% if version.version %}v{{ version.version }}{% else %}n/a{% endif %}</span>
+        <span class="workspace-stat-copy">{{ version.status or 'not loaded' }}</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="panel terminal-page-panel">
+    <div class="hd">
+      <div class="hd-left">
+        <h2>No reader artifact</h2>
+        <span class="pill red">unavailable</span>
+      </div>
+      <div class="btnrow">
+        <a class="btn" href="/reports">Back to Registry</a>
+        {% if report.slug %}
+          <a class="btn primary" href="/reports/{{ report.slug }}">Report Detail</a>
+        {% endif %}
+      </div>
+    </div>
+    <div class="bd">
+      <div class="empty-callout">
+        <h3>Reader mode needs an attached Markdown or PDF artifact.</h3>
+        <p>Use the report detail page to inspect the registry entry, source artifacts, addenda, linked objects, and metadata.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

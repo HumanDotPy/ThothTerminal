@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block content %}
+<link rel="stylesheet" href="/static/memory_system.css?v={{ settings.static_assets_version }}&model=8" />
+<div class="memory-system" data-memory-system>
+  <header class="memory-commandbar">
+    <div>
+      <div class="workspace-kicker">Models / Semiconductor capacity</div>
+      <h1>Memory System <span aria-hidden="true">✣</span></h1>
+      <p>Physical fabs to process nodes, products, demand, constraints, and supplier returns.</p>
+    </div>
+    <div class="memory-command-actions">
+      <div class="memory-scenario" role="group" aria-label="Scenario">
+        <button type="button" data-scenario="low">Low</button>
+        <button type="button" data-scenario="base" class="active">Base</button>
+        <button type="button" data-scenario="high">High</button>
+      </div>
+      <button type="button" class="btn" data-action="export">Export</button>
+      <button type="button" class="btn" data-action="materialize">Materialize</button>
+      <button type="button" class="btn primary" data-action="calculate">Recalculate</button>
+    </div>
+  </header>
+
+  <section class="memory-statusline omori-frame" aria-live="polite">
+    <span class="memory-status-dot" data-status-dot></span>
+    <strong data-status>Calculating</strong>
+    <span data-model-version>Model pending</span>
+    <span data-period>Period not selected</span>
+    <a href="/visualizations/datasets?family=memory_site_program_ramp">Fab ledger</a>
+    <a href="/visualizations/datasets?family=memory_model_output">Model outputs</a>
+  </section>
+
+  <section class="memory-kpis omori-frame">
+    <div><span>Utilized fab WPM</span><strong data-kpi="wpm">—</strong><small data-kpi-note="wpm">Physical capacity</small></div>
+    <div><span>Qualified output</span><strong data-kpi="supply">—</strong><small>GB / month</small></div>
+    <div><span>Modeled demand</span><strong data-kpi="demand">—</strong><small>GB / month</small></div>
+    <div><span>Supply balance</span><strong data-kpi="balance">—</strong><small data-kpi-note="balance">Across products</small></div>
+    <div><span>Shipped revenue</span><strong data-kpi="revenue">—</strong><small>Monthly run-rate</small></div>
+    <div><span>Weighted ROIC</span><strong data-kpi="roic">—</strong><small>Modeled suppliers</small></div>
+  </section>
+
+  <nav class="memory-tabs omori-frame" aria-label="Memory System views">
+    <button type="button" class="active" data-view="overview">Overview</button>
+    <button type="button" data-view="fab">Fab ledger</button>
+    <button type="button" data-view="conversion">Good-bit conversion</button>
+    <button type="button" data-view="demand">Demand</button>
+    <button type="button" data-view="allocation">Allocation</button>
+    <button type="button" data-view="constraints">Constraints</button>
+    <button type="button" data-view="economics">Economics</button>
+    <button type="button" data-view="assumptions">Assumptions & evidence</button>
+    <button type="button" data-view="evidence">Source observations</button>
+  </nav>
+
+  <div class="memory-workspace">
+    <aside class="memory-controls omori-frame">
+      <div class="memory-pane-heading">
+        <span>Evidence inputs</span>
+        <button type="button" data-action="reset">Reset</button>
+      </div>
+      <div class="memory-source-controls">
+        <label>Data source<select data-source-mode><option value="datasets">Published datasets</option><option value="demo">Demonstration assumptions</option></select></label>
+        <div data-dataset-controls>
+          <label>Period<input data-source-period placeholder="Exact period, e.g. 2027-Q1" /></label>
+          <label><span><input type="checkbox" data-allow-draft /> Include draft evidence when no published version exists</span></label>
+          <p>Choose a dataset where several cover the same family. Missing evidence remains visible in the audit.</p>
+          <div data-dataset-selectors>Loading dataset catalog...</div>
+          <div data-source-provenance></div>
+        </div>
+        <p data-demo-notice hidden>Illustrative assumptions only. These values are not reported market data.</p>
+      </div>
+      <form data-input-form>
+        <fieldset>
+          <legend>Physical fab</legend>
+          <label><span>Gross WPM</span><input type="number" min="0" step="1000" data-input="gross_wpm" /></label>
+          <label><span>Equipped fraction</span><input type="number" min="0" max="1" step="0.01" data-input="equipped_fraction" /></label>
+          <label><span>Utilization</span><input type="number" min="0" max="1" step="0.01" data-input="utilization" /></label>
+          <label><span>Ramp factor</span><input type="number" min="0" max="1" step="0.01" data-input="ramp_factor" /></label>
+        </fieldset>
+        <fieldset>
+          <legend>Node split</legend>
+          <label><span>1β share</span><input type="number" min="0" max="1" step="0.01" data-input="node_beta_share" /></label>
+          <label><span>1γ share</span><input type="number" min="0" max="1" step="0.01" data-input="node_gamma_share" /></label>
+        </fieldset>
+        <fieldset>
+          <legend>Architecture demand</legend>
+          <label><span>AI systems</span><input type="number" min="0" step="1000" data-input="ai_system_units" /></label>
+          <label><span>HBM GB / system</span><input type="number" min="0" step="8" data-input="hbm_gb_per_system" /></label>
+          <label><span>Server systems</span><input type="number" min="0" step="1000" data-input="server_system_units" /></label>
+          <label><span>DDR GB / system</span><input type="number" min="0" step="16" data-input="ddr_gb_per_system" /></label>
+        </fieldset>
+        <fieldset>
+          <legend>Economics</legend>
+          <label><span>HBM ASP / GB</span><input type="number" min="0" step="0.25" data-input="hbm_asp" /></label>
+          <label><span>DDR ASP / GB</span><input type="number" min="0" step="0.05" data-input="ddr_asp" /></label>
+          <label><span>Annual capex</span><input type="number" min="0" step="1000000" data-input="capex" /></label>
+          <label><span>Invested capital</span><input type="number" min="0" step="1000000" data-input="invested_capital" /></label>
+        </fieldset>
+      </form>
+    </aside>
+
+    <main class="memory-main omori-frame">
+      <div class="memory-view-heading">
+        <div><span data-view-kicker>System balance</span><h2 data-view-title>Supply and demand</h2></div>
+        <div class="memory-view-meta"><span data-row-count>0 rows</span><span data-freshness>Scenario: Base</span></div>
+      </div>
+      <div class="memory-chart" data-chart aria-label="Memory System chart"></div>
+      <div class="memory-table-wrap">
+        <table class="memory-table">
+          <thead data-table-head></thead>
+          <tbody data-table-body></tbody>
+        </table>
+        <div class="memory-empty" data-empty hidden>No rows for this view.</div>
+      </div>
+    </main>
+
+    <aside class="memory-inspector omori-frame">
+      <div class="memory-pane-heading"><span>Model audit</span><span data-completeness>Pending</span></div>
+      <div class="memory-audit-summary">
+        <div><span>Errors</span><strong data-audit-count="errors">0</strong></div>
+        <div><span>Warnings</span><strong data-audit-count="warnings">0</strong></div>
+        <div><span>Defaults</span><strong data-audit-count="defaults">0</strong></div>
+      </div>
+      <div class="memory-inspector-section">
+        <h3>Active constraints</h3>
+        <div data-constraint-list class="memory-list"></div>
+      </div>
+      <div class="memory-inspector-section">
+        <h3>Selected row</h3>
+        <dl data-selected-detail class="memory-detail"><dt>Status</dt><dd>Select a table row</dd></dl>
+      </div>
+      <div class="memory-inspector-section memory-findings">
+        <h3>Audit findings</h3>
+        <div data-audit-list class="memory-list"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/vendor/echarts.min.js?v={{ settings.static_assets_version }}"></script>
+<script src="/static/memory_system.js?v={{ settings.static_assets_version }}&model=9"></script>
+{% endblock %}

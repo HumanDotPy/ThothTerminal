@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="hd">
+    <h2>Notification Inbox</h2>
+    <span class="pill">recent runs</span>
+    <div class="btnrow" style="margin-left:auto;">
+      <a class="btn" href="/alerts">Discovery</a>
+      <a class="btn" href="/notifications">Rules</a>
+    </div>
+  </div>
+  <div class="bd">
+    {% if rows|length == 0 %}
+      <div style="color:var(--muted);font-family:var(--mono);font-size:12px;">No recent runs.</div>
+    {% else %}
+      <div class="docs">
+        {% for row in rows %}
+          {% set run = row.run %}
+          {% set notify = row.notify or {} %}
+          <div class="doc" style="grid-template-columns: 1fr;">
+            <div>
+              <div class="meta">
+                <span class="pill">{{ row.source }}</span>
+                <span>·</span>
+                {% if run.finished_at %}
+                  <span data-utc="{{ run.finished_at.strftime('%Y-%m-%dT%H:%M:%S') }}">{{ run.finished_at.strftime("%Y-%m-%d %H:%M") }}</span>
+                {% endif %}
+                <span class="pill">new {{ run.items_new }}</span>
+                <span class="pill">updated {{ run.items_updated }}</span>
+                <span class="pill">{{ run.status }}</span>
+                {% if notify.suppressed %}<span class="pill bad">quiet hours</span>{% endif %}
+              </div>
+              <div style="margin-top:8px;">
+                {% if row.rule_hits|length > 0 %}
+                  <div class="chiprow">
+                    {% for hit in row.rule_hits %}
+                      <span class="pill {% if hit.quiet %}bad{% endif %}">{{ hit.name }} · {{ hit.count }}{% if hit.quiet %} (quiet){% endif %}</span>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <div style="color:var(--muted);font-family:var(--mono);font-size:12px;">No rule matches recorded.</div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

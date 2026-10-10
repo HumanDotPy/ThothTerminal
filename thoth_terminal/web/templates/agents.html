@@ -1,0 +1,793 @@
+{% extends "base.html" %}
+{% block content %}
+{% set metrics = state.get('metrics', {}) %}
+{% set agent_documents = state.get('agent_documents', []) %}
+{% set material_compressions = state.get('material_compressions', []) %}
+{% set routine_compressions = state.get('routine_compressions', []) %}
+{% set deep_traces = state.get('deep_analysis_traces', []) %}
+{% set reads = state.get('reads', []) %}
+{% set writes = state.get('writes', []) %}
+{% set recent_runs = state.get('recent_runs', []) %}
+{% set recent_actions = state.get('recent_actions', []) %}
+{% set openshell = state.get('openshell', {}) %}
+{% set stage_decision = state.get('stage_decision') or {} %}
+{% set agents_section = 'overview' %}
+
+{% include "_agents_nav.html" %}
+
+<section class="agents-briefing">
+  <div class="agents-briefing-copy">
+    <div class="workspace-kicker">Local agent / analyst workbench</div>
+    <h1>Agent activity</h1>
+    <p>Review work that needs judgment, inspect durable outputs, and trace every model action back to its sources.</p>
+  </div>
+  <div class="agents-controls">
+    <button class="btn primary" type="button" data-agent-intake-toggle>New intake</button>
+    <a class="btn" href="/agents/activity" data-operation-label="Refreshing agent activity">Refresh</a>
+    <a class="btn" href="/ops">Agent ops</a>
+  </div>
+</section>
+
+<section class="agents-signal-bar" aria-label="Agent workspace status">
+  <div>
+    <span>Review needed</span>
+    <strong>{{ metrics.get('review_needed', 0) }}</strong>
+  </div>
+  <div>
+    <span>Durable writes</span>
+    <strong>{{ metrics.get('durable_writes', 0) }}</strong>
+  </div>
+  <div class="{{ 'is-alert' if metrics.get('blocked_items', 0) else '' }}"><span>Blocked</span><strong>{{ metrics.get('blocked_items', 0) }}</strong></div>
+  <div><span>In progress</span><strong>{{ metrics.get('running_runs', 0) }}</strong></div>
+  <div class="{{ 'is-alert' if metrics.get('errors', 0) else '' }}">
+    <span>Failed</span><strong>{{ metrics.get('errors', 0) }}</strong>
+  </div>
+  <div class="{{ 'is-alert' if stage_decision.get('media_state_code') in ['media_rotation_in_progress', 'media_retry_delayed'] else '' }}">
+    <span>Media state</span>
+    <strong>{{ (stage_decision.get('media_state_code') or 'unknown')|replace('_', ' ') }}</strong>
+    {% if stage_decision.get('pending_media_jobs') is not none %}
+      <span>{{ stage_decision.get('pending_media_jobs', 0) }} pending / {{ stage_decision.get('media_actionable_jobs', 0) }} actionable</span>
+    {% endif %}
+  </div>
+  <div><span>Queued outputs</span><strong>{{ metrics.get('agent_documents', 0) }}</strong></div>
+</section>
+
+<details class="agents-intake-drawer" data-agent-intake-drawer>
+  <summary><span>New agent intake</span><small>URL, text, attachment, and rights metadata</small></summary>
+  {% include "_agent_capture_form.html" %}
+</details>
+
+<section class="agents-command-grid" aria-label="Agent command surface">
+  <aside class="agents-queue-rail">
+    <div class="agents-command-title"><h2>Work queues</h2><span>{{ state.get('hours', 72) }}h</span></div>
+    <a class="active" href="/agent-review"><span>Review needed</span><b>{{ metrics.get('review_needed', 0) }}</b></a>
+    <a href="/agents?queue=blocked"><span>Blocked</span><b>{{ metrics.get('blocked_items', 0) }}</b></a>
+    <a href="/agents?queue=running"><span>In progress</span><b>{{ metrics.get('running_runs', 0) }}</b></a>
+    <a href="#durable-writes"><span>Durable writes</span><b>{{ metrics.get('durable_writes', 0) }}</b></a>
+    <a href="#deep-traces"><span>Deep analysis</span><b>{{ metrics.get('deep_traces', 0) }}</b></a>
+    <a href="#material-intake"><span>Material intake</span><b>{{ metrics.get('material_items', 0) }}</b></a>
+    <a href="#run-state"><span>Run trail</span><b>{{ recent_runs|length }}</b></a>
+    <div class="agents-queue-note">
+      <span>Current stage</span>
+      <strong>{{ (stage_decision.get('model_work_state') or stage_decision.get('reason') or 'unknown')|replace('_', ' ') }}</strong>
+      <small>{{ stage_decision.get('pending_media_jobs', 0) }} media pending</small>
+    </div>
+  </aside>
+
+  <section class="agents-review-queue">
+    <header class="agents-command-title">
+      <div><h2>Review queue</h2><span>{{ state.get('work_items', [])|length }} visible items</span></div>
+      <div class="agents-queue-search"><input type="search" placeholder="Search queue" data-agent-queue-search /><a class="btn" href="/agent-review">Full review</a></div>
+    </header>
+    <div class="agents-work-rows" data-agent-work-rows>
+      {% for item in state.get('work_items', []) %}
+        <article class="agents-work-row is-{{ item.tone or item.kind }}{% if loop.first %} selected{% endif %}"
+          data-agent-work-row
+          data-title="{{ item.title }}"
+          data-label="{{ item.label }}"
+          data-summary="{{ item.summary or '' }}"
+          data-created="{{ item.created_at or '' }}"
+          data-kind="{{ item.kind }}"
+          data-href="{{ item.href or '' }}"
+          tabindex="0">
+          <span class="agents-work-glyph" aria-hidden="true">{{ loop.index }}</span>
+          <div class="agents-work-copy"><h3>{{ item.title }}</h3><p>{{ item.summary or 'No summary is attached.' }}</p></div>
+          <div class="agents-work-type"><span>{{ item.label }}</span><small>{{ item.kind }}</small></div>
+          <time>{{ (item.created_at or '')[:16].replace('T', ' ') }}</time>
+          <span class="agents-work-status">{{ item.tone or item.kind }}</span>
+        </article>
+      {% endfor %}
+      {% if not state.get('work_items', []) %}<div class="agent-empty">No reviewable work in this window.</div>{% endif %}
+    </div>
+    {% set pagination = state.get('pagination') %}
+    {% set pagination_label = 'Agent review queue pages' %}
+    {% include "_traditional_pagination.html" %}
+  </section>
+
+  <aside class="agents-work-inspector" data-agent-work-inspector>
+    <header><span>Selected work item</span><small data-agent-position>0 / {{ state.get('work_items', [])|length }}</small><h2 data-agent-title>Select work</h2><div data-agent-meta>No item selected</div></header>
+    <nav><button class="active" type="button" data-agent-tab="summary">Summary</button><button type="button" data-agent-tab="provenance">Provenance</button></nav>
+    <div class="agents-inspector-pane active" data-agent-pane="summary"><h3>Agent synthesis</h3><p data-agent-summary>Select a work item to inspect its current summary.</p><dl><div><dt>Queue</dt><dd data-agent-kind>&mdash;</dd></div><div><dt>Updated</dt><dd data-agent-created>&mdash;</dd></div><div><dt>Disposition</dt><dd data-agent-label>&mdash;</dd></div></dl></div>
+    <div class="agents-inspector-pane" data-agent-pane="provenance"><h3>Provenance</h3><p>Open the linked document or review surface for source-level evidence, claims, and write history.</p></div>
+    <footer><a class="btn" href="#" data-agent-open>Open details</a><a class="btn primary" href="/agent-review">Review queue</a><button class="btn" type="button" data-agent-intake-toggle>Add context</button></footer>
+  </aside>
+</section>
+
+<details class="agents-provenance-drawer">
+<summary><span>Operational provenance</span><small>Dispatches, traces, reads, writes, and tool execution</small></summary>
+<div class="agents-layout">
+  <main class="agents-main">
+    <section class="panel agent-work-panel">
+      <div class="hd">
+        <div class="hd-left">
+          <h2>Work Product</h2>
+          <span class="pill">{{ state.get('work_items', [])|length }} items</span>
+        </div>
+      </div>
+      <div class="bd agent-work-body">
+        {% set visible_work = namespace(count=0) %}
+        {% for item in state.get('work_items', []) %}
+          {% if item.kind != 'dispatch' %}
+            {% set visible_work.count = visible_work.count + 1 %}
+            <article class="agent-work-item is-{{ item.tone or item.kind }}">
+              <div class="agent-work-meta">
+                <span>{{ item.label }}</span>
+                {% if item.created_at %}<span>{{ item.created_at[:19].replace('T', ' ') }}</span>{% endif %}
+              </div>
+              <h3>
+                {% if item.href %}
+                  <a href="{{ item.href }}">{{ item.title }}</a>
+                {% else %}
+                  {{ item.title }}
+                {% endif %}
+              </h3>
+              {% if item.summary %}<p>{{ item.summary }}</p>{% endif %}
+            </article>
+          {% endif %}
+        {% endfor %}
+
+        {% if agent_documents %}
+          {% for doc in agent_documents %}
+            <article class="agent-dispatch">
+              <header class="agent-dispatch-head">
+                <div>
+                  <div class="agent-kicker">
+                    {{ doc.display_kind or doc.summary_kind or 'Analyst dispatch' }}
+                    {% if doc.updated_at %} / {{ doc.updated_at[:19].replace('T', ' ') }}{% endif %}
+                  </div>
+                  <h3>{{ doc.display_title or doc.title }}</h3>
+                </div>
+                <div class="agent-route-strip compact">
+                  <span>{{ doc.source_document_ids|length }} source docs</span>
+                  <span>{{ doc.compression_ids|length }} signal extractions</span>
+                  {% if doc.run_id %}<span>run #{{ doc.run_id }}</span>{% endif %}
+                </div>
+              </header>
+              <div class="report-markdown-reader agent-markdown">
+                {{ doc.content_html|safe }}
+              </div>
+            </article>
+          {% endfor %}
+        {% endif %}
+
+        {% if not agent_documents and visible_work.count == 0 %}
+          <div class="empty-callout">
+            <h3>No analyst work product in this window.</h3>
+            <p>New dispatches, durable writes, blocked runs, and review-needed items will appear here before raw audit trail.</p>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="panel" id="deep-traces">
+      <div class="hd">
+        <div class="hd-left">
+          <h2>Deep Analysis Traces</h2>
+          <span class="pill">{{ deep_traces|length }} traces</span>
+        </div>
+      </div>
+      <div class="bd agent-deep-list">
+        {% if deep_traces %}
+          {% for trace in deep_traces[:12] %}
+            <article class="agent-deep-trace {{ 'is-bad' if trace.status == 'error' else '' }}">
+              <div class="agent-compression-top">
+                <div>
+                  <a class="agent-doc-title" href="{{ trace.document_href }}">{{ trace.document_title }}</a>
+                  <div class="agent-item-meta">
+                    trace #{{ trace.id }} / signal extraction #{{ trace.compression_id }}
+                    {% if trace.source_name %} / {{ trace.source_name }}{% endif %}
+                    {% if trace.created_at %} / {{ trace.created_at[:19].replace('T', ' ') }}{% endif %}
+                  </div>
+                </div>
+                <div class="agent-route-strip compact">
+                  <span>{{ trace.analysis_mode or 'idle_deep' }}</span>
+                  <span>{{ trace.status }}</span>
+                  <span>{{ trace.signal_level or 'signal n/a' }}</span>
+                  {% if trace.signal_score is not none %}<span>{{ "%.2f"|format(trace.signal_score) }}</span>{% endif %}
+                  {% if trace.run_id %}<span>run #{{ trace.run_id }}</span>{% endif %}
+                </div>
+              </div>
+              {% if trace.summary_html %}
+                <div class="report-markdown-reader agent-markdown agent-trace-markdown">
+                  {{ trace.summary_html|safe }}
+                </div>
+              {% elif trace.summary %}
+                <p>{{ trace.summary }}</p>
+              {% endif %}
+              {% if trace.key_findings %}
+                <div class="agent-claim-list">
+                  {% for finding in trace.key_findings[:3] %}
+                    <div>{{ finding.get('finding') or finding.get('summary') or finding }}</div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+              {% if trace.contradictions %}
+                <div class="agent-note-line bad">{{ trace.contradictions|length }} contradiction or tension candidate(s)</div>
+              {% endif %}
+              {% if trace.open_questions %}
+                <div class="agent-note-line">{{ trace.open_questions|length }} open question(s) for steward review</div>
+              {% endif %}
+              {% if trace.error %}
+                <div class="agent-note-line bad">{{ trace.error }}</div>
+              {% endif %}
+            </article>
+          {% endfor %}
+        {% else %}
+          <div class="empty-callout">
+            <h3>No deep-analysis traces in this window.</h3>
+            <p>When fresh intake is quiet, the laptop worker will revisit recent signal extractions and store reviewable trace output here.</p>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="panel" id="material-intake">
+      <div class="hd">
+        <div class="hd-left">
+          <h2>Material Intake</h2>
+          <span class="pill">{{ material_compressions|length }} items</span>
+        </div>
+      </div>
+      <div class="bd agent-compression-list">
+        {% if material_compressions %}
+          {% for item in material_compressions[:24] %}
+            <article class="agent-compression {{ 'is-review' if item.needs_review else '' }}">
+              <div class="agent-compression-top">
+                <div>
+                  <a class="agent-doc-title" href="{{ item.document_href }}">{{ item.document_title }}</a>
+                  <div class="agent-item-meta">
+                    doc #{{ item.document_id }}{% if item.source_name %} / {{ item.source_name }}{% endif %}
+                    {% if item.created_at %} / {{ item.created_at[:19].replace('T', ' ') }}{% endif %}
+                  </div>
+                </div>
+                <div class="agent-route-strip compact">
+                  <span>{{ item.materiality or 'material' }}</span>
+                  <span>{{ item.status }}</span>
+                  <span>gain {{ item.information_gain or 'n/a' }}</span>
+                  <span>{{ item.document_disposition or 'unclassified' }}</span>
+                  {% if item.confidence is not none %}<span>{{ "%.2f"|format(item.confidence) }}</span>{% endif %}
+                </div>
+              </div>
+              {% if item.summary_short %}<p class="agent-summary-lede">{{ item.summary_short }}</p>{% endif %}
+              {% if item.summary_detail %}<p>{{ item.summary_detail }}</p>{% endif %}
+              {% if item.atomic_claims %}
+                <div class="agent-claim-list">
+                  {% for claim in item.atomic_claims[:4] %}
+                    <div>{{ claim.get('claim_text') or claim }}</div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+              {% if item.skip_reason %}
+                <div class="agent-note-line">Agent note: {{ item.skip_reason }}</div>
+              {% endif %}
+              {% if item.error %}
+                <div class="agent-note-line bad">{{ item.error }}</div>
+              {% endif %}
+            </article>
+          {% endfor %}
+        {% else %}
+          <div class="empty-callout">
+            <h3>No material intake in this window.</h3>
+            <p>The worker may still have routine reads or skipped items in the provenance rail.</p>
+          </div>
+        {% endif %}
+
+        {% if routine_compressions %}
+          <details class="agent-routine-audit">
+            <summary>Routine and skipped audit ({{ routine_compressions|length }})</summary>
+            <div class="agent-routine-list">
+              {% for item in routine_compressions[:18] %}
+                <article>
+                  <a href="{{ item.document_href }}">{{ item.document_title }}</a>
+                  <div class="agent-item-meta">
+                    doc #{{ item.document_id }}{% if item.source_name %} / {{ item.source_name }}{% endif %}
+                    {% if item.created_at %} / {{ item.created_at[:19].replace('T', ' ') }}{% endif %}
+                  </div>
+                  {% if item.summary_short %}<p>{{ item.summary_short }}</p>{% endif %}
+                  {% if item.skip_reason %}<div class="agent-note-line">{{ item.skip_reason }}</div>{% endif %}
+                </article>
+              {% endfor %}
+            </div>
+          </details>
+        {% endif %}
+      </div>
+    </section>
+  </main>
+
+  <aside class="agents-rail">
+    <section class="panel">
+      <div class="hd">
+        <h2>Cloud Sandbox</h2>
+      </div>
+      <div class="bd agent-rail-list">
+        <article class="{{ 'is-bad' if openshell.installed and not openshell.ready else '' }}">
+          <div class="agent-doc-title">
+            {% if openshell.ready %}OpenShell ready{% elif openshell.installed %}OpenShell installed{% else %}OpenShell missing{% endif %}
+          </div>
+          <div class="agent-item-meta">
+            {{ openshell.version or 'version n/a' }}
+            {% if openshell.mode %} / {{ openshell.mode }}{% endif %}
+            {% if openshell.status %} / {{ openshell.status|replace('_', ' ') }}{% endif %}
+          </div>
+          {% if openshell.detail %}<p>{{ openshell.detail }}</p>{% endif %}
+          {% if openshell.command %}
+            <div class="agent-route-strip compact">
+              <span>{{ openshell.command }}</span>
+              {% if openshell.require_gateway %}<span>gateway required</span>{% endif %}
+            </div>
+          {% endif %}
+        </article>
+      </div>
+    </section>
+
+    <section class="panel" id="run-state">
+      <div class="hd">
+        <h2>Run State</h2>
+      </div>
+      <div class="bd agent-rail-list">
+        {% if recent_runs %}
+          {% for run in recent_runs[:10] %}
+            <article class="{{ 'is-bad' if run.status == 'error' else '' }}">
+              <div class="agent-doc-title">#{{ run.id }} {{ run.run_type }}</div>
+              <div class="agent-item-meta">
+                {{ run.status }}{% if run.model_name %} / {{ run.model_name }}{% endif %}
+                {% if run.started_at %} / {{ run.started_at[:19].replace('T', ' ') }}{% endif %}
+              </div>
+              {% if run.summary %}<p>{{ run.summary }}</p>{% endif %}
+              {% if run.error %}<div class="agent-note-line bad">{{ run.error }}</div>{% endif %}
+            </article>
+          {% endfor %}
+        {% else %}
+          <div class="agent-empty">No runs in this window.</div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="hd">
+        <h2>Agent Reads</h2>
+      </div>
+      <div class="bd agent-rail-list">
+        {% if reads %}
+          {% for read in reads[:18] %}
+            <article>
+              <a href="{{ read.document_href }}">{{ read.document_title }}</a>
+              <div class="agent-item-meta">
+                doc #{{ read.document_id }}
+                {% if read.source_name %} / {{ read.source_name }}{% endif %}
+                {% if read.created_at %} / {{ read.created_at[:19].replace('T', ' ') }}{% endif %}
+              </div>
+              <div class="agent-route-strip compact">
+                <span>{{ read.read_kind }}</span>
+                <span>feed {{ read.triage_state or 'unknown' }}</span>
+                {% if read.run_id %}<span>run #{{ read.run_id }}</span>{% endif %}
+              </div>
+            </article>
+          {% endfor %}
+        {% else %}
+          <div class="agent-empty">No model reads in this window.</div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="panel" id="durable-writes">
+      <div class="hd">
+        <h2>Durable Writes</h2>
+      </div>
+      <div class="bd agent-rail-list">
+        {% if writes %}
+          {% for write in writes[:10] %}
+            <article>
+              <div class="agent-doc-title">{{ write.destination_label }}</div>
+              <div class="agent-item-meta">
+                {% if write.created_at %}{{ write.created_at[:19].replace('T', ' ') }}{% endif %}
+                {% if write.confidence is not none %} / confidence {{ "%.2f"|format(write.confidence) }}{% endif %}
+              </div>
+              {% if write.summary %}<p>{{ write.summary }}</p>{% endif %}
+              {% if write.source_document_ids %}
+                <div class="agent-route-strip compact">
+                  {% for doc_id in write.source_document_ids[:6] %}
+                    <span>doc #{{ doc_id }}</span>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </article>
+          {% endfor %}
+        {% else %}
+          <div class="agent-empty">No durable writes in this window.</div>
+        {% endif %}
+      </div>
+    </section>
+
+    <details class="panel agent-tool-trail">
+      <summary class="hd"><h2>Tool Trail</h2></summary>
+      <div class="bd agent-rail-list">
+        {% if recent_actions %}
+          {% for action in recent_actions[:14] %}
+            <article class="{{ 'is-bad' if action.status == 'error' else '' }}">
+              <div class="agent-doc-title">{{ action.action_kind }}</div>
+              <div class="agent-item-meta">
+                {{ action.status }}{% if action.endpoint %} / {{ action.endpoint }}{% endif %}
+                {% if action.created_at %} / {{ action.created_at[:19].replace('T', ' ') }}{% endif %}
+              </div>
+              {% if action.summary %}<p>{{ action.summary }}</p>{% endif %}
+              {% if action.error %}<div class="agent-note-line bad">{{ action.error }}</div>{% endif %}
+            </article>
+          {% endfor %}
+        {% else %}
+          <div class="agent-empty">No tool actions in this window.</div>
+        {% endif %}
+      </div>
+    </details>
+  </aside>
+</div>
+</details>
+
+<style>
+.agents-briefing{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:16px;
+  padding:16px 18px;
+  margin-bottom:10px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:8px;
+  background:rgba(5,8,12,.62);
+}
+.agents-briefing-copy{
+  display:flex;
+  flex-direction:column;
+  gap:7px;
+  min-width:0;
+}
+.agents-briefing h1{
+  margin:0;
+  color:var(--text-bright);
+  font-family:var(--sans);
+  font-size:26px;
+  line-height:1.12;
+  letter-spacing:0;
+}
+.agents-briefing p{
+  max-width:860px;
+  margin:0;
+  color:var(--muted);
+  font-size:13px;
+}
+.agents-controls{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  gap:8px;
+}
+.agents-signal-bar{
+  display:grid;
+  grid-template-columns:repeat(8, minmax(0,1fr));
+  gap:1px;
+  margin:0 0 12px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:8px;
+  overflow:hidden;
+  background:rgba(255,255,255,.06);
+}
+.agents-signal-bar div{
+  min-width:0;
+  padding:9px 10px;
+  background:rgba(5,8,12,.76);
+}
+.agents-signal-bar span,
+.agent-work-meta,
+.agent-kicker,
+.agent-item-meta{
+  color:var(--muted);
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:0;
+}
+.agents-signal-bar span{
+  display:block;
+  margin-bottom:3px;
+  text-transform:uppercase;
+}
+.agents-signal-bar strong{
+  display:block;
+  color:var(--text-bright);
+  font-family:var(--mono);
+  font-size:13px;
+}
+.agents-signal-bar .is-alert strong{
+  color:#fca5a5;
+}
+.agent-capture-panel{
+  margin-bottom:12px;
+  scroll-margin-top:180px;
+}
+.agent-capture-grid{
+  grid-template-columns:minmax(0,1fr) minmax(220px,0.34fr);
+  gap:12px;
+}
+.agent-capture-grid.three{
+  grid-template-columns:repeat(3, minmax(0,1fr));
+}
+.agent-capture-form textarea{
+  min-height:150px;
+}
+.capture-url-line{
+  min-height:24px;
+  margin-top:6px;
+}
+.agent-capture-actions{
+  display:flex;
+  align-items:end;
+  justify-content:flex-end;
+}
+.agent-bookmarklet{
+  margin-top:12px;
+  border-top:1px solid rgba(255,255,255,.07);
+  padding-top:10px;
+}
+.agent-bookmarklet summary{
+  cursor:pointer;
+  color:var(--muted);
+  font-family:var(--mono);
+  font-size:11px;
+  text-transform:uppercase;
+}
+.agent-bookmarklet-body{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-top:10px;
+}
+.agent-bookmarklet pre{
+  max-height:160px;
+  margin:0;
+  overflow:auto;
+  white-space:pre-wrap;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:8px;
+  padding:10px;
+  background:rgba(7,10,13,.55);
+  color:var(--muted);
+  font-size:11px;
+}
+.agents-layout{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(310px,360px);
+  gap:12px;
+  align-items:start;
+}
+.agents-main,
+.agents-rail{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  min-width:0;
+}
+.agent-work-body,
+.agent-deep-list,
+.agent-compression-list,
+.agent-rail-list,
+.agent-routine-list{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.agent-dispatch,
+.agent-work-item,
+.agent-deep-trace,
+.agent-compression,
+.agent-rail-list article,
+.agent-routine-list article{
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:8px;
+  background:rgba(255,255,255,.018);
+  padding:12px;
+}
+.agent-dispatch-head,
+.agent-compression-top{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:12px;
+  align-items:start;
+}
+.agent-dispatch h3,
+.agent-work-item h3{
+  margin:0;
+  color:var(--text-bright);
+  font-size:18px;
+  line-height:1.25;
+  letter-spacing:0;
+}
+.agent-dispatch-head{
+  margin-bottom:10px;
+}
+.agent-markdown{
+  width:100%;
+  margin:0;
+  padding:16px 18px;
+  background:rgba(7,10,13,.46);
+  border-radius:8px;
+}
+.agent-markdown h1:first-child{
+  margin-top:0;
+}
+.agent-markdown h1{
+  font-size:24px;
+  line-height:1.2;
+  letter-spacing:0;
+}
+.agent-markdown h2{
+  font-size:17px;
+  line-height:1.25;
+  letter-spacing:0;
+}
+.agent-work-item{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.agent-work-item.is-blocked,
+.agent-work-item.is-review,
+.agent-compression.is-review,
+.agent-rail-list article.is-bad{
+  border-color:rgba(252,165,165,.24);
+}
+.agent-work-item.is-write{
+  border-color:rgba(16,185,129,.22);
+}
+.agent-work-meta{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  text-transform:uppercase;
+}
+.agent-compression{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.agent-deep-trace{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.agent-trace-markdown{
+  padding:12px 14px;
+}
+.agent-trace-markdown h1,
+.agent-trace-markdown h2{
+  font-size:15px;
+}
+.agent-doc-title{
+  color:var(--text-bright);
+  font-weight:650;
+}
+.agent-summary-lede{
+  color:var(--text-bright);
+  font-weight:600;
+}
+.agent-route-strip{
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+}
+.agent-route-strip span{
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:999px;
+  padding:3px 7px;
+  color:var(--muted);
+  font-family:var(--mono);
+  font-size:10px;
+}
+.agent-claim-list{
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+  padding-left:10px;
+  border-left:2px solid rgba(245,166,35,.28);
+  color:color-mix(in srgb, var(--text) 86%, var(--muted));
+}
+.agent-note-line{
+  color:var(--muted);
+  font-family:var(--mono);
+  font-size:11px;
+}
+.agent-note-line.bad{
+  color:#fca5a5;
+}
+.agent-empty{
+  color:var(--muted);
+  font-size:13px;
+}
+.agent-routine-audit{
+  margin-top:4px;
+  border-top:1px solid rgba(255,255,255,.07);
+  padding-top:10px;
+}
+.agent-routine-audit summary,
+.agent-tool-trail > summary{
+  cursor:pointer;
+}
+.agent-routine-audit summary{
+  color:var(--muted);
+  font-family:var(--mono);
+  font-size:11px;
+  text-transform:uppercase;
+}
+.agent-routine-list{
+  margin-top:10px;
+}
+.agent-tool-trail > summary.hd{
+  list-style:none;
+}
+.agent-tool-trail > summary.hd::-webkit-details-marker{
+  display:none;
+}
+.agent-tool-trail > summary h2{
+  margin:0;
+}
+.agent-rail-list p,
+.agent-routine-list p,
+.agent-compression p,
+.agent-work-item p{
+  margin:0;
+}
+@media (max-width:1180px){
+  .agents-layout{
+    grid-template-columns:1fr;
+  }
+  .agents-signal-bar{
+    grid-template-columns:repeat(3, minmax(0,1fr));
+  }
+  .agent-dispatch-head,
+  .agent-compression-top{
+    grid-template-columns:1fr;
+  }
+}
+@media (max-width:760px){
+  .agents-briefing{
+    align-items:stretch;
+    flex-direction:column;
+  }
+  .agents-controls{
+    justify-content:flex-start;
+  }
+  .agents-signal-bar{
+    grid-template-columns:repeat(2, minmax(0,1fr));
+  }
+  .agent-capture-grid,
+  .agent-capture-grid.three{
+    grid-template-columns:1fr;
+  }
+  .agent-capture-actions{
+    justify-content:flex-start;
+  }
+}
+</style>
+{% endblock %}
+{% block scripts %}
+  <script src="/static/capture_url_check.js?v={{ settings.static_assets_version }}"></script>
+  <script src="/static/agents_workspace.js?v={{ settings.static_assets_version }}&amp;agents=omori-v2"></script>
+{% endblock %}

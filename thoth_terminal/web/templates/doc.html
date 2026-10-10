@@ -1,0 +1,422 @@
+{% extends "base.html" %}
+{% block content %}
+{% set ns = namespace(pdf=None) %}
+{% set reader = reader or {} %}
+{% for a in (doc.attachments or []) %}
+  {% set a_ct = (a.content_type or '').lower() %}
+  {% set a_path = (a.object_path or '').lower() %}
+  {% if not ns.pdf and (a.kind == 'pdf' or a_ct.startswith('application/pdf') or a_path.endswith('.pdf')) %}
+    {% set ns.pdf = a %}
+  {% endif %}
+{% endfor %}
+{% set t = doc.title or doc.url or ('doc ' ~ doc.id) %}
+{% if doc.extra and doc.extra.get('translation_title_en') %}
+  {% set t = doc.extra.get('translation_title_en') %}
+{% endif %}
+{% set media_ns = namespace(has_media=false) %}
+{% if media_entries and media_entries|length > 0 %}
+  {% set media_ns.has_media = true %}
+{% endif %}
+
+<div class="doc-shell" id="doc-panel" data-doc-id="{{ doc.id }}" data-opened="{{ 1 if doc.triage_state != 'NEW' else 0 }}">
+  <section class="doc-command">
+    <div class="doc-command-top">
+      <div class="doc-command-main">
+        <div class="crumbs">
+          <a href="{{ back_href or '/' }}">Feed</a>
+          <span>›</span>
+          <span>Document</span>
+        </div>
+        <span class="doc-code">{{ doc.source.name }} · {{ doc.id }}</span>
+        <h1>{{ t }}</h1>
+        <p>
+          <span data-utc="{{ (doc.published_at or doc.ingested_at).strftime('%Y-%m-%dT%H:%M:%S') }}">{{ (doc.published_at or doc.ingested_at).strftime("%Y-%m-%d %H:%M") }}</span>
+          {% if doc.language %} · {{ doc.language }}{% endif %}
+          {% if reader.get('translation_ready') %} · translation ready{% endif %}
+          {% if ns.pdf or (doc.extra and (doc.extra.get('is_pdf') or doc.extra.get('content_kind') == 'pdf')) %} · pdf capture{% endif %}
+        </p>
+      </div>
+
+      <div class="doc-command-actions">
+        <a class="btn" href="{{ back_href or '/' }}" id="doc-back-btn" aria-label="Back" title="Back">Back</a>
+        {% if prev_doc_id %}
+          <a class="btn" href="/docs/{{ prev_doc_id }}{{ doc_nav_suffix or '' }}">Prev</a>
+        {% else %}
+          <button class="btn" type="button" disabled>Prev</button>
+        {% endif %}
+        {% if next_doc_id %}
+          <a class="btn" href="/docs/{{ next_doc_id }}{{ doc_nav_suffix or '' }}">Next</a>
+        {% else %}
+          <button class="btn" type="button" disabled>Next</button>
+        {% endif %}
+        <a class="btn" href="/notes/new?from_doc={{ doc.id }}" target="_blank" rel="noopener noreferrer">New note</a>
+        <a class="btn" href="/theses/new?from_doc={{ doc.id }}" target="_blank" rel="noopener noreferrer">Seed thesis</a>
+        {% if doc.url %}
+          <a class="btn" href="{{ doc.url|clean_url }}" target="_blank" rel="noopener noreferrer">Open source</a>
+        {% endif %}
+        {% if ns.pdf %}
+          <a class="btn" href="/objects/{{ ns.pdf.object_path }}" target="_blank" rel="noopener noreferrer">Open PDF</a>
+        {% endif %}
+        {% if not reader.get('translation_ready') and doc.language and not doc.language.lower().startswith('en') %}
+          <form class="doc-inline-action" method="post" action="/actions/translate">
+            <input type="hidden" name="ids" value="{{ doc.id }}" />
+            <input type="hidden" name="backend" value="googletrans" />
+            <input type="hidden" name="return_to" value="/docs/{{ doc.id }}{{ doc_nav_suffix or '' }}" />
+            <button class="btn" type="submit">Translate</button>
+          </form>
+        {% endif %}
+        <button class="btn doc-triage" type="button" data-doc-action="save" data-doc-id="{{ doc.id }}">Save</button>
+        <button class="btn doc-triage" type="button" data-doc-action="actioned" data-doc-id="{{ doc.id }}">Actioned</button>
+        <button class="btn doc-triage" type="button" data-doc-action="ignore" data-doc-id="{{ doc.id }}">Ignore</button>
+        <button class="btn doc-triage" type="button" data-doc-action="archive" data-doc-id="{{ doc.id }}">Archive</button>
+        <button class="btn doc-triage" type="button" data-doc-action="reset_to_new" data-doc-id="{{ doc.id }}">Reset</button>
+      </div>
+    </div>
+
+    <div class="doc-command-grid">
+      <div class="doc-command-stat">
+        <span class="label">State</span>
+        <span class="value">{{ doc.triage_state }}</span>
+      </div>
+      <div class="doc-command-stat">
+        <span class="label">Evidence links</span>
+        <span class="value">{{ thesis_evidence|length }}</span>
+      </div>
+      <div class="doc-command-stat">
+        <span class="label">Notes citing</span>
+        <span class="value">{{ note_links|length }}</span>
+      </div>
+      <div class="doc-command-stat">
+        <span class="label">Mentions map</span>
+        <span class="value">{{ mentions_in|length + mentions_out|length }}</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="doc-detail-grid">
+    <div class="doc-reading-panel">
+      {% if mentions_out and mentions_out|length > 0 %}
+        <div class="panel doc-reading-copy">
+          <div class="bd">
+            <div class="section-label">Outgoing links</div>
+            <div class="doc-chip-cluster">
+              {% for m, target in mentions_out %}
+                <a class="pill" href="/docs/{{ target.id }}">Thoth · {{ target.title or target.url or ("doc " ~ target.id) }}</a>
+                {% if m.url %}
+                  <a class="pill" href="{{ m.url|clean_url }}" target="_blank" rel="noopener noreferrer">Web</a>
+                {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if media_ns.has_media %}
+        <div class="panel doc-reading-copy">
+          <div class="bd">
+            <div class="section-label">Media surface</div>
+            <div class="media-grid">
+              {% for media in media_entries %}
+                <button
+                  class="media-thumb"
+                  type="button"
+                  data-media-full="{{ media.src }}"
+                  data-media-open="{{ media.open_url }}"
+                  data-media-label="{{ media.label }}"
+                  data-media-meta="{{ media.section }}{% if media.relation %} · {{ media.relation }}{% endif %}{% if media.stored %} · stored{% else %} · remote{% endif %}"
+                  data-media-note="{{ media.ocr_summary or '' }}"
+                >
+                  <img src="{{ media.src }}" alt="{{ media.label }}" loading="lazy" {% if not media.stored %}referrerpolicy="no-referrer"{% endif %} />
+                  <span class="media-thumb-label">{{ media.label }}</span>
+                </button>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if article_payload and article_payload.get('url') %}
+        <div class="panel doc-reading-copy">
+          <div class="bd">
+            <div class="section-label">X article</div>
+            <div class="doc-link-grid">
+              <a class="link-card" href="{{ article_payload.get('url')|clean_url }}" target="_blank" rel="noopener noreferrer">
+                <div class="link-url">{{ article_payload.get('title') or article_payload.get('url') }}</div>
+              </a>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if thread_sections and thread_sections|length > 0 %}
+        <div class="panel doc-reading-copy">
+          <div class="bd">
+            <div class="section-label">Thread context</div>
+            <div class="thread-surface">
+              {% for section in thread_sections %}
+                <div class="thread-section">
+                  <div class="thread-section-title">{{ section.label }}</div>
+                  <div class="thread-list">
+                      {% for item in section['items'] %}
+                      <a class="thread-card" href="{{ (item.url or '#')|clean_url }}" {% if item.url %}target="_blank" rel="noopener noreferrer"{% endif %}>
+                        <div class="thread-card-meta">
+                          {% if item.created_at %}<span>{{ item.created_at }}</span>{% endif %}
+                          {% if item.tweet_id %}<span>#{{ item.tweet_id }}</span>{% endif %}
+                        </div>
+                        <div class="thread-card-copy">{{ item.text }}</div>
+                      </a>
+                    {% endfor %}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if filing_review %}
+        <div class="panel doc-reading-copy filing-review">
+          <div class="bd">
+            <div class="section-label">Filing review</div>
+            <div class="filing-review-head">
+              {% if filing_review.get('form') %}<span>{{ filing_review.get('form') }}</span>{% endif %}
+              {% if filing_review.get('accession_number') %}<span>{{ filing_review.get('accession_number') }}</span>{% endif %}
+              <span>{{ filing_review.get('status') }}</span>
+            </div>
+            {% if filing_review.get('quality_flags') %}
+              <div class="filing-review-flags">
+                {% for flag in filing_review.get('quality_flags') %}
+                  <span>{{ flag }}</span>
+                {% endfor %}
+              </div>
+            {% endif %}
+            {% if filing_review.get('sections') %}
+              <div class="doc-chip-cluster filing-review-jump">
+                {% for section in filing_review.get('sections') %}
+                  <a class="pill" href="#filing-section-{{ section.anchor }}">{{ section.label }}</a>
+                {% endfor %}
+              </div>
+              <div class="filing-review-sections">
+                {% for section in filing_review.get('sections') %}
+                  <details class="filing-review-section" id="filing-section-{{ section.anchor }}" {% if section.anchor in ['cover', 'mda'] %}open{% endif %}>
+                    <summary>
+                      <span>{{ section.label }}</span>
+                      <span>{{ "{:,}".format(section.char_count) }} chars{% if section.clipped %} · clipped{% endif %}</span>
+                    </summary>
+                    <div class="doc-text-panel filing-review-text">
+                      <pre>{{ section.excerpt }}</pre>
+                    </div>
+                  </details>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="panel doc-reading-copy">
+        <div class="bd">
+          <div class="section-label">Reading surface</div>
+          {% if reader.get('clipped') %}
+            <div class="doc-reader-loadout" id="doc-reader-loadout" data-doc-id="{{ doc.id }}">
+              <span class="pill">showing {{ "{:,}".format(reader.get('initial_chars') or 0) }} of {{ "{:,}".format(reader.get('total_chars') or 0) }} chars</span>
+              <button class="btn" type="button" id="doc-load-full-text">Load full text</button>
+            </div>
+          {% endif %}
+          {% if reader.get('has_translation') %}
+            <div class="doc-text-panel" id="doc-reader-main">
+              <pre data-doc-reader-main>{{ reader.get('text') or '' }}</pre>
+            </div>
+            <details class="doc-text-toggle" style="margin-top:14px;">
+              <summary class="pill" style="cursor:pointer;">Show original text</summary>
+              <div class="doc-text-panel" style="margin-top:14px;" id="doc-reader-original">
+                <pre data-doc-reader-original>{{ reader.get('original_text') or '' }}</pre>
+              </div>
+            </details>
+          {% else %}
+            <div class="doc-text-panel" id="doc-reader-main">
+              <pre data-doc-reader-main>{{ reader.get('text') or '' }}</pre>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="panel doc-reading-copy">
+        <div class="bd">
+          <div class="section-label">Attach image</div>
+          <form class="attachment-form" method="post" action="/docs/{{ doc.id }}/attachments" enctype="multipart/form-data">
+            <input type="file" name="file" accept="image/*" required />
+            <button class="btn" type="submit">Upload</button>
+          </form>
+          {% if doc.attachments and doc.attachments|length > 0 %}
+            <div class="doc-chip-cluster" style="margin-top:12px;">
+              {% for a in doc.attachments %}
+                {% set ext = (a.object_path or '').lower() %}
+                {% if not (ext.endswith('.png') or ext.endswith('.jpg') or ext.endswith('.jpeg') or ext.endswith('.webp') or ext.endswith('.gif')) %}
+                  <a class="pill" href="/objects/{{ a.object_path }}" target="_blank" rel="noopener noreferrer">{{ a.kind }} · {{ a.object_path }}</a>
+                {% endif %}
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="doc-side-stack">
+      <div class="panel doc-side-card">
+        <div class="hd"><h2>Evidence</h2></div>
+        <div class="bd">
+          {% if thesis_evidence and thesis_evidence|length > 0 %}
+            {% for ev, th in thesis_evidence %}
+              <div class="evidence-item compact">
+                <div class="evidence-top">
+                  <div class="evidence-meta">
+                    <span class="pill {{ 'ok' if ev.polarity == 'support' else ('bad' if ev.polarity == 'contradict' else '') }}">{{ ev.polarity }}</span>
+                    <a class="pill" href="/theses/{{ th.id }}" target="_blank" rel="noopener noreferrer">{{ th.title }}</a>
+                  </div>
+                </div>
+                {% if ev.snippet %}<div class="evidence-snippet">{{ ev.snippet }}</div>{% endif %}
+                {% if ev.note %}<div class="evidence-note">{{ ev.note }}</div>{% endif %}
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="workspace-list-copy">No thesis evidence is attached yet.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="panel doc-side-card">
+        <div class="hd"><h2>Notes citing this doc</h2></div>
+        <div class="bd">
+          {% if note_links and note_links|length > 0 %}
+            {% for link, note in note_links %}
+              <div class="note-link">
+                <div>
+                  <a href="/notes/{{ note.id }}" target="_blank" rel="noopener noreferrer">{{ note.title }}</a>
+                  {% if link.snippet %}<div class="pill" style="display:inline-flex;margin-top:8px;">{{ link.snippet[:60] }}{% if link.snippet|length > 60 %}…{% endif %}</div>{% endif %}
+                </div>
+                <span class="pill">N{{ note.id }}</span>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="workspace-list-copy">No linked notes yet.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if mentions_in and mentions_in|length > 0 %}
+        <div class="panel doc-side-card">
+          <div class="hd"><h2>Mentioned by</h2></div>
+          <div class="bd">
+            <div class="doc-chip-cluster">
+              {% for m, source in mentions_in %}
+                <a class="pill" href="/docs/{{ source.id }}">{{ source.title or source.url or ("doc " ~ source.id) }}</a>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if external_links and external_links|length > 0 %}
+        <div class="panel doc-side-card">
+          <div class="hd"><h2>External links</h2></div>
+          <div class="bd">
+            <div class="doc-link-grid">
+              {% for l in external_links %}
+                <a class="link-card" href="{{ l|clean_url }}" target="_blank" rel="noopener noreferrer">
+                  <div class="link-url">{{ l }}</div>
+                </a>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="panel doc-side-card">
+        <div class="hd"><h2>Provenance</h2></div>
+        <div class="bd">
+          <div class="meta">
+            <span class="pill">source</span>
+            <span>{{ doc.source.name }}</span>
+          </div>
+          <div class="meta">
+            <span class="pill">ingested</span>
+            <span data-utc="{{ doc.ingested_at.strftime('%Y-%m-%dT%H:%M:%S') }}">{{ doc.ingested_at.strftime("%Y-%m-%d %H:%M") }}</span>
+          </div>
+          {% if doc.published_at %}
+            <div class="meta">
+              <span class="pill">published</span>
+              <span data-utc="{{ doc.published_at.strftime('%Y-%m-%dT%H:%M:%S') }}">{{ doc.published_at.strftime("%Y-%m-%d %H:%M") }}</span>
+            </div>
+          {% endif %}
+          {% if doc.canonical_url %}
+            <div class="meta">
+              <span class="pill">canonical</span>
+              <a href="{{ doc.canonical_url|clean_url }}" target="_blank" rel="noopener noreferrer">{{ doc.canonical_url|clean_url }}</a>
+            </div>
+          {% endif %}
+          {% if doc.language %}
+            <div class="meta">
+              <span class="pill">language</span>
+              <span>{{ doc.language }}</span>
+              {% if doc.language_confidence %}<span class="pill">conf {{ '%.2f'|format(doc.language_confidence) }}</span>{% endif %}
+            </div>
+          {% endif %}
+          {% if reader.get('translation_ready') %}
+            <div class="meta">
+              <span class="pill">translated</span>
+              <span>{{ doc.translation_backend or 'unknown' }}</span>
+              {% if doc.translation_model %}<span class="pill">{{ doc.translation_model }}</span>{% endif %}
+            </div>
+          {% endif %}
+          {% if doc.content_hash %}
+            <div class="meta">
+              <span class="pill">hash</span>
+              <span>{{ doc.content_hash[:14] }}…</span>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      {% set money = doc.extra.get('money_mentions') if doc.extra else None %}
+      {% if money and money|length > 0 %}
+        {% set base_cur = doc.extra.get('money_base_currency') if doc.extra else 'USD' %}
+        <div class="panel doc-side-card">
+          <div class="hd"><h2>Amounts</h2></div>
+          <div class="bd">
+            <div class="money-grid">
+              {% for m in money %}
+                <div class="money-row">
+                  <div class="money-raw">{{ m.raw }}</div>
+                  <div class="money-usd">
+                    {% if m.usd_amount is not none %}
+                      {% if base_cur == 'USD' %}
+                        ${{ "{:,.2f}".format(m.usd_amount) }}
+                      {% else %}
+                        {{ "{:,.2f}".format(m.usd_amount) }} {{ base_cur }}
+                      {% endif %}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                  <div class="money-meta">{{ m.currency }}</div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="/static/document_interactions.js?v={{ settings.static_assets_version }}"></script>
+  {% if reader.get('clipped') %}
+    <script src="/static/doc_reader.js?v={{ settings.static_assets_version }}"></script>
+  {% endif %}
+  {% if media_entries and media_entries|length > 0 %}
+    <script src="/static/media_lightbox.js?v={{ settings.static_assets_version }}"></script>
+  {% endif %}
+{% endblock %}

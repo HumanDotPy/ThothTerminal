@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="reports-shell">
+  <section class="workspace-header">
+    <div class="workspace-copy">
+      <div class="workspace-kicker">Report Reader / PDF</div>
+      <h1>{{ report.display_name or report.title }}</h1>
+      <p>{{ report.summary or artifact.label or 'PDF report artifact' }}</p>
+    </div>
+    <div class="workspace-summary">
+      <div class="workspace-stat">
+        <span class="workspace-stat-label">Type</span>
+        <span class="workspace-stat-value">{{ report.report_type_label or 'Report' }}</span>
+        <span class="workspace-stat-copy">{{ version.status }}</span>
+      </div>
+      <div class="workspace-stat">
+        <span class="workspace-stat-label">Version</span>
+        <span class="workspace-stat-value">v{{ version.version }}</span>
+        <span class="workspace-stat-copy" data-utc="{{ version.published_at }}">{{ version.published_at }}</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="panel terminal-page-panel">
+    <div class="hd">
+      <div class="hd-left">
+        <h2>{{ artifact.label or 'PDF Artifact' }}</h2>
+        <span class="pill red">pdf</span>
+      </div>
+      <div class="btnrow">
+        <a class="btn" href="/reports">Back to Registry</a>
+        <a class="btn" href="/reports/{{ report.slug }}">Detail</a>
+        <a class="btn" href="{{ raw_url }}">Open Source</a>
+      </div>
+    </div>
+    <div class="bd">
+      <div class="report-reader-frame pdf-reader-frame">
+        <object data="{{ raw_url }}#toolbar=1&navpanes=0" type="application/pdf">
+          <iframe src="{{ raw_url }}" title="{{ artifact.label or report.display_name or 'Report PDF' }}"></iframe>
+        </object>
+      </div>
+      <div class="settings-preview">
+        <h3>Provenance</h3>
+        <div class="stack-meta">
+          {% if provenance.file_name %}<span>{{ provenance.file_name }}</span>{% endif %}
+          {% if provenance.file_sha256 %}<span>{{ provenance.file_sha256[:16] }}</span>{% endif %}
+          {% if provenance.source_label %}<span>{{ provenance.source_label }}</span>{% endif %}
+          {% if provenance.source_url %}<span>{{ provenance.source_url }}</span>{% endif %}
+        </div>
+      </div>
+      {% if report.manual_addenda %}
+      <div class="settings-preview">
+        <h3>Manual Addenda</h3>
+        <div class="stack-list compact-stack">
+          {% for addendum in report.manual_addenda %}
+          <div class="stack-row compact-row">
+            <div class="stack-row-main">
+              <div class="stack-title">{{ addendum.title }}</div>
+              {% if addendum.summary %}<div class="muted">{{ addendum.summary }}</div>{% endif %}
+              <div class="stack-meta">
+                {% if addendum.actor %}<span>{{ addendum.actor }}</span>{% endif %}
+                {% if addendum.created_at %}<span data-utc="{{ addendum.created_at }}">{{ addendum.created_at }}</span>{% endif %}
+              </div>
+            </div>
+            {% if addendum.artifact_id %}
+            <div class="stack-row-side">
+              <a class="btn" href="/reports/{{ report.slug }}/reader?version_id={{ version.id }}&artifact_id={{ addendum.artifact_id }}">Read</a>
+            </div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

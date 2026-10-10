@@ -1,0 +1,258 @@
+.robotics-catalogue{
+  display:grid;
+  grid-template-columns:minmax(280px, 1fr) minmax(280px, 1fr) minmax(300px, .9fr);
+  gap:12px;
+  margin:18px 0;
+}
+.robotics-catalogue-panel{
+  min-height:270px;
+  padding:14px;
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:12px;
+  background:linear-gradient(180deg, rgba(10,14,19,.96), rgba(7,10,14,.94));
+  box-shadow:var(--shadow-sm);
+}
+.robotics-catalogue-panel.selected{
+  background:linear-gradient(135deg, rgba(16,185,129,.08), rgba(255,176,32,.045), rgba(7,10,14,.94));
+}
+.robotics-catalogue-heading{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+}
+.robotics-catalogue-heading h2{
+  margin:4px 0 0;
+  color:var(--text-bright);
+  font-size:18px;
+  letter-spacing:0;
+}
+.robotics-search-field{
+  margin-bottom:12px;
+}
+.robotics-catalogue-list{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  max-height:176px;
+  overflow:auto;
+  padding-right:2px;
+}
+.robotics-catalogue-item{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:4px;
+  width:100%;
+  min-height:58px;
+  padding:10px 11px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:9px;
+  background:rgba(255,255,255,.025);
+  color:var(--text);
+  text-align:left;
+  cursor:pointer;
+  transition:background .12s ease, border-color .12s ease, transform .12s ease;
+}
+.robotics-catalogue-item:hover{
+  border-color:rgba(255,176,32,.32);
+  background:rgba(255,176,32,.055);
+  transform:translateY(-1px);
+}
+.robotics-catalogue-item.active{
+  border-color:rgba(16,185,129,.5);
+  background:rgba(16,185,129,.1);
+}
+.robotics-catalogue-item strong{
+  color:var(--text-bright);
+  font-size:13px;
+  line-height:1.25;
+}
+.robotics-catalogue-item span,
+.robotics-catalogue-empty{
+  color:var(--muted);
+  font-family:var(--mono);
+  font-size:11px;
+  line-height:1.35;
+}
+.robotics-catalogue-remove{
+  margin-top:3px;
+  color:#ffb4b4 !important;
+  text-decoration:underline;
+  text-underline-offset:2px;
+}
+.robotics-selected-grid{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:10px;
+}
+.robotics-selected-grid div{
+  min-height:68px;
+  padding:11px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:9px;
+  background:rgba(255,255,255,.025);
+}
+.robotics-selected-grid span{
+  display:block;
+  color:var(--muted);
+  font-family:var(--mono);
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:.1em;
+}
+.robotics-selected-grid strong{
+  display:block;
+  margin-top:7px;
+  color:var(--text-bright);
+  font-size:14px;
+  line-height:1.25;
+}
+.robotics-gap-list{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+  margin-top:12px;
+}
+.robotics-gap-pill{
+  border:1px solid rgba(245,166,35,.28);
+  border-radius:999px;
+  padding:6px 9px;
+  color:#ffe7b4;
+  background:rgba(245,166,35,.08);
+  font-family:var(--mono);
+  font-size:11px;
+}
+.robotics-gap-pill.complete{
+  border-color:rgba(16,185,129,.32);
+  color:#c8ffeb;
+  background:rgba(16,185,129,.09);
+}
+.robotics-dialog{
+  width:min(760px, calc(100vw - 26px));
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:14px;
+  padding:0;
+  background:linear-gradient(180deg, rgba(10,14,19,.98), rgba(7,10,14,.98));
+  color:var(--text);
+  box-shadow:0 30px 80px rgba(0,0,0,.55);
+}
+.robotics-dialog::backdrop{
+  background:rgba(0,0,0,.64);
+  backdrop-filter:blur(4px);
+}
+.robotics-dialog form{
+  padding:16px;
+}
+.robotics-dialog-heading{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:14px;
+  padding-bottom:12px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+.robotics-dialog-heading h2{
+  margin:0;
+  color:var(--text-bright);
+  font-size:18px;
+}
+.robotics-dialog-actions{
+  display:flex;
+  justify-content:flex-end;
+  margin-top:14px;
+}
+
+@media(max-width:1100px){
+  .robotics-catalogue{
+    grid-template-columns:1fr;
+  }
+}
+
+@media(max-width:680px){
+  .robotics-catalogue-heading{
+    flex-direction:column;
+    align-items:stretch;
+  }
+  .robotics-selected-grid{
+    grid-template-columns:1fr;
+  }
+}
+
+/* Omori modeling workspace */
+.robotics-model{
+  --robot-line:color-mix(in srgb,var(--thoth-mood-text) 28%,transparent);
+  --robot-line-strong:color-mix(in srgb,var(--thoth-mood-text) 72%,transparent);
+  --robot-muted:color-mix(in srgb,var(--thoth-mood-text) 58%,var(--thoth-mood-bg));
+  --robot-accent:var(--thoth-mood-accent);
+  --robot-accent-2:var(--thoth-mood-accent-2);
+  color:var(--thoth-mood-text);
+  font-family:var(--mono);
+}
+.robotics-model-header{border-color:var(--robot-line-strong)}
+.robotics-model-header h1{font:30px/1 var(--omori-display-font);letter-spacing:.04em}
+.robotics-model-header p{color:var(--robot-muted);font-size:10px}
+.robotics-model .workspace-kicker,.robotics-section-title{color:var(--robot-accent);font-family:var(--omori-ui-font);letter-spacing:.05em}
+.robotics-model .btn{border:1px solid var(--robot-line-strong);border-radius:2px;background:#020303;color:var(--thoth-mood-text);font:9px/1 var(--omori-ui-font);text-transform:uppercase}
+.robotics-model .btn:hover,.robotics-model .btn.primary{border-color:var(--robot-accent);background:#020303;color:var(--robot-accent)}
+.robotics-catalogue-panel,.robotics-model-controls,.robotics-matrix-panel,.robotics-audit,
+.robotics-output-primary,.robotics-output-metric,.robotics-solve-block{
+  border-color:var(--robot-line-strong);
+  border-radius:3px;
+  background:#040506;
+  box-shadow:none;
+}
+.robotics-catalogue-panel.selected,.robotics-output-primary,.robotics-output-primary.above,.robotics-output-primary.near{background:#040506}
+.robotics-catalogue-heading{margin-bottom:8px}.robotics-catalogue-heading h2{color:var(--thoth-mood-text);font:15px/1 var(--omori-display-font)}
+.robotics-catalogue-item{border-color:var(--robot-line);border-radius:2px;background:#030405;transition:none}
+.robotics-catalogue-item:hover{transform:none;border-color:var(--robot-line-strong);background:#030405}
+.robotics-catalogue-item.active{border-color:var(--robot-accent);background:color-mix(in srgb,var(--robot-accent) 10%,#030405)}
+.robotics-catalogue-item strong,.robotics-selected-grid strong{color:var(--thoth-mood-text)}
+.robotics-catalogue-item span,.robotics-catalogue-empty,.robotics-selected-grid span{color:var(--robot-muted)}
+.robotics-selected-grid{gap:5px}.robotics-selected-grid div{min-height:55px;padding:8px;border-color:var(--robot-line);border-radius:2px;background:#030405}
+.robotics-gap-pill,.robotics-gap-pill.complete{border-color:var(--robot-accent);border-radius:2px;background:#030405;color:var(--robot-accent)}
+.robotics-control-section{border-color:var(--robot-line)}
+.robotics-model .field span,.robotics-field-grid .field span{color:var(--robot-muted)}
+.robotics-model input,.robotics-model select,.robotics-model textarea{border-color:var(--robot-line-strong);border-radius:2px;background:#020303;color:var(--thoth-mood-text)}
+.robotics-model input:focus,.robotics-model select:focus,.robotics-model textarea:focus{outline:0;border-color:var(--robot-accent);box-shadow:var(--omori-focus)}
+.robotics-advanced,.checkbox-field{border-color:var(--robot-line);border-radius:2px;background:#030405}
+.robotics-output-strip{gap:6px}.robotics-output-primary,.robotics-output-metric,.robotics-solve-block{min-height:82px;padding:11px}
+.robotics-output-label,.robotics-output-metric span,.robotics-solve-block span{color:var(--robot-muted);font:9px/1 var(--omori-ui-font);letter-spacing:.04em}
+.robotics-output-primary strong,.robotics-output-metric strong,.robotics-solve-block strong{color:var(--thoth-mood-text);font-family:var(--omori-ui-font);font-size:22px}
+.robotics-output-primary strong{color:var(--robot-accent)}
+.robotics-panel-heading{padding:11px 13px;border-color:var(--robot-line-strong)}
+.robotics-panel-heading h2{color:var(--thoth-mood-text);font:15px/1 var(--omori-display-font)}
+.robotics-panel-heading p{color:var(--robot-muted);font-size:9px}
+.robotics-matrix-selectors select{border-color:var(--robot-line-strong);border-radius:2px;background:#020303;color:var(--thoth-mood-text)}
+.robotics-matrix{border-spacing:2px}.robotics-matrix th{color:var(--robot-muted);font-size:9px}.robotics-matrix td{height:56px;border-color:var(--robot-line);border-radius:2px}
+.robotics-matrix td:hover{transform:none;border-color:var(--robot-accent);filter:none}
+.robotics-matrix .under{background:color-mix(in srgb,#10b981 22%,#030405)}
+.robotics-matrix .near{background:color-mix(in srgb,var(--robot-accent) 18%,#030405)}
+.robotics-matrix .above{background:color-mix(in srgb,#ef4444 20%,#030405)}
+.robotics-audit-pill{border-color:var(--robot-line);border-radius:2px;background:#030405;color:var(--robot-muted)}
+.robotics-dialog{border-color:var(--robot-line-strong);border-radius:3px;background:#040506;box-shadow:none}
+
+@media(min-width:1600px){
+  .robotics-model{
+    width:calc(100vw - 24px);
+    max-width:none;
+    margin:0 0 36px calc((100% - 100vw)/2 + 12px);
+    display:grid;
+    grid-template-columns:300px minmax(760px,1fr) 360px;
+    grid-template-rows:auto minmax(900px,auto);
+    gap:8px;
+  }
+  .robotics-model-header{grid-column:1/-1;min-height:92px;padding:8px 8px 14px}
+  .robotics-catalogue{grid-column:1;grid-row:2;display:flex;flex-direction:column;gap:8px;margin:0;min-width:0}
+  .robotics-catalogue-panel{min-height:0;padding:11px;flex:1 1 0;overflow:hidden}
+  .robotics-catalogue-panel.selected{flex:.8 1 0}
+  .robotics-catalogue-list{max-height:210px;scrollbar-width:thin;scrollbar-color:var(--robot-accent) transparent}
+  .robotics-model-layout{display:contents}
+  .robotics-model-controls{grid-column:3;grid-row:2;position:static;max-height:1000px;overflow:auto;gap:9px;padding:12px;scrollbar-width:thin;scrollbar-color:var(--robot-accent) transparent}
+  .robotics-model-main{grid-column:2;grid-row:2;gap:8px;min-width:0}
+  .robotics-matrix-wrap{padding:10px 12px 12px}
+}
+@media(max-width:1599px){.robotics-model{width:calc(100vw - 24px);max-width:none;margin:0 0 36px calc((100% - 100vw)/2 + 12px)}.robotics-model-layout{grid-template-columns:minmax(300px,360px) minmax(0,1fr)}}
+@media(max-width:1100px){.robotics-model{width:100%;margin:0 auto 30px}.robotics-model-layout,.robotics-catalogue,.robotics-output-strip,.robotics-solve-grid{grid-template-columns:1fr}.robotics-model-controls{max-height:none}}

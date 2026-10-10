@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="knowledge-shell">
+  <section class="workspace-header">
+    <div class="workspace-copy">
+      <div class="workspace-kicker">Primers / Teardowns / Drafting</div>
+      <h1>Knowledge assets</h1>
+      <p>Draftable primers and teardowns should feel like reusable substrate for report work. This page needs to support both search and rapid drafting without looking like a placeholder form dump.</p>
+    </div>
+    <div class="workspace-summary">
+      <div class="workspace-stat">
+        <span class="workspace-stat-label">Indexed assets</span>
+        <span class="workspace-stat-value">{{ rows|length }}</span>
+        <span class="workspace-stat-copy">Assets matching the current filter set.</span>
+      </div>
+      <div class="workspace-stat">
+        <span class="workspace-stat-label">Kind filter</span>
+        <span class="workspace-stat-value">{{ kind_filter if kind_filter else 'All' }}</span>
+        <span class="workspace-stat-copy">Primer or teardown depending on the use case.</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="panel terminal-page-panel">
+    <div class="hd">
+      <div class="hd-left">
+        <h2>Asset index</h2>
+        <span class="pill red">draft studio</span>
+      </div>
+    </div>
+    <div class="bd">
+      <form method="get" action="/knowledge" class="terminal-controls">
+        <div class="field" style="margin-bottom:0;">
+          <label>Search title or text</label>
+          <input type="text" name="q" value="{{ query }}" placeholder="HBM, CPO, Micron, teardown" />
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label>Subject</label>
+          <input type="text" name="subject" value="{{ subject_query }}" placeholder="Filter by subject" />
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label>Kind</label>
+          <select name="kind">
+            <option value="" {% if not kind_filter %}selected{% endif %}>All kinds</option>
+            <option value="primer" {% if kind_filter == 'primer' %}selected{% endif %}>Primer</option>
+            <option value="teardown" {% if kind_filter == 'teardown' %}selected{% endif %}>Teardown</option>
+          </select>
+        </div>
+        <div class="btnrow" style="justify-content:flex-end;">
+          <button class="btn primary" type="submit">Search</button>
+        </div>
+      </form>
+
+      <div class="knowledge-action-grid">
+        <div class="knowledge-action-card">
+          <h3>Save draft</h3>
+          <p>Capture a draft manually when you already know the structure or want to preserve partially formed research without involving the model.</p>
+          <form method="post" action="/knowledge/draft" class="stack-form">
+            <input type="text" name="subject" placeholder="Subject (HBM, Lumentum, CPO)" required />
+            <select name="kind">
+              <option value="primer">Primer</option>
+              <option value="teardown">Teardown</option>
+            </select>
+            <input type="text" name="title" placeholder="Optional title override" />
+            <textarea name="summary" rows="2" placeholder="Summary"></textarea>
+            <textarea name="content_md" rows="8" placeholder="Draft markdown"></textarea>
+            <input type="number" name="stale_after_days" min="30" max="3650" step="30" placeholder="Stale after days" />
+            <button class="btn" type="submit">Save draft</button>
+          </form>
+        </div>
+
+        <div class="knowledge-action-card">
+          <h3>Generate draft</h3>
+          <p>Use AI drafting when the subject exists but the structure and first-pass synthesis still need to be generated from the research base.</p>
+          <form method="post" action="/knowledge/generate" class="stack-form">
+            <input type="text" name="subject" placeholder="Subject (CPO, Micron, optics)" required />
+            <select name="kind">
+              <option value="primer">Primer</option>
+              <option value="teardown">Teardown</option>
+            </select>
+            <textarea name="instructions" rows="6" placeholder="Optional drafting instructions"></textarea>
+            <button class="btn primary" type="submit">Generate draft</button>
+          </form>
+        </div>
+      </div>
+
+      {% if rows %}
+        <div class="stack-list">
+          {% for row in rows %}
+            <div class="stack-row">
+              <div class="stack-row-main">
+                <div class="stack-title"><a href="{{ row.href }}">{{ row.title }}</a></div>
+                <div class="stack-meta">
+                  <span>{{ row.kind }}</span>
+                  <span>{{ row.subject_display_name }}</span>
+                  {% if row.published %}<span>published v{{ row.published.version }}</span>{% endif %}
+                  {% if row.draft %}<span>draft updated {{ row.draft.updated_at }}</span>{% endif %}
+                </div>
+              </div>
+              <div class="stack-row-side">
+                <a class="btn" href="{{ row.href }}">Open</a>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-callout">
+          <h3>No knowledge assets yet.</h3>
+          <p>Start with a primer or teardown draft for a subject you revisit often. Once assets exist, this page becomes the substrate library for reports and recurring research briefs.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

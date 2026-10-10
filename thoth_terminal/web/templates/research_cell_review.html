@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en" data-theme="charcoal">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Thoth · Research cell review</title>
+  <link rel="stylesheet" href="/assets/research_cell_review.css">
+  <script defer src="/vendor/d3.min.js"></script>
+  <script defer src="/assets/research_cells.js"></script>
+  <script defer src="/assets/research_cell_review.js"></script>
+</head>
+<body>
+<main class="review-shell">
+  <header class="review-top">
+    <div class="review-brand"><span class="review-mark">θ</span> THOTH <span class="review-muted">/ RESEARCH CELLS</span></div>
+    <div class="review-top-controls">
+      <label>Theme <select id="review-theme" aria-label="Theme"><option value="charcoal">Charcoal / sage</option><option value="paper">Paper / olive</option><option value="indigo">Indigo / lavender</option><option value="slate">Slate / blue</option></select></label>
+      <label>Size <select id="review-size" aria-label="Size"><option value="compact">Compact cell</option><option value="full">Expanded cell</option></select></label>
+      <label>Layout <select id="review-layout" aria-label="Layout"><option value="compare">Side by side</option><option value="focus">Full width</option></select></label>
+    </div>
+  </header>
+  <section class="review-heading">
+    <div><h1>What should the evidence look like?</h1><p>The same recorded data, shown in different forms. Compare the axes, density and color treatment before these cells become part of the homepage.</p></div>
+    <div class="review-asof" id="review-asof">Loading database snapshot…</div>
+  </section>
+  <nav class="review-scenarios" aria-label="Research scenarios">
+    <button type="button" data-scenario="flows" aria-pressed="true">01 Memory flows</button>
+    <button type="button" data-scenario="companies" aria-pressed="false">02 Company comparison</button>
+    <button type="button" data-scenario="frontier" aria-pressed="false">03 Model frontier</button>
+    <button type="button" data-scenario="mix" aria-pressed="false">04 Revenue mix</button>
+    <button type="button" data-scenario="chain" aria-pressed="false">05 Supply chain</button>
+  </nav>
+  <div class="review-scenario-description"><p id="review-description">Loading…</p></div>
+  <section class="review-grid" id="review-grid" data-layout="compare" aria-label="Comparison cells"><div class="review-loading" role="status">Loading a bounded set of real observations…</div></section>
+  <footer class="review-footer"><span>Use the cell IDs when giving feedback. Themes change the surfaces and chart styling; model providers keep their color identities.</span><span id="review-status" aria-live="polite"></span></footer>
+</main>
+</body>
+</html>

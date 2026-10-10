@@ -1,0 +1,55 @@
+:root{
+  --omori-ui-font:"OMORI GAME",var(--mono);
+  --omori-display-font:"OMORI GAME",var(--sans);
+  --omori-paper:#f4f1e9;
+  --omori-ink:#080808;
+  --omori-surface:#050607;
+  --omori-surface-raised:#090b0d;
+  --omori-line:color-mix(in srgb,var(--thoth-mood-text) 28%,transparent);
+  --omori-line-strong:color-mix(in srgb,var(--thoth-mood-text) 70%,transparent);
+  --omori-muted:color-mix(in srgb,var(--thoth-mood-text) 58%,var(--thoth-mood-bg));
+  --omori-accent:var(--thoth-mood-accent);
+  --omori-accent-2:var(--thoth-mood-accent-2);
+  --omori-accent-soft:color-mix(in srgb,var(--thoth-mood-accent) 14%,transparent);
+  --omori-focus:0 0 0 2px var(--omori-surface),0 0 0 4px var(--omori-accent);
+}
+
+.omori-frame{
+  border:1px solid var(--omori-line-strong);
+  border-radius:4px;
+  background:var(--omori-surface);
+}
+
+.omori-kicker{
+  color:var(--omori-muted);
+  font:12px/1.2 var(--omori-ui-font);
+  text-transform:uppercase;
+}
+
+.omori-action{
+  min-height:34px;
+  padding:0 14px;
+  border:1px solid var(--omori-line-strong);
+  border-radius:3px;
+  background:var(--omori-surface);
+  color:var(--thoth-mood-text);
+  font:12px/1 var(--omori-ui-font);
+  text-transform:uppercase;
+  cursor:pointer;
+}
+.omori-action:hover{border-color:var(--omori-accent);color:var(--omori-accent)}
+
+.terminal-pager{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;min-height:42px;padding:5px 9px;border-top:1px solid var(--surface-line,var(--omori-line));background:#07090a;color:var(--surface-muted,var(--omori-muted));font:8px var(--omori-ui-font,var(--mono));text-transform:uppercase}
+.terminal-pager-range{white-space:nowrap}
+.terminal-pager-controls{display:flex;align-items:center;justify-content:center;gap:4px;min-width:0}
+.terminal-pager a,.terminal-pager-controls>span:not(.ellipsis),.terminal-pager button{box-sizing:border-box;min-width:27px;height:27px;display:inline-grid;place-items:center;padding:0 7px;border:1px solid var(--surface-line,var(--omori-line));border-radius:2px;background:#0a0d0f;color:var(--surface-text,var(--omori-ink));text-decoration:none;font:8px var(--omori-ui-font,var(--mono));text-transform:uppercase}
+.terminal-pager a:hover{border-color:var(--surface-line-strong,var(--omori-line-strong));color:var(--surface-accent,var(--omori-accent))}
+.terminal-pager .current{border-color:var(--surface-accent,var(--omori-accent));background:var(--surface-accent,var(--omori-accent));color:#090806;font-weight:800}
+.terminal-pager .disabled{opacity:.27;cursor:not-allowed}
+.terminal-pager .ellipsis{padding:0 4px;color:var(--surface-muted,var(--omori-muted))}
+.terminal-pager-jump{display:flex;align-items:center;justify-content:flex-end;gap:5px;white-space:nowrap}
+.terminal-pager-jump input[type=number]{width:46px;height:27px;padding:0 5px;border:1px solid var(--surface-line,var(--omori-line));border-radius:2px;background:#080a0c;color:var(--surface-text,var(--omori-ink));font:8px var(--omori-ui-font,var(--mono))}
+.terminal-pager-jump button{min-width:30px;cursor:pointer}
+@media(max-width:760px){.terminal-pager{grid-template-columns:1fr}.terminal-pager-range{text-align:center}.terminal-pager-controls{flex-wrap:wrap}.terminal-pager-jump{justify-content:center}}
+.omori-action:focus-visible{outline:0;box-shadow:var(--omori-focus)}
+.omori-action.is-primary{border-color:var(--omori-accent);color:var(--omori-accent)}

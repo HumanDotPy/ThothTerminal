@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <div class="hd">
+    <h2>Institutional Ops</h2>
+  </div>
+  <div class="bd">
+    {% set counts = summary.get('counts') or {} %}
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px;">
+      {% for label, value in counts.items() %}
+        <div class="panel">
+          <div class="bd">
+            <div style="color:var(--muted);font-size:11px;text-transform:uppercase;">{{ label.replace('_', ' ') }}</div>
+            <div style="font-size:26px;font-weight:700;">{{ value }}</div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="grid" style="grid-template-columns:1.3fr 1fr 1fr;gap:12px;">
+      <div class="panel">
+        <div class="hd"><h2>Open Gaps</h2></div>
+        <div class="bd">
+          {% for gap in summary.get('open_gaps') or [] %}
+            <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+              <div>{{ gap.title }}</div>
+              <div style="color:var(--muted);font-size:11px;">{{ gap.gap_kind }} · severity {{ gap.severity }}</div>
+            </div>
+          {% else %}
+            <div style="color:var(--muted);">No open gaps.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hd"><h2>Recent Sites</h2></div>
+        <div class="bd">
+          {% for site in summary.get('recent_sites') or [] %}
+            <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+              <a href="/institutional/sites/{{ site.id }}">{{ site.name }}</a>
+              <div style="color:var(--muted);font-size:11px;">{{ site.site_kind }}{% if site.locality %} · {{ site.locality }}{% endif %}</div>
+            </div>
+          {% else %}
+            <div style="color:var(--muted);">No sites yet.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="hd"><h2>Recent Programs</h2></div>
+        <div class="bd">
+          {% for program in summary.get('recent_programs') or [] %}
+            <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+              <a href="/institutional/programs/{{ program.id }}">{{ program.title }}</a>
+              <div style="color:var(--muted);font-size:11px;">{{ program.category }}</div>
+            </div>
+          {% else %}
+            <div style="color:var(--muted);">No programs yet.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

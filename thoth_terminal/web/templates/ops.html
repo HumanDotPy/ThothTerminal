@@ -1,0 +1,918 @@
+{% extends "base.html" %}
+{% block content %}
+{% set dp = health.get('discord_pipeline', {}) if health else {} %}
+<div class="ops-page">
+  {% if notice %}
+    <div class="panel" style="border-color:rgba(34,197,94,.35);margin-bottom:14px;">
+      <div class="bd" style="color:#86efac;">{{ notice }}</div>
+    </div>
+  {% endif %}
+  {% if error %}
+    <div class="panel" style="border-color:rgba(239,68,68,.35);margin-bottom:14px;">
+      <div class="bd" style="color:#fca5a5;">{{ error }}</div>
+    </div>
+  {% endif %}
+
+  <section class="panel">
+    <div class="hd">
+      <div class="hd-left">
+        <h2>Ops Center</h2>
+        <span class="pill {% if health.ok %}ok{% else %}bad{% endif %}">
+          {% if health.ok %}healthy{% else %}attention{% endif %}
+        </span>
+      </div>
+      <div class="btnrow">
+        <a class="btn" href="/ops">Refresh</a>
+        <a class="btn" href="/agent-review">Agent Review</a>
+        <a class="btn" href="/sources">Sources</a>
+        <a class="btn" href="/settings">Settings</a>
+      </div>
+    </div>
+    <div class="bd">
+      <div class="ops-hero-grid">
+        <div class="ops-hero-block">
+          <div class="ops-kicker">Runtime</div>
+          <div class="ops-title">
+            {{ runtime.app_version or 'unknown' }}
+            {% if runtime.git_sha %}
+              <span class="pill">{{ runtime.git_sha }}</span>
+            {% endif %}
+          </div>
+          <div class="ops-sub">
+            {{ runtime.hostname or 'unknown host' }} • pid {{ runtime.pid or 'n/a' }} • scheduler {{ 'on' if scheduler_enabled else 'off' }}
+          </div>
+        </div>
+        <div class="ops-hero-block">
+          <div class="ops-kicker">Primary Guild</div>
+          <div class="ops-title">{{ guild_id or 'unset' }}</div>
+          <div class="ops-sub">
+            Desk {% if desk and desk.desk_enabled %}enabled{% elif desk %}disabled{% else %}unavailable{% endif %}
+            {% if desk and desk.outbox_paused %} • outbox paused{% endif %}
+          </div>
+        </div>
+        <div class="ops-hero-block">
+          <div class="ops-kicker">Pipeline</div>
+          <div class="ops-title">{{ dp.get('watchlist_entries_total', 0) }} tracked tickers</div>
+          <div class="ops-sub">
+            {{ dp.get('watchlist_entries_with_quotes', 0) }} quoted • links {{ (dp.get('link_intake', {}) or {}).get('total', 0) }}
+          </div>
+        </div>
+      </div>
+      {% if issues %}
+        <div class="ops-issues">
+          {% for issue in issues %}
+            <div class="ops-issue">{{ issue }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="ops-metrics">
+    <div class="panel ops-metric-card">
+      <div class="bd">
+        <div class="ops-metric-label">Services</div>
+        <div class="ops-metric-value">{{ service_summary.alive }}/{{ service_summary.total }}</div>
+        <div class="ops-metric-sub">{{ service_summary.dead }} dead runtime states</div>
+      </div>
+    </div>
+    <div class="panel ops-metric-card">
+      <div class="bd">
+        <div class="ops-metric-label">Jobs</div>
+        <div class="ops-metric-value">{{ job_counts.pending + job_counts.running }}</div>
+        <div class="ops-metric-sub">{{ job_counts.error }} in error</div>
+      </div>
+    </div>
+    <div class="panel ops-metric-card">
+      <div class="bd">
+        <div class="ops-metric-label">Discord Outbox</div>
+        <div class="ops-metric-value">{{ outbox_counts.pending + outbox_counts.sending }}</div>
+        <div class="ops-metric-sub">{{ outbox_counts.failed }} failed</div>
+      </div>
+    </div>
+    <div class="panel ops-metric-card">
+      <div class="bd">
+        <div class="ops-metric-label">Agent Actions</div>
+        <div class="ops-metric-value">{{ action_counts.pending + action_counts.running }}</div>
+        <div class="ops-metric-sub">{{ action_counts.completed + action_counts.skipped }} closed</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="ops-layout">
+    <section class="panel">
+      <div class="hd">
+        <h2>Quick Actions</h2>
+        <span class="pill">manual control</span>
+      </div>
+      <div class="bd">
+        {% if guild_id %}
+          <div class="ops-action-grid">
+            <form class="ops-form-card" method="post" action="/ops/jobs/compress">
+              <div class="ops-form-title">Context Compression</div>
+              <div class="field">
+                <label>Mode</label>
+                <select name="mode">
+                  <option value="daily_master">daily_master</option>
+                  <option value="topic">topic</option>
+                  <option value="decision_brief">decision_brief</option>
+                  <option value="custom">custom</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Lookback Hours</label>
+                <input type="number" name="lookback_hours" min="1" max="168" value="{{ agent_settings_effective.get('context_default_lookback_hours', 24) }}" />
+              </div>
+              <div class="field">
+                <label>Focus Query</label>
+                <input type="text" name="focus_query" placeholder="optional topic focus" />
+              </div>
+              <label class="ops-check">
+                <input type="checkbox" name="post_to_outbox" value="true" {% if agent_settings_effective.get('default_post_to_outbox', false) %}checked{% endif %} />
+                <span>Post result to Discord outbox</span>
+              </label>
+              <button class="btn primary" type="submit">Enqueue Compression</button>
+            </form>
+
+            <form class="ops-form-card" method="post" action="/ops/jobs/digest">
+              <div class="ops-form-title">Desk Digest</div>
+              <div class="field">
+                <label>Mode</label>
+                <select name="mode">
+                  <option value="midday">midday</option>
+                  <option value="daily">daily</option>
+                  <option value="manual">manual</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Lookback Hours</label>
+                <input type="number" name="lookback_hours" min="1" max="168" value="24" />
+              </div>
+              <label class="ops-check">
+                <input type="checkbox" name="post_to_outbox" value="true" checked />
+                <span>Post to desk outbox</span>
+              </label>
+              <button class="btn primary" type="submit">Enqueue Digest</button>
+            </form>
+
+            <div class="ops-form-card">
+              <div class="ops-form-title">Desk Controls</div>
+              <div class="ops-control-list">
+                <form method="post" action="/ops/desk">
+                  <input type="hidden" name="enabled" value="{{ 'false' if desk and desk.desk_enabled else 'true' }}" />
+                  <button class="btn" type="submit">
+                    {% if desk and desk.desk_enabled %}Disable Desk{% else %}Enable Desk{% endif %}
+                  </button>
+                </form>
+                <form method="post" action="/ops/outbox">
+                  <input type="hidden" name="paused" value="{{ 'false' if desk and desk.outbox_paused else 'true' }}" />
+                  <button class="btn" type="submit">
+                    {% if desk and desk.outbox_paused %}Resume Outbox{% else %}Pause Outbox{% endif %}
+                  </button>
+                </form>
+                <div class="ops-hint">
+                  Channel {{ desk.desk_channel_id if desk and desk.desk_channel_id else 'unset' }}
+                  {% if desk and desk.desk_thread_id %} • Thread {{ desk.desk_thread_id }}{% endif %}
+                </div>
+              </div>
+            </div>
+
+            <div class="ops-form-card">
+              <div class="ops-form-title">Pipeline Jobs</div>
+              <div class="ops-control-list">
+                <form method="post" action="/ops/jobs/watchlist-refresh">
+                  <input type="hidden" name="mode" value="manual" />
+                  <button class="btn" type="submit">Run Watchlist Refresh</button>
+                </form>
+                <form method="post" action="/ops/jobs/transcript-scan">
+                  <input type="hidden" name="mode" value="manual" />
+                  <input type="hidden" name="lookback_days" value="120" />
+                  <button class="btn" type="submit">Run Transcript Scan</button>
+                </form>
+                <div class="ops-hint">
+                  Latest refresh:
+                  {% if dp.get('latest_watchlist_refresh_job') %}
+                    job #{{ dp.get('latest_watchlist_refresh_job', {}).get('id') }} • {{ dp.get('latest_watchlist_refresh_job', {}).get('status') }}
+                  {% else %}
+                    none
+                  {% endif %}
+                </div>
+                <div class="ops-hint">
+                  Transcript watch:
+                  {{ (dp.get('transcript_watch', {}) or {}).get('states', 0) }} states •
+                  {{ (dp.get('transcript_watch', {}) or {}).get('missing', 0) }} pending gaps •
+                  {{ (dp.get('transcript_watch', {}) or {}).get('found', 0) }} found
+                </div>
+              </div>
+            </div>
+
+            <form class="ops-form-card" method="post" action="/ops/jobs/thesis-autopilot">
+              <div class="ops-form-title">Thesis Autopilot</div>
+              <div class="field">
+                <label>Lookback Hours</label>
+                <input type="number" name="lookback_hours" min="1" max="336" value="72" />
+              </div>
+              <div class="field">
+                <label>Optional Thesis ID</label>
+                <input type="number" name="thesis_id" min="1" placeholder="blank = all active theses" />
+              </div>
+              <button class="btn primary" type="submit">Run Thesis Autopilot</button>
+            </form>
+          </div>
+        {% else %}
+          <div class="ops-empty">Set `THOTH_DISCORD_GUILD_ID` to enable desk and pipeline controls.</div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="hd">
+        <h2>Desk State</h2>
+        <span class="pill">discord + agent</span>
+      </div>
+      <div class="bd">
+        <div class="ops-keyvals">
+          <div><span>Desk enabled</span><strong>{{ desk.desk_enabled if desk else 'n/a' }}</strong></div>
+          <div><span>Outbox paused</span><strong>{{ desk.outbox_paused if desk else 'n/a' }}</strong></div>
+          <div><span>Daily master</span><strong>{{ agent_settings_effective.get('daily_master_enabled', false) }}</strong></div>
+          <div><span>Daily time</span><strong>{{ agent_settings_effective.get('daily_master_hhmm', '18:10') }} {{ agent_settings_effective.get('daily_master_tz', 'America/New_York') }}</strong></div>
+          <div><span>Lookback</span><strong>{{ agent_settings_effective.get('context_default_lookback_hours', 24) }}h</strong></div>
+          <div><span>Post to outbox</span><strong>{{ agent_settings_effective.get('default_post_to_outbox', false) }}</strong></div>
+        </div>
+        <div class="ops-subsection">
+          <div class="ops-subtitle">Watchlist Pipeline</div>
+          <div class="ops-keyvals">
+            <div><span>Total tracked</span><strong>{{ dp.get('watchlist_entries_total', 0) }}</strong></div>
+            <div><span>Quoted</span><strong>{{ dp.get('watchlist_entries_with_quotes', 0) }}</strong></div>
+            <div><span>Fresh &lt;1h</span><strong>{{ (dp.get('quote_freshness', {}) or {}).get('lt_1h', 0) }}</strong></div>
+            <div><span>Missing timestamp</span><strong>{{ (dp.get('quote_freshness', {}) or {}).get('missing_quote_at', 0) }}</strong></div>
+            <div><span>Transcript outbox 24h</span><strong>{{ (dp.get('transcript_outbox_24h', {}) or {}).get('created', 0) }}</strong></div>
+            <div><span>Transcript failures 24h</span><strong>{{ (dp.get('transcript_outbox_24h', {}) or {}).get('failed', 0) }}</strong></div>
+          </div>
+        </div>
+        <div class="ops-subsection">
+          <div class="ops-subtitle">Link Intake</div>
+          <div class="ops-keyvals">
+            <div><span>Total</span><strong>{{ (dp.get('link_intake', {}) or {}).get('total', 0) }}</strong></div>
+            <div><span>Collected</span><strong>{{ (dp.get('link_intake', {}) or {}).get('collected', 0) }}</strong></div>
+            <div><span>Queued</span><strong>{{ (dp.get('link_intake', {}) or {}).get('queued', 0) }}</strong></div>
+            <div><span>Ingested</span><strong>{{ (dp.get('link_intake', {}) or {}).get('ingested', 0) }}</strong></div>
+          </div>
+        </div>
+        {% if dp.get('likely_causes') %}
+          <div class="ops-subsection">
+            <div class="ops-subtitle">Likely Causes</div>
+            <div class="ops-issues compact">
+              {% for cause in dp.get('likely_causes', []) %}
+                <div class="ops-issue">{{ cause }}</div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <div class="ops-layout">
+    <section class="panel">
+      <div class="hd">
+        <h2>Recent Jobs</h2>
+        <span class="pill">queue</span>
+      </div>
+      <div class="bd">
+        {% if recent_jobs %}
+          <table class="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Kind</th>
+                <th>Status</th>
+                <th>Details</th>
+                <th>Updated</th>
+                <th>Error</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for job in recent_jobs %}
+                <tr>
+                  <td>#{{ job.id }}</td>
+                  <td>{{ job.kind }}</td>
+                  <td><span class="pill {% if job.status == 'success' %}ok{% elif job.status == 'error' %}bad{% endif %}">{{ job.status }}</span></td>
+                  <td>{{ job.details }}</td>
+                  <td title="{{ job.updated_utc or '' }}">{{ job.updated_local or 'n/a' }}</td>
+                  <td>{{ job.last_error or '—' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <div class="ops-empty">No jobs yet.</div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="hd">
+        <h2>Discord Flow</h2>
+        <span class="pill">outbox + approvals</span>
+      </div>
+      <div class="bd">
+        <div class="ops-keyvals" style="margin-bottom:16px;">
+          <div><span>Outbox pending</span><strong>{{ outbox_counts.pending }}</strong></div>
+          <div><span>Outbox sending</span><strong>{{ outbox_counts.sending }}</strong></div>
+          <div><span>Outbox failed</span><strong>{{ outbox_counts.failed }}</strong></div>
+          <div><span>Queue pending</span><strong>{{ queue_counts.pending }}</strong></div>
+          <div><span>Queue approved</span><strong>{{ queue_counts.approved }}</strong></div>
+          <div><span>Queue rejected</span><strong>{{ queue_counts.rejected }}</strong></div>
+        </div>
+
+        <div class="ops-subtitle">Recent Outbox</div>
+        {% if recent_outbox %}
+          <table class="table ops-tight-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Status</th>
+                <th>Summary</th>
+                <th>Destination</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in recent_outbox %}
+                <tr>
+                  <td>#{{ item.id }}</td>
+                  <td><span class="pill {% if item.status == 'posted' %}ok{% elif item.status == 'failed' %}bad{% endif %}">{{ item.status }}</span></td>
+                  <td title="{{ item.last_error or '' }}">{{ item.summary }}</td>
+                  <td>ch {{ item.channel_id }}{% if item.thread_id %} • th {{ item.thread_id }}{% endif %}</td>
+                  <td title="{{ item.created_utc or '' }}">{{ item.created_local or 'n/a' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <div class="ops-empty">No outbox items.</div>
+        {% endif %}
+
+        <div class="ops-subtitle" style="margin-top:16px;">Recent Approval Queue</div>
+        {% if recent_queue %}
+          <table class="table ops-tight-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Kind</th>
+                <th>Status</th>
+                <th>Subject</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in recent_queue %}
+                <tr>
+                  <td>#{{ item.id }}</td>
+                  <td>{{ item.kind }}</td>
+                  <td><span class="pill {% if item.status == 'approved' %}ok{% elif item.status == 'rejected' %}bad{% endif %}">{{ item.status }}</span></td>
+                  <td title="{{ item.decision_note or '' }}">{{ item.subject }}</td>
+                  <td title="{{ item.created_utc or '' }}">{{ item.created_local or 'n/a' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <div class="ops-empty">No approval queue items.</div>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <div class="ops-layout">
+    <section class="panel">
+      <div class="hd">
+        <h2>Codex Action Queue</h2>
+        <span class="pill">follow-ups Codex can execute</span>
+      </div>
+      <div class="bd">
+        <div style="color:var(--muted);font-size:12px;margin-bottom:12px;">
+          Pending items are executable follow-ups surfaced by digests and thesis autopilot. The worker only performs direct thesis-autopilot mutations; this queue is intended for Codex automation or operator execution.
+        </div>
+        <div class="ops-keyvals" style="margin-bottom:16px;">
+          <div><span>Pending</span><strong>{{ action_counts.pending }}</strong></div>
+          <div><span>Running</span><strong>{{ action_counts.running }}</strong></div>
+          <div><span>Completed</span><strong>{{ action_counts.completed }}</strong></div>
+          <div><span>Skipped</span><strong>{{ action_counts.skipped }}</strong></div>
+        </div>
+        {% if recent_actions %}
+          <table class="table ops-tight-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>Action</th>
+                <th>Refs</th>
+                <th>Updated</th>
+                <th>Controls</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for action in recent_actions %}
+                <tr>
+                  <td>#{{ action.id }}</td>
+                  <td><span class="pill {% if action.status == 'completed' %}ok{% elif action.status == 'skipped' %}bad{% endif %}">{{ action.status }}</span></td>
+                  <td>{{ action.priority }}</td>
+                  <td>
+                    <div>{{ action.title }}</div>
+                    {% if action.rationale %}<div style="color:var(--muted);font-size:11px;margin-top:4px;">{{ action.rationale }}</div>{% endif %}
+                  </td>
+                  <td>{{ action.refs }}</td>
+                  <td title="{{ action.updated_utc or '' }}">{{ action.updated_local or 'n/a' }}</td>
+                  <td>
+                    {% if action.status in ['pending', 'running'] %}
+                      <div class="btnrow" style="gap:6px;justify-content:flex-start;flex-wrap:wrap;">
+                        <form method="post" action="/ops/actions/{{ action.id }}">
+                          <input type="hidden" name="status" value="completed" />
+                          <button class="btn" type="submit">Complete</button>
+                        </form>
+                        <form method="post" action="/ops/actions/{{ action.id }}">
+                          <input type="hidden" name="status" value="skipped" />
+                          <button class="btn" type="submit">Skip</button>
+                        </form>
+                      </div>
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <div class="ops-empty">No agent actions queued.</div>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <div class="ops-layout">
+    <section class="panel">
+      <div class="hd">
+        <h2>Autonomous Change Runs</h2>
+        <span class="pill">ledger</span>
+      </div>
+      <div class="bd">
+        <div class="ops-keyvals" style="margin-bottom:16px;">
+          <div><span>Running</span><strong>{{ change_counts.running }}</strong></div>
+          <div><span>Success</span><strong>{{ change_counts.success }}</strong></div>
+          <div><span>Error</span><strong>{{ change_counts.error }}</strong></div>
+        </div>
+        {% if recent_change_runs %}
+          <table class="table ops-tight-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Task</th>
+                <th>Status</th>
+                <th>Engine</th>
+                <th>Summary</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for run in recent_change_runs %}
+                <tr>
+                  <td>#{{ run.id }}</td>
+                  <td>{{ run.task_kind }}</td>
+                  <td><span class="pill {% if run.status == 'success' %}ok{% elif run.status == 'error' %}bad{% endif %}">{{ run.status }}</span></td>
+                  <td>{{ run.engine_kind }}</td>
+                  <td>
+                    <div>{{ run.summary or (run.change_count ~ ' change(s)') }}</div>
+                    <div class="ops-table-sub">
+                      {{ run.change_count }} change(s)
+                      {% if run.note_href %} • <a href="{{ run.note_href }}">note</a>{% endif %}
+                      {% if run.source_job_id %} • job #{{ run.source_job_id }}{% endif %}
+                    </div>
+                  </td>
+                  <td title="{{ run.updated_utc or '' }}">{{ run.updated_local or 'n/a' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <div class="ops-empty">No autonomous change runs yet.</div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="hd">
+        <h2>New Thesis Proposals</h2>
+        <span class="pill">approval required</span>
+      </div>
+      <div class="bd">
+        <div class="ops-keyvals" style="margin-bottom:16px;">
+          <div><span>Pending</span><strong>{{ proposal_counts.pending }}</strong></div>
+          <div><span>Promoted</span><strong>{{ proposal_counts.promoted }}</strong></div>
+          <div><span>Rejected</span><strong>{{ proposal_counts.rejected }}</strong></div>
+        </div>
+        {% if recent_proposals %}
+          <table class="table ops-tight-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Status</th>
+                <th>Proposal</th>
+                <th>Scores</th>
+                <th>Updated</th>
+                <th>Controls</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for proposal in recent_proposals %}
+                <tr>
+                  <td>#{{ proposal.id }}</td>
+                  <td><span class="pill {% if proposal.status == 'promoted' %}ok{% elif proposal.status == 'rejected' %}bad{% endif %}">{{ proposal.status }}</span></td>
+                  <td>
+                    <div>{{ proposal.title }}</div>
+                    {% if proposal.rationale %}<div style="color:var(--muted);font-size:11px;margin-top:4px;">{{ proposal.rationale }}</div>{% endif %}
+                    <div class="ops-table-sub">
+                      {% if proposal.note_href %}<a href="{{ proposal.note_href }}">proposal note</a>{% endif %}
+                      {% if proposal.approved_thesis_href %} • <a href="{{ proposal.approved_thesis_href }}">thesis #{{ proposal.approved_thesis_id }}</a>{% endif %}
+                    </div>
+                  </td>
+                  <td>
+                    novelty {{ proposal.novelty_score if proposal.novelty_score is not none else 'n/a' }}<br />
+                    confidence {{ proposal.confidence if proposal.confidence is not none else 'n/a' }}
+                  </td>
+                  <td title="{{ proposal.updated_utc or '' }}">{{ proposal.updated_local or 'n/a' }}</td>
+                  <td>
+                    {% if proposal.status == 'pending' %}
+                      <div class="btnrow" style="gap:6px;justify-content:flex-start;flex-wrap:wrap;">
+                        <form method="post" action="/ops/proposals/{{ proposal.id }}">
+                          <input type="hidden" name="decision" value="approve" />
+                          <button class="btn" type="submit">Approve</button>
+                        </form>
+                        <form method="post" action="/ops/proposals/{{ proposal.id }}">
+                          <input type="hidden" name="decision" value="reject" />
+                          <button class="btn" type="submit">Reject</button>
+                        </form>
+                      </div>
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <div class="ops-empty">No thesis proposals yet.</div>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <div class="ops-layout">
+    <section class="panel">
+      <div class="hd">
+        <h2>Source Health</h2>
+        <span class="pill">stale + failing</span>
+      </div>
+      <div class="bd">
+        {% if source_issues %}
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Status</th>
+                <th>Last New</th>
+                <th>Last Success</th>
+                <th>Next Run</th>
+                <th>Failures</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in source_issues %}
+                <tr>
+                  <td>
+                    <a href="/sources/{{ row.source.id }}">{{ row.source.name }}</a>
+                    <div class="ops-table-sub">{{ row.source.category }}</div>
+                  </td>
+                  <td>
+                    {% if row.stale %}<span class="pill bad">stale</span>{% endif %}
+                    {% if row.failing %}<span class="pill bad">failing</span>{% endif %}
+                    {% if row.content_critical %}<span class="pill bad">no new {{ row.new_age_label }}</span>{% elif row.content_silent %}<span class="pill bad">unusually quiet</span>{% endif %}
+                    {% if row.backoff_s %}<span class="pill">backoff {{ row.backoff_label }}</span>{% endif %}
+                    {% if not row.stale and not row.failing and not row.backoff_s and not row.content_silent %}<span class="pill ok">ok</span>{% endif %}
+                  </td>
+                  <td title="{{ row.latest_new_utc or '' }}">
+                    {{ row.latest_new_local or 'never' }}
+                    {% if row.content_common %}<div class="ops-table-sub">usual {{ row.median_new_interval_label }} · {{ row.zero_success_runs }} zero runs</div>{% endif %}
+                  </td>
+                  <td title="{{ row.last_success_utc or '' }}">{{ row.last_success_local or 'never' }}</td>
+                  <td title="{{ row.next_run_utc or '' }}">{{ row.next_run_local or 'n/a' }}</td>
+                  <td>{{ row.state.consecutive_failures if row.state else 0 }}</td>
+                  <td class="right">
+                    <form method="post" action="/sources/{{ row.source.id }}/run">
+                      <button class="btn" type="submit">Run</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <div class="ops-empty">No stale, failing, or unusually quiet sources right now.</div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="hd">
+        <h2>Runtime Services</h2>
+        <span class="pill">state files</span>
+      </div>
+      <div class="bd">
+        {% if runtime_services %}
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Service</th>
+                <th>PID</th>
+                <th>Status</th>
+                <th>Started</th>
+                <th>State File</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for svc in runtime_services %}
+                <tr>
+                  <td>{{ svc.service }}</td>
+                  <td>{{ svc.pid or 'n/a' }}</td>
+                  <td><span class="pill {% if svc.alive %}ok{% else %}bad{% endif %}">{{ 'alive' if svc.alive else 'dead' }}</span></td>
+                  <td>{{ svc.started_at or 'n/a' }}</td>
+                  <td class="ops-break">{{ svc.path or 'n/a' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <div class="ops-empty">No runtime state files found.</div>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="hd">
+      <h2>Recent Agent Outputs</h2>
+      <span class="pill">digests + compression</span>
+    </div>
+    <div class="bd">
+      {% if recent_agent_docs %}
+        <div class="ops-output-list">
+          {% for doc in recent_agent_docs %}
+            <a class="ops-output-card" href="{{ doc.href }}">
+              <div class="ops-output-kind">{{ doc.kind }}</div>
+              <div class="ops-output-title">{{ doc.title }}</div>
+              <div class="ops-output-time" title="{{ doc.published_utc or '' }}">{{ doc.published_local or 'n/a' }}</div>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="ops-empty">No agent outputs have been published yet.</div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+
+<style>
+.ops-page{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+.ops-hero-grid{
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:14px;
+}
+.ops-hero-block{
+  padding:14px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:linear-gradient(180deg, rgba(11,15,20,.72), rgba(7,10,13,.48));
+}
+.ops-kicker{
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin-bottom:6px;
+}
+.ops-title{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  font-family:var(--display);
+  font-size:22px;
+  color:var(--text-bright);
+}
+.ops-sub{
+  margin-top:6px;
+  color:var(--muted);
+  font-size:12px;
+}
+.ops-issues{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-top:14px;
+}
+.ops-issues.compact{
+  margin-top:10px;
+}
+.ops-issue{
+  border:1px solid rgba(239,68,68,.25);
+  background:rgba(239,68,68,.08);
+  color:#fecaca;
+  border-radius:12px;
+  padding:10px 12px;
+  font-size:12px;
+}
+.ops-metrics{
+  display:grid;
+  grid-template-columns:repeat(4, minmax(0, 1fr));
+  gap:14px;
+}
+.ops-metric-card .bd{
+  padding:18px 16px;
+}
+.ops-metric-label{
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.ops-metric-value{
+  margin-top:8px;
+  font-family:var(--display);
+  font-size:28px;
+  color:var(--text-bright);
+}
+.ops-metric-sub{
+  margin-top:6px;
+  color:var(--muted);
+  font-size:12px;
+}
+.ops-layout{
+  display:grid;
+  grid-template-columns:minmax(0, 1.25fr) minmax(0, 1fr);
+  gap:14px;
+}
+.ops-action-grid{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:12px;
+}
+.ops-form-card{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  padding:14px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:rgba(7,10,13,.42);
+}
+.ops-form-title,
+.ops-subtitle{
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.ops-control-list{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.ops-check{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  color:var(--muted);
+  font-size:12px;
+}
+.ops-hint{
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.5;
+}
+.ops-keyvals{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:10px;
+}
+.ops-keyvals > div{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 12px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:rgba(7,10,13,.36);
+}
+.ops-keyvals span{
+  color:var(--muted);
+  font-size:12px;
+}
+.ops-keyvals strong{
+  color:var(--text-bright);
+  font-family:var(--mono);
+  font-size:12px;
+  text-align:right;
+}
+.ops-subsection{
+  margin-top:16px;
+}
+.ops-empty{
+  padding:18px;
+  border:1px dashed var(--border);
+  border-radius:14px;
+  color:var(--muted);
+  text-align:center;
+  background:rgba(7,10,13,.28);
+}
+.ops-tight-table th,
+.ops-tight-table td{
+  padding:8px 8px;
+}
+.ops-table-sub{
+  margin-top:4px;
+  color:var(--muted);
+  font-size:11px;
+}
+.ops-break{
+  word-break:break-all;
+}
+.ops-output-list{
+  display:grid;
+  grid-template-columns:repeat(5, minmax(0, 1fr));
+  gap:12px;
+}
+.ops-output-card{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  padding:14px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:linear-gradient(180deg, rgba(11,15,20,.72), rgba(7,10,13,.5));
+  transition:border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.ops-output-card:hover{
+  border-color:var(--border-accent);
+  transform:translateY(-1px);
+  box-shadow:var(--shadow-sm);
+}
+.ops-output-kind{
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--accent2);
+}
+.ops-output-title{
+  font-size:14px;
+  color:var(--text-bright);
+}
+.ops-output-time{
+  color:var(--muted);
+  font-size:11px;
+}
+@media (max-width: 1180px){
+  .ops-hero-grid,
+  .ops-metrics,
+  .ops-action-grid,
+  .ops-output-list{
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+  }
+  .ops-layout{
+    grid-template-columns:1fr;
+  }
+}
+@media (max-width: 720px){
+  .ops-hero-grid,
+  .ops-metrics,
+  .ops-action-grid,
+  .ops-keyvals,
+  .ops-output-list{
+    grid-template-columns:1fr;
+  }
+}
+</style>
+{% endblock %}

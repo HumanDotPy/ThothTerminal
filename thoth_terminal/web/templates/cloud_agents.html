@@ -1,0 +1,2606 @@
+{% extends "base.html" %}
+{% block content %}
+{% set agents_section = 'cloud' %}
+{% include "_agents_nav.html" %}
+{% set rows = catalog.get('rows', []) %}
+{% set selected_provider = catalog.get('selected_provider', 'openrouter') %}
+{% set selected_model = catalog.get('selected_model', 'openrouter/free') %}
+{% set openshell = openshell_status or {} %}
+{% set cloud_ops = cloud_status or {} %}
+{% set cloud_settings = cloud_ops.get('settings', {}) %}
+{% set cloud_metrics = cloud_ops.get('metrics', {}) %}
+{% set cloud_memory = cloud_ops.get('memory', {}) %}
+{% set write_policy = cloud_ops.get('write_policy', {}) %}
+{% set cloud_provider = cloud_settings.get('provider', selected_provider) %}
+{% set cloud_model = cloud_settings.get('model', selected_model) %}
+
+<section class="cloud-agent-shell">
+  <header class="cloud-agent-top">
+    <div>
+      <div class="workspace-kicker">Cloud Research / Model Memory</div>
+      <h1>Cloud Research Workbench</h1>
+      <p>Run deep worldview research against Thoth evidence, private memory, and versioned model-write rails.</p>
+    </div>
+    <div class="cloud-agent-status">
+      <span class="pill ok">Model {{ cloud_provider }} / {{ cloud_model }}</span>
+      <span class="pill {% if cloud_memory.get('requires_compression') %}warn{% else %}ok{% endif %}">Memory {{ cloud_memory.get('active_segments', 0) }} segments</span>
+      <span class="pill {% if catalog.get('free_only') %}ok{% endif %}">Free guard {{ 'on' if catalog.get('free_only') else 'off' }}</span>
+      <span class="pill {% if openshell.ready %}ok{% endif %}">OpenShell {{ 'ready' if openshell.ready else ('unchecked' if openshell.ready is none else 'not ready') }}</span>
+      <span class="pill {% if write_policy.get('enabled') and write_policy.get('openshell_ready') %}ok{% endif %}" id="cloud-write-policy-pill">Writes {{ 'ready' if write_policy.get('enabled') and write_policy.get('openshell_ready') else 'gated' }}</span>
+    </div>
+  </header>
+
+  <section class="cloud-ops-panel">
+    <div class="cloud-ops-metrics" id="cloud-ops-metrics" style="display:none;">
+      <div>
+        <span>Runs</span>
+        <strong>{{ cloud_metrics.get('recent_runs', 0) }}</strong>
+      </div>
+      <div class="{{ 'is-alert' if cloud_metrics.get('running_runs', 0) else '' }}">
+        <span>Running</span>
+        <strong>{{ cloud_metrics.get('running_runs', 0) }}</strong>
+      </div>
+      <div class="{{ 'is-alert' if cloud_metrics.get('failed_runs', 0) else '' }}">
+        <span>Failed</span>
+        <strong>{{ cloud_metrics.get('failed_runs', 0) }}</strong>
+      </div>
+      <div>
+        <span>Jobs</span>
+        <strong>{{ cloud_metrics.get('pending_jobs', 0) }} pending / {{ cloud_metrics.get('running_jobs', 0) }} running</strong>
+      </div>
+      <div>
+        <span>Tokens</span>
+        <strong>{{ cloud_metrics.get('recent_total_tokens', 0) }}</strong>
+      </div>
+      <div>
+        <span>Input / Output</span>
+        <strong>{{ cloud_metrics.get('recent_input_tokens', 0) }} / {{ cloud_metrics.get('recent_output_tokens', 0) }}</strong>
+      </div>
+      <div>
+        <span>Prompt Cache</span>
+        <strong>
+          {% if cloud_metrics.get('recent_cache_hit_rate') is not none %}
+            {{ (cloud_metrics.get('recent_cache_hit_rate', 0) * 100)|round(1) }}% / {{ cloud_metrics.get('recent_cache_hit_tokens', 0) }} tok
+          {% else %}
+            unavailable
+          {% endif %}
+        </strong>
+      </div>
+      <div>
+        <span>LLM Latency</span>
+        <strong>{% if cloud_metrics.get('average_llm_latency_ms') is not none %}{{ cloud_metrics.get('average_llm_latency_ms') }} ms avg{% else %}unavailable{% endif %}</strong>
+      </div>
+      <div>
+        <span>Reported Cost</span>
+        <strong>{% if cloud_metrics.get('reported_cost_usd') is not none %}${{ '%.6f'|format(cloud_metrics.get('reported_cost_usd')) }}{% else %}unavailable{% endif %}</strong>
+      </div>
+      <div class="{{ 'is-alert' if cloud_memory.get('requires_compression') else '' }}">
+        <span>Memory</span>
+        <strong>{{ cloud_memory.get('active_segments', 0) }} seg / {{ cloud_memory.get('token_estimate', 0) }} tok</strong>
+      </div>
+    </div>
+    <div class="cloud-ops-controls">
+      <select id="cloud-run-mode">
+        <option value="heartbeat">Worldview research</option>
+        <option value="inquisitive">Inquisitive</option>
+        <option value="nightly">Nightly</option>
+      </select>
+      <input id="cloud-run-lookback" type="number" min="1" max="720" value="{{ cloud_settings.get('heartbeat', {}).get('lookback_hours', 168) }}" />
+      <button class="btn" type="button" id="cloud-run-now">Run Now</button>
+      <button class="btn" type="button" id="cloud-refresh-status">Refresh Status</button>
+    </div>
+    <details class="cloud-schedule-details">
+      <summary>
+        <span>Schedule</span>
+        <em>Worldview research {{ cloud_settings.get('heartbeat', {}).get('local_times', '08:00,20:00') }} / legacy modes on demand</em>
+      </summary>
+      <div class="cloud-schedule-grid">
+        <label><input type="checkbox" id="cloud-schedule-enabled" {% if cloud_settings.get('enabled', True) %}checked{% endif %} /> Automation</label>
+        <label><input type="checkbox" id="cloud-nightly-enabled" {% if cloud_settings.get('nightly', {}).get('enabled', False) %}checked{% endif %} /> Legacy nightly schedule</label>
+        <input id="cloud-nightly-times" value="{{ cloud_settings.get('nightly', {}).get('local_times', '12:10') }}" aria-label="Nightly local times" />
+        <input id="cloud-nightly-lookback" type="number" min="1" max="720" value="{{ cloud_settings.get('nightly', {}).get('lookback_hours', 72) }}" aria-label="Nightly lookback hours" />
+        <label><input type="checkbox" id="cloud-heartbeat-enabled" {% if cloud_settings.get('heartbeat', {}).get('enabled', True) %}checked{% endif %} /> Worldview research</label>
+        <input id="cloud-heartbeat-times" value="{{ cloud_settings.get('heartbeat', {}).get('local_times', '08:00,20:00') }}" aria-label="Worldview research local times" />
+        <input id="cloud-heartbeat-interval" type="number" min="1" max="168" value="{{ cloud_settings.get('heartbeat', {}).get('interval_hours', 12) }}" aria-label="Worldview fallback interval hours" />
+        <input id="cloud-heartbeat-lookback" type="number" min="1" max="720" value="{{ cloud_settings.get('heartbeat', {}).get('lookback_hours', 168) }}" aria-label="Worldview research lookback hours" />
+        <label><input type="checkbox" id="cloud-inquisitive-enabled" {% if cloud_settings.get('inquisitive', {}).get('enabled', False) %}checked{% endif %} /> Legacy inquisitive schedule</label>
+        <input id="cloud-inquisitive-times" value="{{ cloud_settings.get('inquisitive', {}).get('local_times', '11:30,18:30') }}" aria-label="Inquisitive local times" />
+        <input id="cloud-inquisitive-lookback" type="number" min="1" max="720" value="{{ cloud_settings.get('inquisitive', {}).get('lookback_hours', 96) }}" aria-label="Inquisitive lookback hours" />
+        <button class="btn" type="button" id="cloud-save-schedule">Save Schedule</button>
+      </div>
+    </details>
+    <div class="cloud-ops-status" id="cloud-ops-status">
+      <p>{{ cloud_ops.get('generated_at', '') }}{% if cloud_ops.get('error') %} / {{ cloud_ops.get('error') }}{% endif %}</p>
+      <p id="cloud-write-policy-status">Durable writes: {{ 'enabled' if write_policy.get('enabled') else 'disabled' }} / OpenShell {{ 'ready' if write_policy.get('openshell_ready') else 'not ready' }} / operator approval {{ 'required' if write_policy.get('require_operator_approval', True) else 'not required' }}</p>
+    </div>
+  </section>
+
+  <div class="cloud-agent-grid">
+    <aside class="cloud-run-rail">
+      <section class="cloud-workbench-panel">
+        <header class="cloud-panel-head">
+          <div>
+            <h2>Run Ledger</h2>
+            <p>Recent cloud automation passes and token footprint.</p>
+          </div>
+          <em id="cloud-run-count">{{ cloud_ops.get('runs', [])|length }} runs</em>
+        </header>
+        <div class="gap-hunter-result cloud-runs-ledger" id="cloud-runs-list">
+          {% for run in cloud_ops.get('runs', [])[:16] %}
+            <div class="gap-row">
+              <div>
+                <strong>#{{ run.id }} {{ run.task_kind }} / {{ run.status }}</strong>
+                <span>{{ run.objective[:140] }}{% if run.objective|length > 140 %}...{% endif %}</span>
+              </div>
+              <span>{{ run.stats.get('total_tokens', 0) }} tok{% if run.stats.get('cloud_durable_operations') %} / {{ run.stats.get('cloud_durable_operations', {}).get('applied_count', 0) }} durable{% endif %}{% if run.stats.get('cloud_agent_memory') %} / {{ run.stats.get('cloud_agent_memory', {}).get('applied_count', 0) }} mem{% endif %}</span>
+              {% set write_summaries = run.stats.get('cloud_durable_operations', {}).get('write_summaries', []) %}
+              {% set informal_summaries = run.stats.get('cloud_durable_operations', {}).get('informal_doc_summaries', []) %}
+              {% if write_summaries %}
+                <details class="cloud-write-details">
+                  <summary>{{ write_summaries|length }} write{% if write_summaries|length != 1 %}s{% endif %}</summary>
+                  {% for write in write_summaries[:5] %}
+                    <button class="cloud-write-diff" type="button" data-write-diff-id="{{ write.get('write_diff_id') }}">
+                      {{ write.get('destination_label') or (write.get('destination_type') ~ ' #' ~ write.get('destination_id')) }}:
+                      {% if write.get('words_added_net', 0) >= 0 %}+{% endif %}{{ write.get('words_added_net', 0) }} words
+                    </button>
+                  {% endfor %}
+                </details>
+              {% endif %}
+              {% if informal_summaries %}
+                <details class="cloud-write-details">
+                  <summary>{{ informal_summaries|length }} research doc{% if informal_summaries|length != 1 %}s{% endif %}</summary>
+                  {% for doc in informal_summaries[:5] %}
+                    <a class="cloud-write-diff" href="{{ '/worldview-journal/' if doc.get('category') == 'worldview_journal' else '/informal-research/' }}{{ doc.get('informal_doc_key') }}">
+                      {{ doc.get('title') or doc.get('subject') or 'Informal research' }}:
+                      {% if doc.get('words_added', 0) >= 0 %}+{% endif %}{{ doc.get('words_added', 0) }} words
+                      {% if doc.get('failure_reason') %} / fallback{% endif %}
+                    </a>
+                    {% if doc.get('failure_reason') %}
+                      <span class="muted">{{ doc.get('failure_reason')[:160] }}{% if doc.get('failure_reason')|length > 160 %}...{% endif %}</span>
+                    {% endif %}
+                  {% endfor %}
+                </details>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </section>
+      <section class="cloud-workbench-panel cloud-audit-panel">
+        <header class="cloud-panel-head">
+          <div>
+            <h2>Replay &amp; Lineage</h2>
+            <p>Verify compacted state, reconstruct the full event ledger, and inspect accepted child work.</p>
+          </div>
+        </header>
+        <div class="cloud-audit-controls">
+          <input id="cloud-audit-run-id" type="number" min="1" placeholder="run id" aria-label="Cloud run ID" />
+          <button class="btn" type="button" id="cloud-audit-projection">Projection</button>
+          <button class="btn" type="button" id="cloud-audit-full">Full replay</button>
+          <button class="btn" type="button" id="cloud-audit-lineage">Lineage</button>
+        </div>
+        <div class="cloud-audit-controls">
+          <input id="cloud-audit-lineage-id" type="number" min="1" placeholder="lineage id" aria-label="Lineage ID" />
+          <button class="btn" type="button" id="cloud-audit-accept">Accept completed output</button>
+        </div>
+        <pre class="cloud-audit-result" id="cloud-audit-result">Select a run from the ledger or enter its ID.</pre>
+      </section>
+    </aside>
+
+    <main class="cloud-chat-pane">
+      <header class="cloud-panel-head cloud-console-head">
+        <div>
+          <h2>Dispatch Console</h2>
+          <p>Ask against worldview memory, recent Terminal context, and local-agent work without starting a scheduled run.</p>
+        </div>
+      </header>
+      <section class="cloud-picker-band">
+        <div class="cloud-picker-field">
+          <label for="cloud-model-select">Model</label>
+          <select id="cloud-model-select">
+            {% for row in rows if row.usable %}
+              <option
+                value="{{ row.provider }}|{{ row.model }}"
+                data-service="{{ row.service }}"
+                data-model="{{ row.model }}"
+                data-input="{{ row.price_input }}"
+                data-output="{{ row.price_output }}"
+                data-free="{{ '1' if row.free else '0' }}"
+                data-context="{{ row.context_tier or 'unknown' }}"
+                data-aa="{{ row.intelligence_score if row.intelligence_score is not none else '' }}"
+                {% if row.provider == cloud_provider and row.model == cloud_model %}selected{% elif row.selected and not cloud_model %}selected{% elif not catalog.get('selected_model') and not cloud_model and row.provider == 'openrouter' and row.model == 'openrouter/free' %}selected{% endif %}
+              >
+                {{ row.service }} · {{ row.model_label }} · {{ row.context_tier or 'context n/a' }} · AA {{ row.intelligence_score if row.intelligence_score is not none else 'n/a' }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="cloud-price-readout" aria-label="Selected model pricing">
+          <div>
+            <span>Service</span>
+            <strong id="cloud-service-readout">OpenRouter</strong>
+          </div>
+          <div>
+            <span>Model</span>
+            <strong id="cloud-model-readout">openrouter/free</strong>
+          </div>
+          <div>
+            <span>Input</span>
+            <strong id="cloud-input-readout">free</strong>
+          </div>
+          <div>
+            <span>Output</span>
+            <strong id="cloud-output-readout">free</strong>
+          </div>
+          <div>
+            <span>Context</span>
+            <strong id="cloud-context-readout">unknown</strong>
+          </div>
+          <div>
+            <span>AA Intel</span>
+            <strong id="cloud-aa-readout">n/a</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="cloud-transcript" id="cloud-transcript" aria-live="polite">
+        <article class="cloud-message is-system">
+          <div class="cloud-message-meta">system / dispatch console</div>
+          <p>Ask against Thoth context, worldview memory, and local-agent work. Durable writes are handled by scheduled run rails.</p>
+        </article>
+      </section>
+
+      <form class="cloud-composer" id="cloud-composer">
+        <div class="cloud-command-wrap">
+          <textarea id="cloud-message-input" rows="4" placeholder="Ask a question, or press / to create and manage an autonomous goal."></textarea>
+          <div class="cloud-slash-menu" id="cloud-slash-menu" hidden>
+            <button type="button" data-command="/goal ">
+              <strong>/goal</strong>
+              <span>Create, inspect, pursue, revise, pause, resume, or clear durable analyst goals.</span>
+            </button>
+          </div>
+        </div>
+        <div class="cloud-composer-actions">
+          <label for="goal-flash-model">Flash delegate</label>
+          <select id="goal-flash-model" aria-label="Flash delegate model">
+            {% for row in rows if row.usable %}
+              <option value="{{ row.provider }}|{{ row.model }}" {% if row.model == 'deepseek-v4-flash' %}selected{% endif %}>{{ row.service }} · {{ row.model_label }}</option>
+            {% endfor %}
+          </select>
+          <label for="cloud-skill-select">Thoth skills</label>
+          <select id="cloud-skill-select" multiple aria-label="Thoth skills" title="Select one or more Thoth-native skills"></select>
+          <label>
+            <input type="checkbox" id="goal-approve-writes" />
+            Goal may write
+          </label>
+          <label>
+            <input type="checkbox" id="cloud-free-only" {% if catalog.get('free_only') and cloud_provider == 'openrouter' %}checked{% endif %} />
+            Free-only OpenRouter
+          </label>
+          <button class="btn primary" type="submit">Run</button>
+        </div>
+      </form>
+    </main>
+
+    <aside class="cloud-model-rail">
+      <details class="cloud-side-section" open>
+        <summary>
+          <span>Worldview Memory</span>
+          <em id="cloud-memory-count">{{ cloud_memory.get('active_segments', 0) }} segments</em>
+        </summary>
+        <div class="gap-hunter-controls">
+          <input id="cloud-memory-filter" class="cloud-model-filter" type="text" placeholder="Search memory" />
+          <button class="btn" type="button" id="cloud-memory-refresh">Refresh</button>
+          <button class="btn" type="button" id="cloud-memory-context">Context</button>
+        </div>
+        <div class="cloud-memory-form">
+          <input id="cloud-memory-key" class="cloud-model-filter" type="text" placeholder="segment_key" />
+          <input id="cloud-memory-title" class="cloud-model-filter" type="text" placeholder="Title" />
+          <select id="cloud-memory-type" class="cloud-model-filter">
+            <option value="operating_principle">Operating principle</option>
+            <option value="world_model">World model</option>
+            <option value="working_model">Working model</option>
+            <option value="sector_model">Sector model</option>
+            <option value="company_model">Company model</option>
+            <option value="mechanism">Mechanism</option>
+            <option value="contradiction">Contradiction</option>
+            <option value="source_model">Source model</option>
+            <option value="open_question">Open question</option>
+            <option value="episodic">Episodic</option>
+            <option value="scratch">Scratch</option>
+          </select>
+          <select id="cloud-memory-scope" class="cloud-model-filter">
+            <option value="core">Core</option>
+            <option value="stable">Stable</option>
+            <option value="active">Active</option>
+            <option value="episodic">Episodic</option>
+            <option value="scratch">Scratch</option>
+          </select>
+        </div>
+        <textarea id="cloud-memory-content" class="gap-question" rows="4" placeholder="Seed or revise a worldview memory segment."></textarea>
+        <div class="gap-hunter-actions">
+          <button class="btn primary" type="button" id="cloud-memory-save">Save Segment</button>
+          <button class="btn" type="button" id="cloud-memory-archive">Archive Key</button>
+        </div>
+        <div class="gap-hunter-result" id="cloud-memory-result">
+          <p>Worldview memory is private agent state, loaded before volatile research context.</p>
+        </div>
+      </details>
+
+      <details class="cloud-side-section">
+        <summary>
+          <span>Gap Hunter</span>
+          <em>Universe coverage index</em>
+        </summary>
+        <div class="gap-hunter-controls">
+          <input id="gap-keyword" class="cloud-model-filter" type="text" placeholder="Keyword, section, company, role" />
+          <button class="btn" type="button" id="gap-run">Search</button>
+          <button class="btn" type="button" id="gap-overview">Overview</button>
+        </div>
+        <textarea id="gap-question" class="gap-question" rows="3" placeholder="Optional Gap Hunter question, e.g. enough in-rack copper content coverage versus optics and HVDC?"></textarea>
+        <div class="gap-hunter-actions">
+          <label>
+            <input type="checkbox" id="gap-persist" />
+            Draft requests
+          </label>
+          <button class="btn primary" type="button" id="gap-task-run">Run Gap Hunter</button>
+        </div>
+        <div class="gap-hunter-actions">
+          <button class="btn" type="button" id="gap-goal-start">Start Goal Run</button>
+          <button class="btn" type="button" id="gap-goal-continue">Continue Goal</button>
+        </div>
+        <div class="gap-hunter-result" id="gap-result">
+          <p>Load the section-level universe map, then drill down by keyword or section without flooding agent context.</p>
+        </div>
+      </details>
+
+      <details class="cloud-side-section">
+        <summary>
+          <span>Advanced Goal Controls</span>
+          <em>Manual plan, dispatch, compact</em>
+        </summary>
+        <textarea id="orchestrator-objective" class="gap-question" rows="4" placeholder="Objective for orchestration, e.g. build a research plan for missing HBM roadmap and technical mechanics coverage."></textarea>
+        <div class="gap-hunter-controls">
+          <input id="orchestrator-run-id" class="cloud-model-filter" type="text" placeholder="Run ID" />
+          <button class="btn" type="button" id="orchestrator-start">Start</button>
+          <button class="btn" type="button" id="orchestrator-plan">Plan</button>
+        </div>
+        <div class="gap-hunter-actions">
+          <label><input type="checkbox" id="orchestrator-execute-child" /> Execute child</label>
+          <label><input type="checkbox" id="orchestrator-approve-writes" /> Approve writes</label>
+          <button class="btn" type="button" id="orchestrator-dispatch">Dispatch</button>
+          <button class="btn" type="button" id="orchestrator-compact">Compact</button>
+        </div>
+        <div class="gap-hunter-result" id="orchestrator-result">
+          <p>Use the orchestrator to choose bounded cloud tasks, create child runs, and compact long ledgers when needed.</p>
+        </div>
+      </details>
+
+      <details class="cloud-side-section">
+        <summary>
+          <span>Lead Analyst Skill</span>
+          <em>Editable runtime prompts</em>
+        </summary>
+        <textarea id="overlord-skill-prompt" class="gap-question" rows="10" placeholder="Lead analyst system prompt"></textarea>
+        <textarea id="overlord-subagent-prompts" class="gap-question" rows="6" placeholder='Subagent prompt overrides as JSON, e.g. {"red_team":"..."}'></textarea>
+        <div class="gap-hunter-actions">
+          <button class="btn" type="button" id="overlord-skill-load">Reload</button>
+          <button class="btn primary" type="button" id="overlord-skill-save">Save Skill</button>
+        </div>
+        <div class="gap-hunter-result" id="overlord-skill-result">
+          <p>This prompt is captured into each new goal so a running campaign remains reproducible.</p>
+        </div>
+      </details>
+
+      <details class="cloud-side-section">
+        <summary>
+          <span>Report Body Builder</span>
+          <em>Draft readable report prose</em>
+        </summary>
+        <div class="gap-hunter-controls">
+          <input id="report-body-target" class="cloud-model-filter" type="text" placeholder="Report ID or subject" />
+          <button class="btn" type="button" id="report-body-start">Start</button>
+          <button class="btn" type="button" id="report-body-continue">Continue</button>
+        </div>
+        <textarea id="report-body-objective" class="gap-question" rows="3" placeholder="Optional body-builder objective"></textarea>
+        <div class="gap-hunter-actions">
+          <label>
+            <input type="checkbox" id="report-body-persist" />
+            Persist addendum
+          </label>
+        </div>
+        <div class="gap-hunter-result" id="report-body-result">
+          <p>Build a substantive report body from Thoth memory, preserving institutional, vetted-relay, primary, and gap labels.</p>
+        </div>
+      </details>
+
+      <details class="cloud-side-section">
+        <summary>
+          <span>Red Team</span>
+          <em>Adversarial review</em>
+        </summary>
+        <div class="gap-hunter-controls">
+          <input id="red-team-target" class="cloud-model-filter" type="text" placeholder="Report ID or subject" />
+          <button class="btn" type="button" id="red-team-start">Start</button>
+          <button class="btn" type="button" id="red-team-continue">Continue</button>
+        </div>
+        <textarea id="red-team-objective" class="gap-question" rows="3" placeholder="Optional red-team objective"></textarea>
+        <div class="gap-hunter-actions">
+          <label>
+            <input type="checkbox" id="red-team-persist" />
+            Draft requests
+          </label>
+        </div>
+        <div class="gap-hunter-result" id="red-team-result">
+          <p>Challenge a report or company thesis for weak evidence, hidden assumptions, stale material, and missing counterevidence.</p>
+        </div>
+      </details>
+
+      <details class="cloud-side-section">
+        <summary>
+          <span>Model Catalog</span>
+          <em>{{ rows|length }} models{% if catalog.get('artificial_analysis_rows') %} / AA {{ catalog.get('artificial_analysis_rows') }}{% endif %}</em>
+        </summary>
+        <section class="cloud-rail-head">
+          <div>
+            <h2>Model Catalog</h2>
+            <p>{{ rows|length }} models tracked{% if catalog.get('artificial_analysis_rows') %} / AA weekly scores {{ catalog.get('artificial_analysis_rows') }}{% endif %}{% if catalog.get('openrouter_error') %} / OpenRouter refresh limited{% endif %}{% if catalog.get('nous_error') %} / Nous refresh limited{% endif %}</p>
+          </div>
+          <button class="btn" type="button" id="cloud-refresh-models">Load models</button>
+        </section>
+        <input id="cloud-model-filter" class="cloud-model-filter" type="text" placeholder="Filter service or model" />
+        <div class="cloud-model-table" id="cloud-model-table">
+          <div class="cloud-model-row is-head">
+            <span>Service</span>
+            <span>Model</span>
+            <span>Input</span>
+            <span>Route</span>
+          </div>
+          {% for row in rows %}
+            <button class="cloud-model-row" type="button" data-provider="{{ row.provider }}" data-model="{{ row.model }}" data-search="{{ (row.service ~ ' ' ~ row.model ~ ' ' ~ row.model_label ~ ' ' ~ (row.routing_lanes or [])|join(' '))|lower }}">
+              <span>{{ row.service }}</span>
+              <span>
+                {{ row.model_label }}
+                {% if row.auto %}<em>auto</em>{% elif row.free %}<em>free</em>{% endif %}
+                {% if not row.text_output %}<em>media</em>{% endif %}
+              </span>
+              <span>{{ row.price_input }}</span>
+              <span>{{ row.context_tier or 'n/a' }}{% if row.intelligence_score is not none %} / AA {{ row.intelligence_score }}{% endif %}</span>
+            </button>
+          {% endfor %}
+        </div>
+      </details>
+    </aside>
+  </div>
+</section>
+
+<style>
+.cloud-agent-shell{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.cloud-agent-top{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:16px;
+  padding:16px 18px 14px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:8px;
+  background:linear-gradient(180deg, rgba(12,16,22,.88), rgba(5,8,12,.72));
+}
+.cloud-agent-top h1{
+  margin:4px 0 6px;
+  color:var(--text-bright);
+  font-size:24px;
+  line-height:1.1;
+  letter-spacing:0;
+}
+.cloud-agent-top p,
+.cloud-rail-head p{
+  margin:0;
+  color:var(--muted);
+  font-size:12px;
+}
+.cloud-agent-status,
+.cloud-composer-actions{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.pill.warn{
+  border-color:rgba(255,196,87,.42);
+  color:#ffd58a;
+}
+.cloud-agent-grid{
+  display:grid;
+  grid-template-columns:minmax(260px,330px) minmax(0,1fr) minmax(340px,430px);
+  gap:10px;
+  align-items:start;
+}
+.cloud-ops-panel{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  padding:10px 12px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:8px;
+  background:rgba(5,8,12,.56);
+}
+.cloud-ops-metrics,
+.cloud-ops-controls,
+.cloud-schedule-grid{
+  display:grid;
+  gap:8px;
+  align-items:center;
+}
+.cloud-ops-metrics{
+  grid-template-columns:repeat(6,minmax(0,1fr));
+}
+.cloud-ops-metrics div{
+  min-width:0;
+  padding:7px 9px;
+  border-left:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.025);
+}
+.cloud-ops-metrics div.is-alert{
+  border-color:rgba(255,196,87,.35);
+}
+.cloud-ops-metrics span{
+  display:block;
+  color:var(--muted);
+  font-family:var(--mono);
+  font-size:10px;
+  text-transform:uppercase;
+}
+.cloud-ops-metrics strong{
+  display:block;
+  overflow:hidden;
+  color:var(--text-bright);
+  font-size:14px;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.cloud-ops-controls{
+  grid-template-columns:150px 96px auto auto minmax(0,1fr);
+}
+.cloud-schedule-grid{
+  grid-template-columns:130px minmax(0,1fr) 90px 130px minmax(0,1fr) 90px 130px minmax(0,1fr) 90px auto;
+}
+.cloud-schedule-details{
+  border-top:1px solid rgba(255,255,255,.08);
+  padding-top:8px;
+}
+.cloud-schedule-details summary{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  cursor:pointer;
+  color:var(--text-bright);
+  font-size:12px;
+}
+.cloud-schedule-details summary em{
+  overflow:hidden;
+  color:var(--muted);
+  font-style:normal;
+  font-family:var(--mono);
+  font-size:10px;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.cloud-schedule-details .cloud-schedule-grid{
+  margin-top:8px;
+}
+.cloud-ops-controls select,
+.cloud-ops-controls input,
+.cloud-schedule-grid input{
+  min-width:0;
+  height:34px;
+  padding:0 9px;
+  color:var(--text);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:8px;
+  background:rgba(0,0,0,.24);
+}
+.cloud-schedule-grid label{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  color:var(--muted);
+  font-size:12px;
+}
+.cloud-ops-status p{
+  margin:0;
+  color:var(--muted);
+  font-size:12px;
+}
+.cloud-chat-pane,
+.cloud-model-rail,
+.cloud-run-rail{
+  min-width:0;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:8px;
+  background:rgba(5,8,12,.64);
+}
+.cloud-run-rail,
+.cloud-model-rail{
+  position:sticky;
+  top:10px;
+  max-height:calc(100vh - 20px);
+  overflow:auto;
+}
+.cloud-workbench-panel{
+  padding:12px;
+}
+.cloud-audit-panel{
+  border-top:1px solid rgba(255,255,255,.08);
+}
+.cloud-audit-controls{
+  display:grid;
+  grid-template-columns:minmax(72px,1fr) auto auto auto;
+  gap:6px;
+  margin-top:8px;
+}
+.cloud-audit-controls input{
+  min-width:0;
+  height:32px;
+  padding:0 8px;
+  color:var(--text);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:7px;
+  background:rgba(0,0,0,.24);
+}
+.cloud-audit-controls + .cloud-audit-controls{
+  grid-template-columns:minmax(72px,1fr) auto;
+}
+.cloud-audit-result{
+  max-height:320px;
+  margin:8px 0 0;
+  padding:9px;
+  overflow:auto;
+  color:var(--muted);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:7px;
+  background:rgba(0,0,0,.25);
+  font:10px/1.45 var(--mono);
+  white-space:pre-wrap;
+}
+.cloud-panel-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  padding:12px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+.cloud-workbench-panel .cloud-panel-head{
+  padding:0 0 10px;
+}
+.cloud-panel-head h2{
+  margin:0 0 4px;
+  color:var(--text-bright);
+  font-size:14px;
+  letter-spacing:0;
+}
+.cloud-panel-head p{
+  margin:0;
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.4;
+}
+.cloud-panel-head em{
+  color:var(--muted);
+  font-style:normal;
+  font-family:var(--mono);
+  font-size:10px;
+  white-space:nowrap;
+}
+.cloud-console-head{
+  border-bottom:0;
+  padding-bottom:0;
+}
+.cloud-runs-ledger{
+  max-height:calc(100vh - 122px);
+  padding:0;
+}
+.cloud-write-details{
+  margin-top:6px;
+  color:var(--muted);
+  font-family:var(--mono);
+  font-size:10px;
+}
+.cloud-write-details summary{
+  cursor:pointer;
+}
+.cloud-write-diff{
+  display:block;
+  margin:5px 0 0;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:var(--text);
+  font:inherit;
+  text-align:left;
+  cursor:pointer;
+}
+.cloud-write-diff-view{
+  max-height:260px;
+  overflow:auto;
+  margin:6px 0 0;
+  padding:8px;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:8px;
+  background:rgba(0,0,0,.24);
+  white-space:pre-wrap;
+}
+.cloud-picker-band{
+  display:grid;
+  grid-template-columns:minmax(260px,420px) minmax(0,1fr);
+  gap:12px;
+  padding:10px 12px 12px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+.cloud-picker-field{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.cloud-picker-field label,
+.cloud-price-readout span,
+.cloud-message-meta{
+  color:var(--muted);
+  font-family:var(--mono);
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:0;
+}
+.cloud-picker-field select,
+.cloud-model-filter,
+.cloud-composer textarea,
+.cloud-composer select{
+  width:100%;
+  min-width:0;
+  color:var(--text);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:8px;
+  background:rgba(0,0,0,.24);
+}
+.cloud-command-wrap{position:relative;min-width:0;flex:1}
+.cloud-slash-menu{
+  position:absolute;
+  z-index:20;
+  left:0;
+  right:0;
+  bottom:calc(100% + 6px);
+  padding:5px;
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:8px;
+  background:#10151d;
+  box-shadow:0 14px 34px rgba(0,0,0,.45);
+}
+.cloud-slash-menu button{
+  display:grid;
+  grid-template-columns:72px 1fr;
+  gap:10px;
+  width:100%;
+  padding:9px 10px;
+  color:var(--text);
+  text-align:left;
+  border:0;
+  border-radius:6px;
+  background:transparent;
+  cursor:pointer;
+}
+.cloud-slash-menu button:hover,.cloud-slash-menu button:focus{background:rgba(255,255,255,.08)}
+.cloud-slash-menu span{color:var(--muted);font-size:11px}
+.cloud-composer-actions select{max-width:260px;height:34px;padding:0 8px}
+.cloud-picker-field select,
+.cloud-model-filter{
+  height:38px;
+  padding:0 10px;
+}
+.cloud-price-readout{
+  display:grid;
+  grid-template-columns:1fr 1.6fr 1fr 1fr;
+  gap:1px;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:8px;
+  background:rgba(255,255,255,.06);
+}
+.cloud-price-readout div{
+  min-width:0;
+  padding:8px 10px;
+  background:rgba(0,0,0,.22);
+}
+.cloud-price-readout strong{
+  display:block;
+  overflow:hidden;
+  color:var(--text-bright);
+  font-family:var(--mono);
+  font-size:12px;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.cloud-transcript{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  min-height:430px;
+  max-height:58vh;
+  overflow:auto;
+  padding:14px;
+}
+.cloud-message{
+  max-width:820px;
+  padding:10px 12px;
+  border-left:2px solid rgba(255,255,255,.16);
+  background:rgba(255,255,255,.035);
+}
+.cloud-message.is-user{
+  align-self:flex-end;
+  border-left-color:var(--accent2);
+  background:rgba(255,255,255,.055);
+}
+.cloud-message.is-agent{
+  border-left-color:var(--accent);
+}
+.cloud-message p{
+  margin:5px 0 0;
+  color:var(--text);
+  font-size:13px;
+  line-height:1.55;
+}
+.cloud-message ul{
+  margin:8px 0 0 18px;
+  padding:0;
+  color:var(--text);
+  font-size:13px;
+}
+.cloud-composer{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  padding:12px;
+  border-top:1px solid rgba(255,255,255,.08);
+}
+.cloud-composer textarea{
+  resize:vertical;
+  min-height:96px;
+  padding:10px;
+  line-height:1.5;
+}
+.cloud-composer-actions label{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  color:var(--muted);
+  font-size:12px;
+}
+.cloud-model-rail{
+  padding:10px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.cloud-side-section{
+  border-top:1px solid rgba(255,255,255,.08);
+  background:transparent;
+}
+.cloud-side-section:first-child{
+  border-top:0;
+}
+.cloud-side-section summary{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  cursor:pointer;
+  padding:11px 2px;
+  color:var(--text-bright);
+  font-size:13px;
+}
+.cloud-side-section summary em{
+  color:var(--muted);
+  font-style:normal;
+  font-size:11px;
+}
+.cloud-rail-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+  margin:0 0 10px;
+  padding:0 10px;
+}
+.cloud-rail-head h2{
+  margin:0 0 4px;
+  color:var(--text-bright);
+  font-size:17px;
+}
+.cloud-model-table{
+  display:flex;
+  flex-direction:column;
+  max-height:46vh;
+  overflow:auto;
+  margin-top:10px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:8px;
+}
+.gap-hunter-controls{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto auto;
+  gap:8px;
+  padding:0 0 10px;
+}
+.gap-hunter-actions{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding:0 0 10px;
+  color:var(--muted);
+  font-size:12px;
+}
+.gap-question{
+  width:100%;
+  min-height:72px;
+  margin:0 0 8px;
+  resize:vertical;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:8px;
+  background:rgba(255,255,255,.04);
+  color:var(--text);
+  padding:9px 10px;
+  font:inherit;
+  font-size:12px;
+}
+.cloud-memory-form{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);
+  gap:8px;
+  padding:0 0 8px;
+}
+.cloud-memory-preview{
+  max-height:260px;
+  overflow:auto;
+  margin:8px 0 0;
+  padding:8px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:8px;
+  background:rgba(0,0,0,.2);
+  color:var(--text);
+  white-space:pre-wrap;
+}
+.cloud-memory-meta{
+  color:var(--muted);
+  font-family:var(--mono);
+  font-size:10px;
+}
+.gap-hunter-result{
+  max-height:430px;
+  overflow:auto;
+  padding:0 0 10px;
+  color:var(--muted);
+  font-size:12px;
+}
+.gap-hunter-result p{
+  margin:0 0 8px;
+}
+.gap-universe,
+.gap-row{
+  width:100%;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:8px;
+  border:0;
+  border-top:1px solid rgba(255,255,255,.08);
+  background:transparent;
+  color:var(--text);
+  padding:8px 0;
+  text-align:left;
+}
+.gap-row{
+  grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);
+  cursor:pointer;
+  transition:background .16s ease, border-color .16s ease;
+}
+.gap-row:hover{
+  background:rgba(255,255,255,.035);
+  border-top-color:rgba(255,255,255,.16);
+}
+.gap-universe strong,
+.gap-row strong{
+  display:block;
+  color:var(--text-bright);
+  font-size:12px;
+  font-weight:600;
+}
+.gap-universe span,
+.gap-row span{
+  color:var(--muted);
+  font-size:11px;
+}
+.gap-pill{
+  align-self:start;
+  color:var(--muted);
+  font-family:var(--mono);
+  font-size:10px;
+}
+.gap-result-block{
+  border-top:1px solid rgba(255,255,255,.08);
+  padding-top:8px;
+}
+.gap-result-block h4{
+  margin:0 0 6px;
+  color:var(--text-bright);
+  font-size:12px;
+  letter-spacing:0;
+}
+.gap-result-block ul{
+  margin:0 0 8px;
+  padding-left:18px;
+  color:var(--text);
+  font-size:12px;
+}
+.cloud-model-row{
+  display:grid;
+  grid-template-columns:82px minmax(0,1fr) 72px 72px;
+  gap:8px;
+  width:100%;
+  min-height:34px;
+  align-items:center;
+  padding:7px 9px;
+  border:0;
+  border-bottom:1px solid rgba(255,255,255,.06);
+  color:var(--text);
+  background:transparent;
+  text-align:left;
+}
+.cloud-model-row:not(.is-head):hover{
+  background:rgba(255,255,255,.055);
+}
+.cloud-model-row.is-head{
+  position:sticky;
+  top:0;
+  z-index:1;
+  color:var(--muted);
+  font-family:var(--mono);
+  font-size:10px;
+  text-transform:uppercase;
+  background:rgba(5,8,12,.96);
+}
+.cloud-model-row span{
+  min-width:0;
+  overflow:hidden;
+  font-size:12px;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.cloud-model-row em{
+  display:inline-block;
+  margin-left:5px;
+  color:var(--accent2);
+  font-style:normal;
+  font-family:var(--mono);
+  font-size:10px;
+}
+@media (max-width: 980px){
+  .cloud-agent-grid,
+  .cloud-picker-band{
+    grid-template-columns:1fr;
+  }
+  .cloud-run-rail,
+  .cloud-model-rail{
+    position:static;
+    max-height:none;
+  }
+  .cloud-price-readout{
+    grid-template-columns:1fr 1fr;
+  }
+  .cloud-ops-metrics,
+  .cloud-ops-controls,
+  .cloud-schedule-grid{
+    grid-template-columns:1fr 1fr;
+  }
+  .cloud-schedule-details summary{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+  .cloud-memory-form{
+    grid-template-columns:1fr;
+  }
+}
+</style>
+
+<script>
+(function(){
+  const catalog = {{ catalog_bootstrap|tojson }};
+  let cloudStatus = {{ cloud_status_bootstrap|tojson }};
+  let rows = Array.isArray(catalog.rows) ? catalog.rows : [];
+  const modelSelect = document.getElementById('cloud-model-select');
+  const serviceOut = document.getElementById('cloud-service-readout');
+  const modelOut = document.getElementById('cloud-model-readout');
+  const inputOut = document.getElementById('cloud-input-readout');
+  const outputOut = document.getElementById('cloud-output-readout');
+  const contextOut = document.getElementById('cloud-context-readout');
+  const aaOut = document.getElementById('cloud-aa-readout');
+  const transcript = document.getElementById('cloud-transcript');
+  const composer = document.getElementById('cloud-composer');
+  const input = document.getElementById('cloud-message-input');
+  const slashMenu = document.getElementById('cloud-slash-menu');
+  const goalFlashModel = document.getElementById('goal-flash-model');
+  const cloudSkillSelect = document.getElementById('cloud-skill-select');
+  const goalApproveWrites = document.getElementById('goal-approve-writes');
+  const freeOnly = document.getElementById('cloud-free-only');
+  const filter = document.getElementById('cloud-model-filter');
+  const refreshBtn = document.getElementById('cloud-refresh-models');
+  const gapKeyword = document.getElementById('gap-keyword');
+  const gapRun = document.getElementById('gap-run');
+  const gapOverview = document.getElementById('gap-overview');
+  const gapResult = document.getElementById('gap-result');
+  const gapQuestion = document.getElementById('gap-question');
+  const gapPersist = document.getElementById('gap-persist');
+  const gapTaskRun = document.getElementById('gap-task-run');
+  const gapGoalStart = document.getElementById('gap-goal-start');
+  const gapGoalContinue = document.getElementById('gap-goal-continue');
+  const reportBodyTarget = document.getElementById('report-body-target');
+  const reportBodyObjective = document.getElementById('report-body-objective');
+  const reportBodyPersist = document.getElementById('report-body-persist');
+  const reportBodyStart = document.getElementById('report-body-start');
+  const reportBodyContinue = document.getElementById('report-body-continue');
+  const reportBodyResult = document.getElementById('report-body-result');
+  const redTeamTarget = document.getElementById('red-team-target');
+  const redTeamObjective = document.getElementById('red-team-objective');
+  const redTeamPersist = document.getElementById('red-team-persist');
+  const redTeamStart = document.getElementById('red-team-start');
+  const redTeamContinue = document.getElementById('red-team-continue');
+  const redTeamResult = document.getElementById('red-team-result');
+  const cloudRunMode = document.getElementById('cloud-run-mode');
+  const cloudRunLookback = document.getElementById('cloud-run-lookback');
+  const cloudRunNow = document.getElementById('cloud-run-now');
+  const cloudRefreshStatus = document.getElementById('cloud-refresh-status');
+  const cloudSaveSchedule = document.getElementById('cloud-save-schedule');
+  const cloudOpsStatus = document.getElementById('cloud-ops-status');
+  const cloudWritePolicyPill = document.getElementById('cloud-write-policy-pill');
+  const cloudWritePolicyStatus = document.getElementById('cloud-write-policy-status');
+  const cloudRunsList = document.getElementById('cloud-runs-list');
+  const cloudRunCount = document.getElementById('cloud-run-count');
+  const cloudAuditRunId = document.getElementById('cloud-audit-run-id');
+  const cloudAuditProjection = document.getElementById('cloud-audit-projection');
+  const cloudAuditFull = document.getElementById('cloud-audit-full');
+  const cloudAuditLineage = document.getElementById('cloud-audit-lineage');
+  const cloudAuditLineageId = document.getElementById('cloud-audit-lineage-id');
+  const cloudAuditAccept = document.getElementById('cloud-audit-accept');
+  const cloudAuditResult = document.getElementById('cloud-audit-result');
+  const cloudMemoryFilter = document.getElementById('cloud-memory-filter');
+  const cloudMemoryRefresh = document.getElementById('cloud-memory-refresh');
+  const cloudMemoryContext = document.getElementById('cloud-memory-context');
+  const cloudMemoryKey = document.getElementById('cloud-memory-key');
+  const cloudMemoryTitle = document.getElementById('cloud-memory-title');
+  const cloudMemoryType = document.getElementById('cloud-memory-type');
+  const cloudMemoryScope = document.getElementById('cloud-memory-scope');
+  const cloudMemoryContent = document.getElementById('cloud-memory-content');
+  const cloudMemorySave = document.getElementById('cloud-memory-save');
+  const cloudMemoryArchive = document.getElementById('cloud-memory-archive');
+  const cloudMemoryResult = document.getElementById('cloud-memory-result');
+  const cloudMemoryCount = document.getElementById('cloud-memory-count');
+  const orchestratorObjective = document.getElementById('orchestrator-objective');
+  const orchestratorRunId = document.getElementById('orchestrator-run-id');
+  const orchestratorStart = document.getElementById('orchestrator-start');
+  const orchestratorPlan = document.getElementById('orchestrator-plan');
+  const orchestratorDispatch = document.getElementById('orchestrator-dispatch');
+  const orchestratorCompact = document.getElementById('orchestrator-compact');
+  const orchestratorExecuteChild = document.getElementById('orchestrator-execute-child');
+  const orchestratorApproveWrites = document.getElementById('orchestrator-approve-writes');
+  const orchestratorResult = document.getElementById('orchestrator-result');
+  const overlordSkillPrompt = document.getElementById('overlord-skill-prompt');
+  const overlordSubagentPrompts = document.getElementById('overlord-subagent-prompts');
+  const overlordSkillLoad = document.getElementById('overlord-skill-load');
+  const overlordSkillSave = document.getElementById('overlord-skill-save');
+  const overlordSkillResult = document.getElementById('overlord-skill-result');
+  let currentGapIndex = null;
+  let currentGapParams = {};
+  let currentGapRunId = null;
+  let currentReportBodyRunId = null;
+  let currentRedTeamRunId = null;
+  let currentOrchestratorRunId = null;
+
+  function selectedParts(){
+    const value = modelSelect ? modelSelect.value : 'openrouter|openrouter/free';
+    const [provider, ...modelParts] = value.split('|');
+    return { provider, model: modelParts.join('|') };
+  }
+
+  function flashParts(){
+    const value = goalFlashModel ? goalFlashModel.value : (modelSelect ? modelSelect.value : 'openrouter|openrouter/free');
+    const [provider, ...modelParts] = value.split('|');
+    return { provider, model: modelParts.join('|') };
+  }
+
+  function selectedSkillSlugs(){
+    return cloudSkillSelect ? Array.from(cloudSkillSelect.selectedOptions).map(option => option.value).filter(Boolean) : [];
+  }
+
+  async function loadCloudSkills(){
+    if (!cloudSkillSelect) return;
+    try {
+      const resp = await fetch('/api/agents/cloud/skills');
+      const data = await resp.json();
+      if (!data.ok) return;
+      cloudSkillSelect.innerHTML = '';
+      (data.catalog || []).forEach(skill => {
+        const option = document.createElement('option');
+        option.value = skill.slug;
+        option.textContent = skill.name;
+        option.title = skill.description || skill.slug;
+        cloudSkillSelect.appendChild(option);
+      });
+    } catch (_) {
+      // The console remains usable without optional skill discovery.
+    }
+  }
+
+  function goalSummary(data){
+    if (data.action === 'list') {
+      const goals = Array.isArray(data.goals) ? data.goals : [];
+      return goals.length
+        ? goals.slice(0, 8).map(goal => `#${goal.id} ${goal.goal_state} / ${goal.run_status}: ${goal.objective}`).join('\n')
+        : 'No durable cloud goals yet.';
+    }
+    const run = data.run || {};
+    return `Goal #${run.id || '?'} ${data.action || 'updated'}: ${run.objective || ''}`;
+  }
+
+  async function runGoalCommand(command){
+    const lead = selectedParts();
+    const flash = flashParts();
+    appendMessage('system', `Running ${command.split(/\s+/)[0]} with lead ${lead.provider} / ${lead.model} and Flash ${flash.provider} / ${flash.model}...`);
+    const resp = await fetch('/api/agents/goals/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        command,
+        provider: lead.provider,
+        model: lead.model,
+        flash_provider: flash.provider,
+        flash_model: flash.model,
+        free_only: freeOnly ? freeOnly.checked : false,
+        permission_profile: {
+          allow_durable_writes: goalApproveWrites ? goalApproveWrites.checked : false,
+          operator_approved: goalApproveWrites ? goalApproveWrites.checked : false,
+          child_max_steps: 3,
+        },
+        skill_slugs: selectedSkillSlugs(),
+      }),
+    });
+    const data = await resp.json();
+    if (!data.ok) throw new Error(data.error || data.detail || 'Goal command failed.');
+    if (data.run && data.run.id) {
+      currentOrchestratorRunId = data.run.id;
+      if (orchestratorRunId) orchestratorRunId.value = String(data.run.id);
+    }
+    appendMessage('agent', goalSummary(data));
+    await refreshCloudStatus();
+  }
+
+  async function loadOverlordSkill(){
+    if (overlordSkillResult) overlordSkillResult.innerHTML = '<p>Loading skill...</p>';
+    try {
+      const resp = await fetch('/api/agents/orchestrator/skill');
+      const data = await resp.json();
+      if (!data.ok) throw new Error(data.error || data.detail || 'Skill load failed.');
+      if (overlordSkillPrompt) overlordSkillPrompt.value = data.skill.system_prompt || '';
+      if (overlordSubagentPrompts) overlordSubagentPrompts.value = JSON.stringify(data.skill.subagent_prompts || {}, null, 2);
+      if (overlordSkillResult) overlordSkillResult.innerHTML = `<p>Loaded skill #${data.skill.id}. New goals snapshot this prompt.</p>`;
+    } catch (err) {
+      if (overlordSkillResult) overlordSkillResult.innerHTML = `<p>${String(err)}</p>`;
+    }
+  }
+
+  async function saveOverlordSkill(){
+    if (overlordSkillResult) overlordSkillResult.innerHTML = '<p>Saving skill...</p>';
+    try {
+      const overrides = JSON.parse((overlordSubagentPrompts && overlordSubagentPrompts.value.trim()) || '{}');
+      const resp = await fetch('/api/agents/orchestrator/skill', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_prompt: overlordSkillPrompt ? overlordSkillPrompt.value.trim() : '',
+          subagent_prompts: overrides,
+        }),
+      });
+      const data = await resp.json();
+      if (!data.ok) throw new Error(data.error || data.detail || 'Skill save failed.');
+      if (overlordSkillResult) overlordSkillResult.innerHTML = `<p>Saved skill #${data.skill.id}.</p>`;
+    } catch (err) {
+      if (overlordSkillResult) overlordSkillResult.innerHTML = `<p>${String(err)}</p>`;
+    }
+  }
+
+  function selectedRow(){
+    const parts = selectedParts();
+    return rows.find(row => row.provider === parts.provider && row.model === parts.model) || null;
+  }
+
+  function syncReadout(){
+    const row = selectedRow();
+    if (!row) return;
+    serviceOut.textContent = row.service || row.provider || 'service';
+    modelOut.textContent = row.model || 'model';
+    inputOut.textContent = row.price_input || 'n/a';
+    outputOut.textContent = row.price_output || 'n/a';
+    if (contextOut) contextOut.textContent = row.context_tier || 'unknown';
+    if (aaOut) aaOut.textContent = row.intelligence_score == null ? 'n/a' : String(row.intelligence_score);
+  }
+
+  function appendMessage(kind, text, payload){
+    if (!transcript) return;
+    const article = document.createElement('article');
+    article.className = `cloud-message is-${kind}`;
+    const meta = document.createElement('div');
+    meta.className = 'cloud-message-meta';
+    meta.textContent = kind === 'user' ? 'you' : kind === 'agent' ? 'cloud agent' : 'system';
+    article.appendChild(meta);
+    const p = document.createElement('p');
+    p.textContent = text;
+    article.appendChild(p);
+    if (payload && Array.isArray(payload.key_points) && payload.key_points.length) {
+      const ul = document.createElement('ul');
+      payload.key_points.slice(0, 6).forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = String(item);
+        ul.appendChild(li);
+      });
+      article.appendChild(ul);
+    }
+    transcript.appendChild(article);
+    transcript.scrollTop = transcript.scrollHeight;
+  }
+
+  function gapSetLoading(text){
+    if (!gapResult) return;
+    gapResult.innerHTML = '';
+    const p = document.createElement('p');
+    p.textContent = text;
+    gapResult.appendChild(p);
+  }
+
+  function smallText(parts){
+    return parts.filter(Boolean).join(' · ');
+  }
+
+  function renderGapOverview(index){
+    if (!gapResult) return;
+    currentGapIndex = index;
+    gapResult.innerHTML = '';
+    const intro = document.createElement('p');
+    intro.textContent = `Section-level first pass: ${index.items.length} universes, ${index.row_count || 0} rows available for drilldown.`;
+    gapResult.appendChild(intro);
+    index.items.forEach(item => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'gap-universe';
+      const main = document.createElement('div');
+      const title = document.createElement('strong');
+      title.textContent = item.universe_name || item.universe_slug || 'Universe';
+      main.appendChild(title);
+      const meta = document.createElement('span');
+      meta.textContent = smallText([`${item.section_count || 0} sections`, `${item.row_count || 0} rows`]);
+      main.appendChild(meta);
+      wrapper.appendChild(main);
+      const pill = document.createElement('span');
+      pill.className = 'gap-pill';
+      pill.textContent = item.universe_slug || '';
+      wrapper.appendChild(pill);
+      gapResult.appendChild(wrapper);
+      (item.sections || []).slice(0, 8).forEach(section => {
+        const btn = document.createElement('button');
+        btn.className = 'gap-row';
+        btn.type = 'button';
+        btn.dataset.sectionId = String(section.section_id);
+        const left = document.createElement('div');
+        const name = document.createElement('strong');
+        name.textContent = section.section_name || section.section_key || 'Section';
+        left.appendChild(name);
+        const detail = document.createElement('span');
+        detail.textContent = smallText([item.universe_name, section.description]);
+        left.appendChild(detail);
+        btn.appendChild(left);
+        const right = document.createElement('span');
+        right.textContent = `${section.row_count || 0} rows`;
+        btn.appendChild(right);
+        btn.addEventListener('click', () => loadGapIndex({ section_id: section.section_id }));
+        gapResult.appendChild(btn);
+      });
+    });
+  }
+
+  function renderGapDrilldown(index){
+    if (!gapResult) return;
+    currentGapIndex = index;
+    gapResult.innerHTML = '';
+    const intro = document.createElement('p');
+    intro.textContent = `${index.row_count || 0} row matches${index.keyword ? ` for "${index.keyword}"` : ''}.`;
+    gapResult.appendChild(intro);
+    (index.rows || []).forEach(row => {
+      const div = document.createElement('div');
+      div.className = 'gap-row';
+      const left = document.createElement('div');
+      const title = document.createElement('strong');
+      title.textContent = smallText([row.company, row.ticker]);
+      left.appendChild(title);
+      const note = document.createElement('span');
+      note.textContent = smallText([row.universe_name, row.section_name, row.role, row.note]);
+      left.appendChild(note);
+      div.appendChild(left);
+      const right = document.createElement('span');
+      right.textContent = row.has_company_report ? smallText([`report ${row.report_id}`, row.report_quality || 'unknown']) : 'report missing';
+      div.appendChild(right);
+      gapResult.appendChild(div);
+    });
+  }
+
+  async function loadGapIndex(params){
+    if (!gapResult) return;
+    currentGapParams = { ...(params || {}) };
+    const query = new URLSearchParams();
+    Object.entries(params || {}).forEach(([key, value]) => {
+      if (value !== null && value !== undefined && String(value).trim()) query.set(key, String(value));
+    });
+    gapSetLoading('Loading universe coverage index...');
+    try {
+      const resp = await fetch(`/api/agents/gap-hunter/universe-index?${query.toString()}`);
+      const data = await resp.json();
+      if (!data.ok) {
+        gapSetLoading(data.error || 'Universe coverage index failed.');
+        return;
+      }
+      const index = data.index || {};
+      if (index.mode === 'overview') renderGapOverview(index);
+      else renderGapDrilldown(index);
+    } catch (err) {
+      gapSetLoading(String(err));
+    }
+  }
+
+  function stringifyCandidate(item){
+    if (typeof item === 'string') return item;
+    if (!item || typeof item !== 'object') return String(item || '');
+    return [
+      item.company || item.ticker || item.topic || item.term || item.concept || item.title || item.query,
+      item.reason || item.rationale || item.summary || item.description,
+    ].filter(Boolean).join(' - ');
+  }
+
+  function renderGapTask(data){
+    if (!gapResult) return;
+    const index = data.index || currentGapIndex || {};
+    if (index.mode === 'overview') renderGapOverview(index);
+    else renderGapDrilldown(index);
+    const result = data.result || {};
+    const block = document.createElement('div');
+    block.className = 'gap-result-block';
+    const title = document.createElement('h4');
+    title.textContent = 'Cloud Gap Hunter';
+    block.appendChild(title);
+    const summary = document.createElement('p');
+    summary.textContent = result.coverage_summary || 'No coverage summary returned.';
+    block.appendChild(summary);
+    [
+      ['missing_company_reports', 'Missing company reports'],
+      ['missing_product_explainers', 'Missing product explainers'],
+      ['technical_definition_gaps', 'Definition gaps'],
+      ['super_report_candidates', 'Super-report candidates'],
+      ['bottleneck_candidates', 'Bottleneck candidates'],
+      ['followup_context_requests', 'Follow-up context requests'],
+      ['next_best_actions', 'Next actions'],
+    ].forEach(([key, label]) => {
+      const rows = Array.isArray(result[key]) ? result[key] : [];
+      if (!rows.length) return;
+      const h = document.createElement('h4');
+      h.textContent = label;
+      block.appendChild(h);
+      const ul = document.createElement('ul');
+      rows.slice(0, 6).forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = stringifyCandidate(item);
+        ul.appendChild(li);
+      });
+      block.appendChild(ul);
+    });
+    if (data.persisted_candidates && data.persisted_candidates.length) {
+      const p = document.createElement('p');
+      p.textContent = `${data.persisted_candidates.length} draft instrument requests created.`;
+      block.appendChild(p);
+    }
+    if (data.routed_model && data.routed_model !== data.requested_model) {
+      const p = document.createElement('p');
+      p.textContent = `OpenRouter routed ${data.requested_model} to ${data.routed_model}.`;
+      block.appendChild(p);
+    }
+    if (data.usage && data.usage.total_tokens) {
+      const p = document.createElement('p');
+      p.textContent = `Token usage: ${data.usage.total_tokens} total.`;
+      block.appendChild(p);
+    }
+    gapResult.appendChild(block);
+  }
+
+  async function runGapTask(){
+    const parts = selectedParts();
+    const body = {
+      ...currentGapParams,
+      provider: parts.provider,
+      model: parts.model,
+      free_only: freeOnly ? freeOnly.checked : true,
+      question: gapQuestion ? gapQuestion.value.trim() : '',
+      persist_candidates: gapPersist ? gapPersist.checked : false,
+      operator_approved: gapPersist ? gapPersist.checked : false,
+    };
+    if (!currentGapIndex && gapKeyword && gapKeyword.value.trim()) {
+      body.keyword = gapKeyword.value.trim();
+    }
+    gapSetLoading(`Running Gap Hunter on ${parts.provider} / ${parts.model}...`);
+    try {
+      const resp = await fetch('/api/agents/gap-hunter/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json();
+      if (!data.ok) {
+        gapSetLoading(data.error || 'Gap Hunter run failed.');
+        return;
+      }
+      renderGapTask(data);
+    } catch (err) {
+      gapSetLoading(String(err));
+    }
+  }
+
+  function renderGapGoal(run){
+    if (!gapResult) return;
+    gapResult.innerHTML = '';
+    currentGapRunId = run && run.id ? run.id : currentGapRunId;
+    const intro = document.createElement('p');
+    intro.textContent = `Goal run ${run.id} / ${run.status} / ${run.provider} ${run.routed_model || run.model}`;
+    gapResult.appendChild(intro);
+    if (run.final_result && run.final_result.coverage_summary) {
+      const summary = document.createElement('p');
+      summary.textContent = run.final_result.coverage_summary;
+      gapResult.appendChild(summary);
+    }
+    const stats = run.stats || {};
+    const meta = document.createElement('p');
+    meta.textContent = `steps ${stats.steps || 0} / tokens ${stats.total_tokens || stats.input_tokens || 0} / compactions ${stats.compactions || 0}`;
+    gapResult.appendChild(meta);
+    (run.events || []).slice(-12).forEach(event => {
+      const div = document.createElement('div');
+      div.className = 'gap-row';
+      const left = document.createElement('div');
+      const title = document.createElement('strong');
+      title.textContent = `step ${event.step_index} / ${event.event_kind}`;
+      left.appendChild(title);
+      const note = document.createElement('span');
+      note.textContent = event.summary || event.content_md || '';
+      left.appendChild(note);
+      div.appendChild(left);
+      const right = document.createElement('span');
+      right.textContent = `${event.token_estimate || 0} tok`;
+      div.appendChild(right);
+      gapResult.appendChild(div);
+    });
+  }
+
+  async function startGapGoal(){
+    const parts = selectedParts();
+    const body = {
+      ...currentGapParams,
+      provider: parts.provider,
+      model: parts.model,
+      free_only: freeOnly ? freeOnly.checked : false,
+      objective: gapQuestion ? gapQuestion.value.trim() : '',
+      limit: 200,
+    };
+    if (!body.objective) delete body.objective;
+    gapSetLoading(`Starting durable Gap Hunter goal on ${parts.provider} / ${parts.model}...`);
+    try {
+      const resp = await fetch('/api/agents/gap-hunter/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json();
+      if (!data.ok) {
+        gapSetLoading(data.error || 'Gap Hunter goal start failed.');
+        return;
+      }
+      renderGapGoal(data.run);
+    } catch (err) {
+      gapSetLoading(String(err));
+    }
+  }
+
+  async function continueGapGoal(){
+    if (!currentGapRunId) {
+      await startGapGoal();
+      return;
+    }
+    gapSetLoading(`Continuing Gap Hunter goal ${currentGapRunId}...`);
+    try {
+      const resp = await fetch(`/api/agents/gap-hunter/runs/${currentGapRunId}/continue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          max_steps: 5,
+          persist_candidates: gapPersist ? gapPersist.checked : false,
+          operator_approved: gapPersist ? gapPersist.checked : false,
+        }),
+      });
+      const data = await resp.json();
+      if (!data.ok) {
+        gapSetLoading(data.error || 'Gap Hunter goal continue failed.');
+        return;
+      }
+      renderGapGoal(data.run);
+    } catch (err) {
+      gapSetLoading(String(err));
+    }
+  }
+
+  function renderRunPanel(target, run){
+    if (!target) return;
+    target.innerHTML = '';
+    const intro = document.createElement('p');
+    intro.textContent = `Run ${run.id} / ${run.status} / ${run.provider} ${run.routed_model || run.model}`;
+    target.appendChild(intro);
+    const stats = run.stats || {};
+    const meta = document.createElement('p');
+    meta.textContent = `steps ${stats.steps || 0} / tokens ${stats.total_tokens || 0} / compactions ${stats.compactions || 0}`;
+    target.appendChild(meta);
+    const final = run.final_result || {};
+    if (final.summary || final.coverage_summary) {
+      const p = document.createElement('p');
+      p.textContent = final.summary || final.coverage_summary;
+      target.appendChild(p);
+    }
+    (run.events || []).slice(-10).forEach(event => {
+      const div = document.createElement('div');
+      div.className = 'gap-row';
+      const left = document.createElement('div');
+      const title = document.createElement('strong');
+      title.textContent = `step ${event.step_index} / ${event.event_kind}`;
+      left.appendChild(title);
+      const note = document.createElement('span');
+      note.textContent = event.summary || event.content_md || '';
+      left.appendChild(note);
+      div.appendChild(left);
+      const right = document.createElement('span');
+      right.textContent = `${event.token_estimate || 0} tok`;
+      div.appendChild(right);
+      target.appendChild(div);
+    });
+  }
+
+  function statusMessage(text){
+    if (!cloudOpsStatus) return;
+    cloudOpsStatus.innerHTML = '';
+    const p = document.createElement('p');
+    p.textContent = text;
+    cloudOpsStatus.appendChild(p);
+    if (cloudWritePolicyStatus) cloudOpsStatus.appendChild(cloudWritePolicyStatus);
+  }
+
+  function renderWritePolicy(status){
+    const policy = (status && status.write_policy) || {};
+    const enabled = !!policy.enabled;
+    const openshellReady = !!policy.openshell_ready;
+    if (cloudWritePolicyPill) {
+      cloudWritePolicyPill.textContent = `Writes ${enabled && openshellReady ? 'ready' : 'gated'}`;
+      cloudWritePolicyPill.classList.toggle('ok', enabled && openshellReady);
+    }
+    if (cloudWritePolicyStatus) {
+      cloudWritePolicyStatus.textContent = `Durable writes: ${enabled ? 'enabled' : 'disabled'} / OpenShell ${openshellReady ? 'ready' : 'not ready'} / operator approval ${policy.require_operator_approval === false ? 'not required' : 'required'}`;
+    }
+  }
+
+  function renderCloudRuns(status){
+    if (!cloudRunsList) return;
+    const runs = Array.isArray(status && status.runs) ? status.runs : [];
+    if (cloudRunCount) cloudRunCount.textContent = `${runs.length} runs`;
+    cloudRunsList.innerHTML = '';
+    if (!runs.length) {
+      cloudRunsList.innerHTML = status?.loading ? '<p>Loading research status…</p>' : '<p>No recent cloud runs.</p>';
+      return;
+    }
+    runs.slice(0, 18).forEach(run => {
+      const row = document.createElement('div');
+      row.className = 'gap-row';
+      const left = document.createElement('div');
+      const title = document.createElement('strong');
+      title.textContent = `#${run.id} ${run.task_kind} / ${run.status}`;
+      left.appendChild(title);
+      const note = document.createElement('span');
+      note.textContent = String(run.objective || '').slice(0, 180);
+      left.appendChild(note);
+      row.appendChild(left);
+      const right = document.createElement('span');
+      const stats = run.stats || {};
+      const durable = stats.cloud_durable_operations || {};
+      const memory = stats.cloud_agent_memory || {};
+      const suffixes = [`${stats.total_tokens || 0} tok`];
+      if (durable.operation_count || durable.applied_count || durable.error_count) {
+        suffixes.push(`${durable.applied_count || 0} durable`);
+      }
+      if (durable.fallback_count) {
+        suffixes.push(`${durable.fallback_count} fallback`);
+      }
+      if (memory.operation_count || memory.applied_count) {
+        suffixes.push(`${memory.applied_count || 0} mem`);
+      }
+      right.textContent = suffixes.join(' / ');
+      row.appendChild(right);
+      const writeSummaries = Array.isArray(durable.write_summaries) ? durable.write_summaries : [];
+      if (writeSummaries.length) {
+        const details = document.createElement('details');
+        details.className = 'cloud-write-details';
+        const summary = document.createElement('summary');
+        summary.textContent = `${writeSummaries.length} write${writeSummaries.length === 1 ? '' : 's'}`;
+        details.appendChild(summary);
+        writeSummaries.slice(0, 5).forEach(write => {
+          const button = document.createElement('button');
+          button.className = 'cloud-write-diff';
+          button.type = 'button';
+          button.dataset.writeDiffId = String(write.write_diff_id || '');
+          const label = write.destination_label || `${write.destination_type || 'destination'}${write.destination_id ? ` #${write.destination_id}` : ''}`;
+          const words = Number(write.words_added_net || 0);
+          button.textContent = `${label}: ${words >= 0 ? '+' : ''}${words} words`;
+          details.appendChild(button);
+        });
+        left.appendChild(details);
+      }
+      const informalSummaries = Array.isArray(durable.informal_doc_summaries) ? durable.informal_doc_summaries : [];
+      if (informalSummaries.length) {
+        const details = document.createElement('details');
+        details.className = 'cloud-write-details';
+        const summary = document.createElement('summary');
+        summary.textContent = `${informalSummaries.length} research doc${informalSummaries.length === 1 ? '' : 's'}`;
+        details.appendChild(summary);
+        informalSummaries.slice(0, 5).forEach(doc => {
+          const link = document.createElement('a');
+          link.className = 'cloud-write-diff';
+          link.href = `/${doc.category === 'worldview_journal' ? 'worldview-journal' : 'informal-research'}/${encodeURIComponent(doc.informal_doc_key || doc.informal_doc_id || '')}`;
+          const label = doc.title || doc.subject || 'Informal research';
+          const words = Number(doc.words_added || 0);
+          link.textContent = `${label}: ${words >= 0 ? '+' : ''}${words} words${doc.failure_reason ? ' / fallback' : ''}`;
+          if (doc.failure_reason) link.title = doc.failure_reason;
+          details.appendChild(link);
+          if (doc.failure_reason) {
+            const reason = document.createElement('span');
+            reason.className = 'muted';
+            reason.textContent = String(doc.failure_reason).slice(0, 160);
+            details.appendChild(reason);
+          }
+        });
+        left.appendChild(details);
+      }
+      row.addEventListener('click', () => {
+        if (cloudAuditRunId) cloudAuditRunId.value = String(run.id);
+        if (run.task_kind === 'cloud_orchestrator') {
+          currentOrchestratorRunId = run.id;
+          if (orchestratorRunId) orchestratorRunId.value = String(run.id);
+          renderRunPanel(orchestratorResult, run);
+        } else {
+          appendMessage('system', `Selected run #${run.id} (${run.task_kind}).`);
+        }
+      });
+      cloudRunsList.appendChild(row);
+    });
+  }
+
+  function renderAuditPayload(payload){
+    if (!cloudAuditResult) return;
+    const text = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
+    const maxChars = 120000;
+    cloudAuditResult.textContent = text.length > maxChars
+      ? `${text.slice(0, maxChars)}\n\n[UI preview truncated at ${maxChars.toLocaleString()} characters; the API response remains complete.]`
+      : text;
+  }
+
+  async function loadCloudReplay(mode){
+    const runId = Number(cloudAuditRunId && cloudAuditRunId.value || 0);
+    if (!runId) return renderAuditPayload('Enter or select a cloud run ID.');
+    renderAuditPayload(`Loading ${mode} replay for run #${runId}...`);
+    try {
+      const resp = await fetch(`/api/agents/cloud/runs/${encodeURIComponent(runId)}/replay?mode=${encodeURIComponent(mode)}`);
+      const data = await resp.json();
+      if (!data.ok) return renderAuditPayload(data.error || 'Replay unavailable.');
+      renderAuditPayload(data.replay || {});
+    } catch (err) {
+      renderAuditPayload(String(err));
+    }
+  }
+
+  async function loadCloudLineage(){
+    const runId = Number(cloudAuditRunId && cloudAuditRunId.value || 0);
+    if (!runId) return renderAuditPayload('Enter or select a parent cloud run ID.');
+    renderAuditPayload(`Loading lineage for parent run #${runId}...`);
+    try {
+      const resp = await fetch(`/api/agents/cloud/lineage?parent_run_id=${encodeURIComponent(runId)}&limit=100`);
+      const data = await resp.json();
+      if (!data.ok) return renderAuditPayload(data.error || 'Lineage unavailable.');
+      renderAuditPayload(data.lineage || []);
+    } catch (err) {
+      renderAuditPayload(String(err));
+    }
+  }
+
+  async function acceptCloudLineage(){
+    const lineageId = Number(cloudAuditLineageId && cloudAuditLineageId.value || 0);
+    if (!lineageId) return renderAuditPayload('Enter a completed lineage ID to accept.');
+    renderAuditPayload(`Accepting completed lineage #${lineageId}...`);
+    try {
+      const resp = await fetch(`/api/agents/cloud/lineage/${encodeURIComponent(lineageId)}/accept`, { method: 'POST' });
+      const data = await resp.json();
+      if (!data.ok) return renderAuditPayload(data.error || 'Lineage acceptance failed.');
+      renderAuditPayload(data.lineage || {});
+    } catch (err) {
+      renderAuditPayload(String(err));
+    }
+  }
+
+  async function loadCloudWriteDiff(button){
+    const id = button && button.dataset ? button.dataset.writeDiffId : '';
+    if (!id) return;
+    let pre = button.nextElementSibling;
+    if (pre && pre.classList && pre.classList.contains('cloud-write-diff-view')) {
+      pre.remove();
+      return;
+    }
+    pre = document.createElement('pre');
+    pre.className = 'cloud-write-diff-view';
+    pre.textContent = 'Loading diff...';
+    button.insertAdjacentElement('afterend', pre);
+    try {
+      const resp = await fetch(`/api/agents/cloud/write-diffs/${encodeURIComponent(id)}`);
+      const data = await resp.json();
+      if (!data.ok) {
+        pre.textContent = data.error || 'Diff unavailable.';
+        return;
+      }
+      const write = data.write || {};
+      pre.textContent = write.diff_text || '(empty diff)';
+    } catch (err) {
+      pre.textContent = String(err);
+    }
+  }
+
+  document.addEventListener('click', event => {
+    const button = event.target && event.target.closest ? event.target.closest('.cloud-write-diff') : null;
+    if (!button) return;
+    event.preventDefault();
+    event.stopPropagation();
+    loadCloudWriteDiff(button);
+  });
+
+  function renderCloudMemorySegments(payload){
+    if (!cloudMemoryResult) return;
+    const segments = Array.isArray(payload && payload.segments) ? payload.segments : [];
+    const meta = payload && payload.meta ? payload.meta : {};
+    if (cloudMemoryCount) {
+      cloudMemoryCount.textContent = `${segments.length} segments`;
+    }
+    cloudMemoryResult.innerHTML = '';
+    const head = document.createElement('p');
+    head.className = 'cloud-memory-meta';
+    head.textContent = `${meta.token_estimate || 0} token estimate / ${meta.cache_scopes ? meta.cache_scopes.join(', ') : 'no scopes'}`;
+    cloudMemoryResult.appendChild(head);
+    if (!segments.length) {
+      const empty = document.createElement('p');
+      empty.textContent = 'No active worldview memory segments.';
+      cloudMemoryResult.appendChild(empty);
+      return;
+    }
+    segments.forEach(segment => {
+      const row = document.createElement('button');
+      row.className = 'gap-row';
+      row.type = 'button';
+      const left = document.createElement('div');
+      const title = document.createElement('strong');
+      title.textContent = `${segment.title || segment.segment_key}`;
+      left.appendChild(title);
+      const note = document.createElement('span');
+      note.textContent = `${segment.segment_key} / ${segment.segment_type} / ${segment.cache_scope}`;
+      left.appendChild(note);
+      row.appendChild(left);
+      const right = document.createElement('span');
+      right.textContent = `${segment.token_estimate || 0} tok`;
+      row.appendChild(right);
+      row.addEventListener('click', () => {
+        if (cloudMemoryKey) cloudMemoryKey.value = segment.segment_key || '';
+        if (cloudMemoryTitle) cloudMemoryTitle.value = segment.title || '';
+        if (cloudMemoryType) cloudMemoryType.value = segment.segment_type || 'working_model';
+        if (cloudMemoryScope) cloudMemoryScope.value = segment.cache_scope || 'active';
+        if (cloudMemoryContent) cloudMemoryContent.value = segment.content_md || '';
+      });
+      cloudMemoryResult.appendChild(row);
+    });
+  }
+
+  async function refreshCloudMemory(){
+    if (!cloudMemoryResult) return;
+    cloudMemoryResult.innerHTML = '<p>Loading worldview memory...</p>';
+    try {
+      const query = cloudMemoryFilter && cloudMemoryFilter.value.trim() ? `?query=${encodeURIComponent(cloudMemoryFilter.value.trim())}` : '';
+      const resp = await fetch(`/api/agents/cloud/memory/segments${query}`);
+      const data = await resp.json();
+      if (!data.ok) {
+        cloudMemoryResult.innerHTML = `<p>${data.error || 'Memory refresh failed.'}</p>`;
+        return;
+      }
+      renderCloudMemorySegments(data);
+    } catch (err) {
+      cloudMemoryResult.innerHTML = `<p>${String(err)}</p>`;
+    }
+  }
+
+  async function loadCloudMemoryContext(){
+    if (!cloudMemoryResult) return;
+    cloudMemoryResult.innerHTML = '<p>Rendering worldview memory context...</p>';
+    try {
+      const resp = await fetch('/api/agents/cloud/memory/context');
+      const data = await resp.json();
+      if (!data.ok) {
+        cloudMemoryResult.innerHTML = `<p>${data.error || 'Memory context failed.'}</p>`;
+        return;
+      }
+      cloudMemoryResult.innerHTML = '';
+      const meta = document.createElement('p');
+      meta.className = 'cloud-memory-meta';
+      meta.textContent = `${data.meta && data.meta.included_segments || 0}/${data.meta && data.meta.segments || 0} included / ${data.meta && data.meta.token_estimate || 0} token estimate`;
+      cloudMemoryResult.appendChild(meta);
+      const pre = document.createElement('pre');
+      pre.className = 'cloud-memory-preview';
+      pre.textContent = String(data.content_md || '');
+      cloudMemoryResult.appendChild(pre);
+    } catch (err) {
+      cloudMemoryResult.innerHTML = `<p>${String(err)}</p>`;
+    }
+  }
+
+  async function saveCloudMemorySegment(){
+    if (!cloudMemoryResult) return;
+    const key = cloudMemoryKey ? cloudMemoryKey.value.trim() : '';
+    const title = cloudMemoryTitle ? cloudMemoryTitle.value.trim() : '';
+    const content = cloudMemoryContent ? cloudMemoryContent.value.trim() : '';
+    if (!title || !content) {
+      cloudMemoryResult.innerHTML = '<p>Title and content are required.</p>';
+      return;
+    }
+    cloudMemoryResult.innerHTML = '<p>Saving worldview memory segment...</p>';
+    try {
+      const resp = await fetch('/api/agents/cloud/memory/segments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          segment_key: key,
+          title,
+          content_md: content,
+          segment_type: cloudMemoryType ? cloudMemoryType.value : 'working_model',
+          cache_scope: cloudMemoryScope ? cloudMemoryScope.value : 'active',
+          summary: title,
+          priority: 50,
+          importance: 3,
+          metadata: { seeded_from_ui: true },
+        }),
+      });
+      const data = await resp.json();
+      if (!data.ok) {
+        cloudMemoryResult.innerHTML = `<p>${data.error || 'Memory save failed.'}</p>`;
+        return;
+      }
+      await refreshCloudMemory();
+    } catch (err) {
+      cloudMemoryResult.innerHTML = `<p>${String(err)}</p>`;
+    }
+  }
+
+  async function archiveCloudMemorySegment(){
+    if (!cloudMemoryResult) return;
+    const key = cloudMemoryKey ? cloudMemoryKey.value.trim() : '';
+    if (!key) {
+      cloudMemoryResult.innerHTML = '<p>segment_key is required to archive memory.</p>';
+      return;
+    }
+    cloudMemoryResult.innerHTML = '<p>Archiving worldview memory segment...</p>';
+    try {
+      const resp = await fetch('/api/agents/cloud/memory/segments/archive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ segment_key: key, reason: 'Archived from cloud agent UI.' }),
+      });
+      const data = await resp.json();
+      if (!data.ok) {
+        cloudMemoryResult.innerHTML = `<p>${data.error || 'Memory archive failed.'}</p>`;
+        return;
+      }
+      await refreshCloudMemory();
+    } catch (err) {
+      cloudMemoryResult.innerHTML = `<p>${String(err)}</p>`;
+    }
+  }
+
+  async function refreshCloudStatus(){
+    statusMessage('Refreshing cloud operator status...');
+    try {
+      const resp = await fetch('/api/agents/cloud/status?limit=32', {signal:AbortSignal.timeout(15000)});
+      const data = await resp.json();
+      if (!data.ok) {
+        statusMessage(data.error || 'Cloud status failed.');
+        return;
+      }
+      cloudStatus = data.status || {};
+      renderCloudRuns(cloudStatus);
+      renderWritePolicy(cloudStatus);
+      const m = cloudStatus.metrics || {};
+      const memory = cloudStatus.memory || {};
+      const metrics = document.getElementById('cloud-ops-metrics');
+      if (metrics) {
+        const cells = [m.recent_runs || 0, m.running_runs || 0, m.failed_runs || 0,
+          (m.pending_jobs || 0) + ' pending / ' + (m.running_jobs || 0) + ' running',
+          m.recent_total_tokens || 0, (m.recent_input_tokens || 0) + ' / ' + (m.recent_output_tokens || 0),
+          m.recent_cache_hit_rate == null ? 'unavailable' : (m.recent_cache_hit_rate * 100).toFixed(1) + '% / ' + (m.recent_cache_hit_tokens || 0) + ' tok',
+          m.average_llm_latency_ms == null ? 'unavailable' : m.average_llm_latency_ms + ' ms avg',
+          m.reported_cost_usd == null ? 'unavailable' : '$' + Number(m.reported_cost_usd).toFixed(6),
+          (memory.active_segments || 0) + ' seg / ' + (memory.token_estimate || 0) + ' tok'];
+        metrics.querySelectorAll('strong').forEach((cell, index) => { cell.textContent = cells[index]; });
+        metrics.style.display = 'grid';
+      }
+      if (cloudMemoryCount) cloudMemoryCount.textContent = `${memory.active_segments || 0} segments`;
+      statusMessage(`Status ${cloudStatus.generated_at || ''}: ${m.recent_runs || 0} runs, ${m.pending_jobs || 0} pending jobs, ${m.recent_total_tokens || 0} recent tokens.`);
+    } catch (err) {
+      statusMessage(String(err));
+    }
+  }
+
+  function schedulePayload(){
+    const parts = selectedParts();
+    return {
+      enabled: document.getElementById('cloud-schedule-enabled')?.checked ?? true,
+      provider: parts.provider,
+      model: parts.model,
+      nightly: {
+        enabled: document.getElementById('cloud-nightly-enabled')?.checked ?? true,
+        local_times: document.getElementById('cloud-nightly-times')?.value || '02:15',
+        lookback_hours: Number(document.getElementById('cloud-nightly-lookback')?.value || 36),
+      },
+      heartbeat: {
+        enabled: document.getElementById('cloud-heartbeat-enabled')?.checked ?? true,
+        local_times: document.getElementById('cloud-heartbeat-times')?.value || '08:00,20:00',
+        interval_hours: Number(document.getElementById('cloud-heartbeat-interval')?.value || 12),
+        lookback_hours: Number(document.getElementById('cloud-heartbeat-lookback')?.value || 168),
+      },
+      inquisitive: {
+        enabled: document.getElementById('cloud-inquisitive-enabled')?.checked ?? true,
+        local_times: document.getElementById('cloud-inquisitive-times')?.value || '11:30,18:30',
+        lookback_hours: Number(document.getElementById('cloud-inquisitive-lookback')?.value || 96),
+      },
+    };
+  }
+
+  async function saveCloudSchedule(){
+    statusMessage('Saving cloud automation schedule...');
+    try {
+      const resp = await fetch('/api/agents/cloud/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(schedulePayload()),
+      });
+      const data = await resp.json();
+      if (!data.ok) {
+        statusMessage(data.error || 'Schedule save failed.');
+        return;
+      }
+      statusMessage(`Schedule saved for ${data.settings.provider} / ${data.settings.model}. Restart is safest for long-running worker processes.`);
+    } catch (err) {
+      statusMessage(String(err));
+    }
+  }
+
+  async function runCloudAutomationNow(){
+    const parts = selectedParts();
+    statusMessage(`Enqueuing ${cloudRunMode ? cloudRunMode.value : 'heartbeat'} cloud automation...`);
+    try {
+      const resp = await fetch('/api/agents/cloud/automation/run-now', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: cloudRunMode ? cloudRunMode.value : 'heartbeat',
+          lookback_hours: Number(cloudRunLookback ? cloudRunLookback.value : 168),
+          provider: parts.provider,
+          model: parts.model,
+        }),
+      });
+      const data = await resp.json();
+      if (!data.ok) {
+        statusMessage(data.error || 'Run-now enqueue failed.');
+        return;
+      }
+      statusMessage(`Queued job #${data.job.id} (${data.job.payload.mode}).`);
+      await refreshCloudStatus();
+    } catch (err) {
+      statusMessage(String(err));
+    }
+  }
+
+  async function startOrchestrator(){
+    const parts = selectedParts();
+    const flash = flashParts();
+    const objective = orchestratorObjective ? orchestratorObjective.value.trim() : '';
+    if (!objective) {
+      if (orchestratorResult) orchestratorResult.innerHTML = '<p>Objective is required.</p>';
+      return;
+    }
+    if (orchestratorResult) orchestratorResult.innerHTML = '<p>Starting orchestrator run...</p>';
+    try {
+      const resp = await fetch('/api/agents/orchestrator/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          objective,
+          provider: parts.provider,
+          model: parts.model,
+          free_only: freeOnly ? freeOnly.checked : true,
+          strong_provider: parts.provider,
+          strong_model: parts.model,
+          flash_provider: flash.provider,
+          flash_model: flash.model,
+          permission_profile: {
+            allow_durable_writes: orchestratorApproveWrites ? orchestratorApproveWrites.checked : false,
+            operator_approved: orchestratorApproveWrites ? orchestratorApproveWrites.checked : false,
+            child_max_steps: 3,
+          },
+        }),
+      });
+      const data = await resp.json();
+      if (!data.ok) {
+        if (orchestratorResult) orchestratorResult.innerHTML = `<p>${data.error || 'Orchestrator start failed.'}</p>`;
+        return;
+      }
+      currentOrchestratorRunId = data.run.id;
+      if (orchestratorRunId) orchestratorRunId.value = String(data.run.id);
+      renderRunPanel(orchestratorResult, data.run);
+      await refreshCloudStatus();
+    } catch (err) {
+      if (orchestratorResult) orchestratorResult.innerHTML = `<p>${String(err)}</p>`;
+    }
+  }
+
+  async function planOrchestrator(){
+    const id = Number((orchestratorRunId && orchestratorRunId.value) || currentOrchestratorRunId || 0);
+    if (!id) {
+      await startOrchestrator();
+      return;
+    }
+    if (orchestratorResult) orchestratorResult.innerHTML = `<p>Planning orchestrator run ${id}...</p>`;
+    try {
+      const resp = await fetch(`/api/agents/orchestrator/runs/${id}/continue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ max_steps: 1 }),
+      });
+      const data = await resp.json();
+      if (!data.ok) {
+        if (orchestratorResult) orchestratorResult.innerHTML = `<p>${data.error || 'Orchestrator planning failed.'}</p>`;
+        return;
+      }
+      currentOrchestratorRunId = data.run.id;
+      renderRunPanel(orchestratorResult, data.run);
+      await refreshCloudStatus();
+    } catch (err) {
+      if (orchestratorResult) orchestratorResult.innerHTML = `<p>${String(err)}</p>`;
+    }
+  }
+
+  async function dispatchOrchestrator(){
+    const id = Number((orchestratorRunId && orchestratorRunId.value) || currentOrchestratorRunId || 0);
+    if (!id) return;
+    if (orchestratorResult) orchestratorResult.innerHTML = `<p>Dispatching next step from orchestrator ${id}...</p>`;
+    try {
+      const resp = await fetch(`/api/agents/orchestrator/runs/${id}/dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          execute_child: orchestratorExecuteChild ? orchestratorExecuteChild.checked : false,
+          child_max_steps: 1,
+          allow_durable_writes: orchestratorApproveWrites ? orchestratorApproveWrites.checked : false,
+          operator_approved: orchestratorApproveWrites ? orchestratorApproveWrites.checked : false,
+        }),
+      });
+      const data = await resp.json();
+      if (!data.ok) {
+        if (orchestratorResult) orchestratorResult.innerHTML = `<p>${data.error || 'Orchestrator dispatch failed.'}</p>`;
+        return;
+      }
+      renderRunPanel(orchestratorResult, data.run);
+      await refreshCloudStatus();
+    } catch (err) {
+      if (orchestratorResult) orchestratorResult.innerHTML = `<p>${String(err)}</p>`;
+    }
+  }
+
+  async function compactOrchestrator(){
+    const id = Number((orchestratorRunId && orchestratorRunId.value) || currentOrchestratorRunId || 0);
+    if (!id) return;
+    if (orchestratorResult) orchestratorResult.innerHTML = `<p>Compacting run ${id}...</p>`;
+    try {
+      const resp = await fetch(`/api/agents/runs/${id}/compact`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: true, reason: 'operator requested compaction' }),
+      });
+      const data = await resp.json();
+      if (!data.ok) {
+        if (orchestratorResult) orchestratorResult.innerHTML = `<p>${data.error || 'Compaction failed.'}</p>`;
+        return;
+      }
+      renderRunPanel(orchestratorResult, data.run);
+      await refreshCloudStatus();
+    } catch (err) {
+      if (orchestratorResult) orchestratorResult.innerHTML = `<p>${String(err)}</p>`;
+    }
+  }
+
+  async function startRedTeam(){
+    const parts = selectedParts();
+    const rawTarget = redTeamTarget ? redTeamTarget.value.trim() : '';
+    const body = {
+      provider: parts.provider,
+      model: parts.model,
+      free_only: freeOnly ? freeOnly.checked : true,
+      objective: redTeamObjective ? redTeamObjective.value.trim() : '',
+    };
+    if (/^\d+$/.test(rawTarget)) body.report_id = Number(rawTarget);
+    else if (rawTarget) body.subject = rawTarget;
+    if (!body.objective) delete body.objective;
+    if (redTeamResult) {
+      redTeamResult.innerHTML = '<p>Starting red-team run...</p>';
+    }
+    try {
+      const resp = await fetch('/api/agents/red-team/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json();
+      if (!data.ok) {
+        if (redTeamResult) redTeamResult.innerHTML = `<p>${data.error || 'Red-team start failed.'}</p>`;
+        return;
+      }
+      currentRedTeamRunId = data.run.id;
+      renderRunPanel(redTeamResult, data.run);
+    } catch (err) {
+      if (redTeamResult) redTeamResult.innerHTML = `<p>${String(err)}</p>`;
+    }
+  }
+
+  async function startReportBody(){
+    const parts = selectedParts();
+    const rawTarget = reportBodyTarget ? reportBodyTarget.value.trim() : '';
+    const body = {
+      provider: parts.provider,
+      model: parts.model,
+      free_only: freeOnly ? freeOnly.checked : false,
+      objective: reportBodyObjective ? reportBodyObjective.value.trim() : '',
+    };
+    if (/^\d+$/.test(rawTarget)) body.report_id = Number(rawTarget);
+    else if (rawTarget) body.subject = rawTarget;
+    if (!body.objective) delete body.objective;
+    if (reportBodyResult) {
+      reportBodyResult.innerHTML = '<p>Starting report body builder run...</p>';
+    }
+    try {
+      const resp = await fetch('/api/agents/report-body/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json();
+      if (!data.ok) {
+        if (reportBodyResult) reportBodyResult.innerHTML = `<p>${data.error || 'Report body builder start failed.'}</p>`;
+        return;
+      }
+      currentReportBodyRunId = data.run.id;
+      renderRunPanel(reportBodyResult, data.run);
+    } catch (err) {
+      if (reportBodyResult) reportBodyResult.innerHTML = `<p>${String(err)}</p>`;
+    }
+  }
+
+  async function continueReportBody(){
+    if (!currentReportBodyRunId) {
+      await startReportBody();
+      return;
+    }
+    if (reportBodyResult) reportBodyResult.innerHTML = `<p>Continuing report body builder run ${currentReportBodyRunId}...</p>`;
+    try {
+      const resp = await fetch(`/api/agents/report-body/runs/${currentReportBodyRunId}/continue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          max_steps: 3,
+          persist_addendum: reportBodyPersist ? reportBodyPersist.checked : false,
+          operator_approved: reportBodyPersist ? reportBodyPersist.checked : false,
+        }),
+      });
+      const data = await resp.json();
+      if (!data.ok) {
+        if (reportBodyResult) reportBodyResult.innerHTML = `<p>${data.error || 'Report body builder continue failed.'}</p>`;
+        return;
+      }
+      renderRunPanel(reportBodyResult, data.run);
+    } catch (err) {
+      if (reportBodyResult) reportBodyResult.innerHTML = `<p>${String(err)}</p>`;
+    }
+  }
+
+  async function continueRedTeam(){
+    if (!currentRedTeamRunId) {
+      await startRedTeam();
+      return;
+    }
+    if (redTeamResult) redTeamResult.innerHTML = `<p>Continuing red-team run ${currentRedTeamRunId}...</p>`;
+    try {
+      const resp = await fetch(`/api/agents/red-team/runs/${currentRedTeamRunId}/continue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          max_steps: 3,
+          persist_candidates: redTeamPersist ? redTeamPersist.checked : false,
+          operator_approved: redTeamPersist ? redTeamPersist.checked : false,
+        }),
+      });
+      const data = await resp.json();
+      if (!data.ok) {
+        if (redTeamResult) redTeamResult.innerHTML = `<p>${data.error || 'Red-team continue failed.'}</p>`;
+        return;
+      }
+      renderRunPanel(redTeamResult, data.run);
+    } catch (err) {
+      if (redTeamResult) redTeamResult.innerHTML = `<p>${String(err)}</p>`;
+    }
+  }
+
+  if (modelSelect) modelSelect.addEventListener('change', syncReadout);
+  const modelTable = document.getElementById('cloud-model-table');
+  modelTable?.addEventListener('click', event => {
+      const row = event.target.closest('.cloud-model-row[data-provider]');
+      if (!row) return;
+      const value = `${row.dataset.provider}|${row.dataset.model}`;
+      if (modelSelect) {
+        modelSelect.value = value;
+        syncReadout();
+      }
+  });
+  if (filter) {
+    filter.addEventListener('input', () => {
+      const needle = filter.value.trim().toLowerCase();
+      document.querySelectorAll('.cloud-model-row[data-search]').forEach(row => {
+        row.style.display = !needle || row.dataset.search.includes(needle) ? 'grid' : 'none';
+      });
+    });
+  }
+  let modelLoad = null, modelsLoaded = false;
+  async function loadModels(refresh = false) {
+    if (modelLoad || (modelsLoaded && !refresh)) return modelLoad;
+    refreshBtn.disabled = true;
+    refreshBtn.textContent = 'Loading…';
+    modelLoad = (async () => {
+      try {
+        const response = await fetch('/api/agents/cloud/models?refresh=' + (refresh ? '1' : '0'));
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || 'Model catalog unavailable.');
+        Object.assign(catalog, data.catalog);
+        rows = data.catalog.rows || [];
+        for (const select of [modelSelect, goalFlashModel]) {
+          if (!select) continue;
+          const selected = select.value || catalog.selected_provider + '|' + catalog.selected_model;
+          const options = rows.filter(row => row.usable).map(row => new Option((row.service || row.provider) + ' / ' + (row.model_label || row.model), row.provider + '|' + row.model));
+          if (selected && !options.some(option => option.value === selected)) options.unshift(new Option(selected, selected));
+          select.replaceChildren(...options);
+          select.value = selected;
+        }
+        modelTable.querySelectorAll('[data-provider]').forEach(row => row.remove());
+        const fragment = document.createDocumentFragment();
+        rows.forEach(row => {
+          const button = document.createElement('button');
+          button.type = 'button'; button.className = 'cloud-model-row';
+          button.dataset.provider = row.provider; button.dataset.model = row.model;
+          button.dataset.search = ((row.service || '') + ' ' + row.model + ' ' + (row.model_label || '')).toLowerCase();
+          [row.service || row.provider, row.model_label || row.model, row.price_input || 'Unknown', row.context_tier || 'n/a'].forEach(value => {
+            const cell = document.createElement('span'); cell.textContent = value; button.append(cell);
+          });
+          fragment.append(button);
+        });
+        modelTable.append(fragment);
+        filter?.dispatchEvent(new Event('input'));
+        modelsLoaded = true;
+        syncReadout();
+        refreshBtn.textContent = 'Refresh models';
+      } catch (error) {
+        refreshBtn.textContent = 'Retry loading models';
+        refreshBtn.title = error.message;
+      } finally { modelLoad = null; refreshBtn.disabled = false; }
+    })();
+    return modelLoad;
+  }
+  refreshBtn?.addEventListener('click', () => loadModels(modelsLoaded));
+  [modelSelect, goalFlashModel].forEach(select => select?.addEventListener('focus', () => loadModels()));
+  modelTable?.closest('details')?.addEventListener('toggle', event => { if (event.target.open) loadModels(); });
+  if (gapRun) {
+    gapRun.addEventListener('click', () => loadGapIndex({ keyword: gapKeyword ? gapKeyword.value.trim() : '' }));
+  }
+  if (gapOverview) {
+    gapOverview.addEventListener('click', () => loadGapIndex({}));
+  }
+  if (gapTaskRun) {
+    gapTaskRun.addEventListener('click', runGapTask);
+  }
+  if (gapGoalStart) {
+    gapGoalStart.addEventListener('click', startGapGoal);
+  }
+  if (gapGoalContinue) {
+    gapGoalContinue.addEventListener('click', continueGapGoal);
+  }
+  if (reportBodyStart) {
+    reportBodyStart.addEventListener('click', startReportBody);
+  }
+  if (reportBodyContinue) {
+    reportBodyContinue.addEventListener('click', continueReportBody);
+  }
+  if (redTeamStart) {
+    redTeamStart.addEventListener('click', startRedTeam);
+  }
+  if (redTeamContinue) {
+    redTeamContinue.addEventListener('click', continueRedTeam);
+  }
+  if (cloudRefreshStatus) {
+    cloudRefreshStatus.addEventListener('click', refreshCloudStatus);
+  }
+  if (cloudSaveSchedule) {
+    cloudSaveSchedule.addEventListener('click', saveCloudSchedule);
+  }
+  if (cloudRunNow) {
+    cloudRunNow.addEventListener('click', runCloudAutomationNow);
+  }
+  if (cloudMemoryRefresh) {
+    cloudMemoryRefresh.addEventListener('click', refreshCloudMemory);
+  }
+  if (cloudMemoryContext) {
+    cloudMemoryContext.addEventListener('click', loadCloudMemoryContext);
+  }
+  if (cloudMemorySave) {
+    cloudMemorySave.addEventListener('click', saveCloudMemorySegment);
+  }
+  if (cloudMemoryArchive) {
+    cloudMemoryArchive.addEventListener('click', archiveCloudMemorySegment);
+  }
+  if (cloudMemoryFilter) {
+    cloudMemoryFilter.addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        refreshCloudMemory();
+      }
+    });
+  }
+  if (orchestratorStart) {
+    orchestratorStart.addEventListener('click', startOrchestrator);
+  }
+  if (orchestratorPlan) {
+    orchestratorPlan.addEventListener('click', planOrchestrator);
+  }
+  if (orchestratorDispatch) {
+    orchestratorDispatch.addEventListener('click', dispatchOrchestrator);
+  }
+  if (orchestratorCompact) {
+    orchestratorCompact.addEventListener('click', compactOrchestrator);
+  }
+  if (cloudAuditProjection) cloudAuditProjection.addEventListener('click', () => loadCloudReplay('projection'));
+  if (cloudAuditFull) cloudAuditFull.addEventListener('click', () => loadCloudReplay('full'));
+  if (cloudAuditLineage) cloudAuditLineage.addEventListener('click', loadCloudLineage);
+  if (cloudAuditAccept) cloudAuditAccept.addEventListener('click', acceptCloudLineage);
+  if (overlordSkillLoad) overlordSkillLoad.addEventListener('click', loadOverlordSkill);
+  if (overlordSkillSave) overlordSkillSave.addEventListener('click', saveOverlordSkill);
+  if (input) {
+    input.addEventListener('input', () => {
+      if (slashMenu) slashMenu.hidden = !(input.value.startsWith('/') && !input.value.includes(' '));
+    });
+    input.addEventListener('keydown', event => {
+      if (!slashMenu || slashMenu.hidden) return;
+      if (event.key === 'Escape') slashMenu.hidden = true;
+      if (event.key === 'Enter' || event.key === 'Tab') {
+        event.preventDefault();
+        input.value = '/goal ';
+        slashMenu.hidden = true;
+      }
+    });
+  }
+  if (slashMenu) {
+    slashMenu.querySelectorAll('[data-command]').forEach(button => {
+      button.addEventListener('click', () => {
+        if (input) {
+          input.value = button.dataset.command || '/goal ';
+          input.focus();
+        }
+        slashMenu.hidden = true;
+      });
+    });
+  }
+  if (gapKeyword) {
+    gapKeyword.addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        loadGapIndex({ keyword: gapKeyword.value.trim() });
+      }
+    });
+  }
+  if (composer) {
+    composer.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const message = input ? input.value.trim() : '';
+      if (!message) return;
+      const parts = selectedParts();
+      appendMessage('user', message);
+      if (input) input.value = '';
+      if (slashMenu) slashMenu.hidden = true;
+      if (message === '/goal' || message.startsWith('/goal ')) {
+        try {
+          await runGoalCommand(message);
+        } catch (err) {
+          appendMessage('system', String(err));
+        }
+        return;
+      }
+      appendMessage('system', `Running ${parts.provider} / ${parts.model}...`);
+      try {
+        const resp = await fetch('/api/agents/cloud/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message,
+            provider: parts.provider,
+            model: parts.model,
+            free_only: freeOnly ? freeOnly.checked : true,
+            skill_slugs: selectedSkillSlugs(),
+          }),
+        });
+        const data = await resp.json();
+        if (!data.ok) {
+          appendMessage('system', data.error || 'Cloud agent request failed.');
+          return;
+        }
+        if (data.routed_model && data.routed_model !== data.requested_model) {
+          appendMessage('system', `OpenRouter routed ${data.requested_model} to ${data.routed_model}.`);
+        } else if (data.submitted_model) {
+          appendMessage('system', `Model used: ${data.submitted_model}.`);
+        }
+        if (data.usage && data.usage.total_tokens) {
+          appendMessage('system', `Token usage: ${data.usage.total_tokens} total.`);
+        }
+        appendMessage('agent', data.result && data.result.summary ? data.result.summary : JSON.stringify(data.result), data.result);
+      } catch (err) {
+        appendMessage('system', String(err));
+      }
+    });
+  }
+  syncReadout();
+  renderCloudRuns(cloudStatus || {});
+  refreshCloudStatus();
+  refreshCloudMemory();
+  loadOverlordSkill();
+  loadCloudSkills();
+})();
+</script>
+{% endblock %}

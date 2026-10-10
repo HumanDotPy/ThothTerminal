@@ -1,0 +1,21 @@
+[package]
+name = "thoth-html"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "_thoth_html"
+crate-type = ["cdylib"]
+
+[dependencies]
+ego-tree = "0.10"
+pyo3 = { version = "0.27", features = ["extension-module", "abi3-py311"] }
+regex = "1.11"
+scraper = "0.24"
+serde_json = "1.0"
+url = "2.5"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

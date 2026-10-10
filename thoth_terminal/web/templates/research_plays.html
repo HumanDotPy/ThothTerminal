@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="research-shell">
+  <section class="panel">
+    <div class="hd">
+      <h2>Research Plays</h2>
+      <div class="btnrow">
+        <span class="pill">persistent skills</span>
+        <span class="pill">scheduled plays</span>
+      </div>
+    </div>
+    <div class="bd">
+      <p class="muted-copy">
+        Skills define reusable research instincts. Plays bind those Skills to a persistent monitoring surface that can run on schedule and emit signals when new evidence lands.
+      </p>
+      <form class="research-filter-row" method="get" action="/research/plays">
+        <div class="field">
+          <label>Query</label>
+          <input type="text" name="query" value="{{ query }}" placeholder="semiconductor, optics, anthropic" />
+        </div>
+        <div class="field">
+          <label>Owner</label>
+          <input type="text" name="owner" value="{{ owner }}" placeholder="Harvey" />
+        </div>
+        <div class="btnrow">
+          <button class="btn primary" type="submit">Filter</button>
+          <a class="btn" href="/research/plays">Reset</a>
+        </div>
+      </form>
+      {% if notice %}
+        <div class="notice success">{{ notice }}</div>
+      {% endif %}
+      {% if error %}
+        <div class="notice error">{{ error }}</div>
+      {% endif %}
+    </div>
+  </section>
+
+  <div class="research-play-grid">
+    <section class="panel">
+      <div class="hd"><h2>Create Skill</h2></div>
+      <div class="bd">
+        <form method="post" action="/research/skills" class="stack-form">
+          <div class="field">
+            <label>Name</label>
+            <input type="text" name="name" placeholder="Semi sentiment diffusion" required />
+          </div>
+          <div class="field">
+            <label>Slug</label>
+            <input type="text" name="slug" placeholder="semi-sentiment-diffusion" required />
+          </div>
+          <div class="field">
+            <label>Owner</label>
+            <input type="text" name="owner" placeholder="Harvey" />
+          </div>
+          <div class="field">
+            <label>Description</label>
+            <textarea name="description" placeholder="Detects emerging sentiment moves and spillover signals across a universe."></textarea>
+          </div>
+          <div class="field">
+            <label>Cloud-agent instructions</label>
+            <textarea name="instructions" rows="10" placeholder="Full procedural instructions loaded only when this skill is selected or triggered."></textarea>
+          </div>
+          <div class="research-inline-fields">
+            <div class="field">
+              <label>Slash commands</label>
+              <input type="text" name="commands" placeholder="/sentiment, /spillover" />
+            </div>
+            <div class="field">
+              <label>Implicit keywords</label>
+              <input type="text" name="keywords" placeholder="sentiment diffusion, spillover" />
+            </div>
+            <div class="field">
+              <label>Automation modes</label>
+              <input type="text" name="modes" placeholder="heartbeat, inquisitive, nightly" />
+            </div>
+          </div>
+          <label class="check-row"><input type="checkbox" name="implicit" value="true" /> Allow keyword auto-activation</label>
+          <div class="field">
+            <label>Search Query</label>
+            <input type="text" name="query" placeholder="LITE OR COHR OR AAOI" />
+          </div>
+          <div class="field">
+            <label>Domains</label>
+            <input type="text" name="domains" placeholder="semis, optics" />
+          </div>
+          <div class="field">
+            <label>Source IDs</label>
+            <input type="text" name="source_ids" placeholder="12, 18" />
+          </div>
+          <div class="research-inline-fields">
+            <div class="field">
+              <label>Lookback hours</label>
+              <input type="number" name="lookback_hours" value="24" min="1" max="720" />
+            </div>
+            <div class="field">
+              <label>Signal kind</label>
+              <input type="text" name="signal_kind" value="document_match" />
+            </div>
+            <div class="field">
+              <label>Max docs</label>
+              <input type="number" name="max_docs" value="8" min="1" max="50" />
+            </div>
+          </div>
+          <div class="btnrow">
+            <button class="btn primary" type="submit">Save Skill</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="hd"><h2>Create Play</h2></div>
+      <div class="bd">
+        <form method="post" action="/research/plays" class="stack-form">
+          <div class="field">
+            <label>Name</label>
+            <input type="text" name="name" placeholder="Semi Sentiment Play" required />
+          </div>
+          <div class="field">
+            <label>Slug</label>
+            <input type="text" name="slug" placeholder="semi-sentiment-play" required />
+          </div>
+          <div class="field">
+            <label>Owner</label>
+            <input type="text" name="owner" placeholder="Harvey" />
+          </div>
+          <div class="field">
+            <label>Description</label>
+            <textarea name="description" placeholder="Persistent morning dashboard for semi sentiment, spillovers, and new evidence."></textarea>
+          </div>
+          <div class="field">
+            <label>Universe Query</label>
+            <input type="text" name="query" placeholder="LITE OR COHR OR AAOI OR NVDA" />
+          </div>
+          <div class="field">
+            <label>Domains</label>
+            <input type="text" name="domains" placeholder="semis, optics" />
+          </div>
+          <div class="field">
+            <label>Source IDs</label>
+            <input type="text" name="source_ids" placeholder="12, 18" />
+          </div>
+          <div class="research-inline-fields">
+            <div class="field">
+              <label>Interval minutes</label>
+              <input type="number" name="interval_minutes" value="60" min="0" max="10080" />
+            </div>
+            <div class="field">
+              <label>Lookback hours</label>
+              <input type="number" name="lookback_hours" value="24" min="1" max="720" />
+            </div>
+          </div>
+          <div class="research-inline-fields">
+            <div class="field">
+              <label>Alert guild</label>
+              <input type="number" name="alert_guild_id" placeholder="Discord guild id" />
+            </div>
+            <div class="field">
+              <label>Alert channel</label>
+              <input type="number" name="alert_channel_id" placeholder="Discord channel id" />
+            </div>
+            <div class="field">
+              <label>Alert thread</label>
+              <input type="number" name="alert_thread_id" placeholder="Optional thread id" />
+            </div>
+          </div>
+          <div class="btnrow">
+            <button class="btn primary" type="submit">Save Play</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <div class="research-play-grid">
+    <section class="panel">
+      <div class="hd">
+        <h2>Plays</h2>
+        <span class="pill">{{ plays|length }} total</span>
+      </div>
+      <div class="bd">
+        {% if plays %}
+          <div class="research-card-stack">
+            {% for play in plays %}
+              <article class="research-card">
+                <div class="research-card-top">
+                  <div>
+                    <div class="research-card-title"><a href="/research/plays/{{ play.id }}">{{ play.name }}</a></div>
+                    <div class="research-card-meta">{{ play.slug }}{% if play.owner %} · {{ play.owner }}{% endif %}</div>
+                  </div>
+                  <span class="pill">{{ play.status }}</span>
+                </div>
+                {% if play.description %}
+                  <p class="research-card-copy">{{ play.description }}</p>
+                {% endif %}
+                <div class="research-stat-row">
+                  <span class="pill">skills {{ play.skill_count }}</span>
+                  <span class="pill">interval {{ play.schedule_json.get('interval_minutes') or 0 }}m</span>
+                  {% if play.latest_run %}
+                    <span class="pill">last {{ play.latest_run.status }}</span>
+                  {% endif %}
+                </div>
+                {% if play.latest_run %}
+                  <div class="research-run-summary">{{ play.latest_run.summary or 'No summary yet.' }}</div>
+                {% endif %}
+                <div class="btnrow">
+                  <a class="btn" href="/research/plays/{{ play.id }}">Open</a>
+                  <form method="post" action="/research/plays/{{ play.id }}/run">
+                    <button class="btn primary" type="submit">Queue run</button>
+                  </form>
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty-state">No research plays yet.</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="hd">
+        <h2>Skills</h2>
+        <span class="pill">{{ skills|length }} total</span>
+      </div>
+      <div class="bd">
+        {% if skills %}
+          <div class="research-card-stack">
+            {% for skill in skills %}
+              <article class="research-card">
+                <div class="research-card-top">
+                  <div>
+                    <div class="research-card-title">{{ skill.name }}</div>
+                    <div class="research-card-meta">{{ skill.slug }}{% if skill.owner %} · {{ skill.owner }}{% endif %}</div>
+                  </div>
+                  <span class="pill">{{ skill.status }}</span>
+                </div>
+                {% if skill.description %}
+                  <p class="research-card-copy">{{ skill.description }}</p>
+                {% endif %}
+                <div class="research-stat-row">
+                  {% if skill.inputs_json.get('query') %}
+                    <span class="pill">query</span>
+                  {% endif %}
+                  {% if skill.universe_json.get('domains') %}
+                    <span class="pill">{{ skill.universe_json.get('domains')|join(', ') }}</span>
+                  {% endif %}
+                  <span class="pill">lookback {{ skill.trigger_json.get('lookback_hours') or 24 }}h</span>
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="empty-state">No research skills yet.</p>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}
